@@ -296,7 +296,9 @@ export type SwapRequest = QuoteRequest & {
  *    surface's answer.
  *
  * `getQuote`/`getSwap` are consumers of this same stream: each stops at the first actionable `lead`
- * (`quote` for quotes; `ready`/`needs-action` for swaps) or at `final`, whichever comes first.
+ * (`quote` for quotes; `ready`/`needs-action` for swaps) WHOSE report says the first measurement
+ * round has settled (`SearchReport.firstRoundComplete`), or at `final`, whichever comes first — the
+ * engine emits a `lead` at the moment that axis flips, so the promise surfaces never wait past it.
  */
 export type SearchEvent<R> =
   | { type: 'lead'; result: R }
@@ -567,6 +569,31 @@ export type SearchReport = {
    * no failed call anywhere for the other two to count.
    */
   headRegressed: boolean
+  /**
+   * True once the search's FIRST measurement wave has settled: the round the initial planning pass
+   * dispatches, plus everything that round's own answers make due before the pump first goes dry —
+   * the two-hop out-legs its in-leg answers wake (re-measured until they sit at the final `m_X`),
+   * and each transport-lost key's one retry. Structurally it is the pump's first dry moment
+   * (nothing due over current knowledge, nothing in flight); later rounds — frontier growth, pools
+   * a post-gate scan lands — never reset it.
+   *
+   * THIS IS THE AXIS THAT SEPARATES A FIRST-LEAD ANSWER FROM A SETTLED ONE, and it closes an
+   * observability gap: before it existed, a caller could not tell whether a result came from the
+   * search's very first envelope (a dozen legs, whichever answered fastest) or from a first wave
+   * that had fully settled. `getQuote`/`getSwap` answer only at an actionable lead whose report
+   * carries `firstRoundComplete: true` (or at `final`), so a promise caller's answer is never a
+   * partial first round; the streaming surfaces still deliver every envelope-cadence lead, each
+   * stamped with this axis, and the loop guarantees a `lead` event fires the moment the axis flips
+   * so the settled-first-wave moment is always observable and never waited past.
+   *
+   * THE SETTLEMENT RULE (settled-once counts; nothing re-opens): a transport-lost leg completes
+   * the wave only when its one re-dispatch settles it; a leg whose call was never sent
+   * (`unattempted` — the caller's abort landed first) never completes it, so an aborted first wave
+   * reports `false`; and a leg invalidated and re-measured after settling once keeps the flag
+   * where the flip left it. A search with nothing measurable at all flips true vacuously on its
+   * first dry cycle — `quoting.attempted === 0` says why its answer is still empty.
+   */
+  firstRoundComplete: boolean
   /**
    * Preflight-simulation budget, reported rather than silently absorbed (C4-P7) — the one cap that
    * otherwise converts to an authoritative verdict with no visible trace: the verifier

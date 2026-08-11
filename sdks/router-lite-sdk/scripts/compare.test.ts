@@ -261,6 +261,7 @@ describe('liteEvidence', () => {
       aborted: true,
       verificationDegraded: false,
       headRegressed: false,
+      firstRoundComplete: true,
       verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
     })
     expect(evidence.discovery).toBe('v2:complete v3:partial v4:disabled')

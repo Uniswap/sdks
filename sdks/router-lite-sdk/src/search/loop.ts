@@ -256,10 +256,15 @@ export type EngineEvent =
   | { type: 'progress'; state: SearchState; report: SearchReport }
   | { type: 'final'; ranked: RankedRoute[]; state: SearchState; report: SearchReport }
 
-/** The leader's observable identity — the four fields whose change means "new lead". */
+/** The leader's observable identity — the four fields whose change means "new lead", plus the
+ * first-round axis: the cycle where `firstRoundComplete` flips true emits a `lead` even when the
+ * leader itself did not move, because that flip is the moment the promise surface is first ALLOWED
+ * to answer (`router.ts#getQuote`/`getSwap` gate on it) — without a lead event carrying the ranked
+ * list at that moment, a search whose leader was already right after round one would make the
+ * facade wait out the whole widening search for a leader change that never comes. */
 function leadSignature(state: SearchState, best: RankedRoute): string {
   const id = routeId(best.route)
-  return [id, best.quote.amountOut, best.execution, state.compiledById.has(id)].join('|')
+  return [id, best.quote.amountOut, best.execution, state.compiledById.has(id), state.firstRoundComplete].join('|')
 }
 
 /** The report's observable identity, for `progress` coalescing: the cycle's fold, stringified with
@@ -462,6 +467,16 @@ export async function* search(
       // own verdict (its cursor, plus no round in flight), and the ctx rides along for the day
       // planning needs it.
       const dry = pumpDry(state, pumpCtx)
+      // THE FIRST-ROUND FLIP: the first time the pump goes dry, the initial measurement wave has
+      // settled — the round the initial planning pass dispatched, plus the out-legs its in-leg
+      // answers made due (at their final m_X) and every transport-lost key's one retry. This is the
+      // moment the promise surfaces are first allowed to answer, so it is decided BEFORE this
+      // cycle's report fold and lead emission: the flip cycle's own `lead` (leadSignature carries
+      // the axis) is what `getQuote`/`getSwap` return on. Monotone by construction — nothing ever
+      // writes `false` back — so the frontier growth and gate opening a later cycle brings never
+      // reset it. An aborted search cannot reach here with a partial wave (`pump()` never cleans
+      // the cursor once aborted), so an aborted first round honestly stays incomplete.
+      if (dry && !state.firstRoundComplete) state.firstRoundComplete = true
       // One fold per cycle, AFTER the pump/verifier writes above: it decides `progress` coalescing
       // and rides out on whichever event this cycle emits.
       const report = buildReport(state, ctx, req)

@@ -935,6 +935,86 @@ test('ingestLogs (and ingestReceipt) upsert pools ahead of time, so a route reso
   assertResultCoherent(res)
 })
 
+test('getQuote answers only after the first round settles: a fast bad first envelope never wins over a slow good one', async () => {
+  // The parity-sweep smoking gun, hermetically: twelve well-evidenced junk pools fill the vanguard
+  // (one prices terribly, eleven revert), while the one honest pool sits past the vanguard in the
+  // round's second envelope — held on the wire long enough that the vanguard's lead fires first.
+  // The old stop rule returned that first lead; the first-round gate must wait the ~one envelope
+  // for the round to settle and return the honest price.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+  const [token0, token1] = sortAddresses(TOKEN_A, TOKEN_B)
+  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+
+  /** A `PairCreated` log naming an ARBITRARY pair address — how the index comes to hold twelve
+   * distinct v2 pools on one token pair, which no CREATE2 derivation could produce. */
+  const fakePairLog = (pair: Address, blockNumber: bigint): Log<bigint, number, false> =>
+    ({
+      address: manifest.v2!.factory,
+      topics: encodeEventTopics({ abi: V2_FACTORY_ABI, eventName: 'PairCreated', args: { token0, token1 } }),
+      data: encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [pair, 1n]),
+      blockNumber,
+    }) as unknown as Log<bigint, number, false>
+
+  const fakes = Array.from({ length: 12 }, (_, i) => `0x${'d0'.repeat(19)}${(0x10 + i).toString(16)}` as Address)
+  const badCall = v2Module.encodeQuote(
+    [{ pool: v2Ref(fakes[0]!, TOKEN_A, TOKEN_B), currencyIn: TOKEN_A, currencyOut: TOKEN_B }],
+    AMOUNT_IN,
+    manifest,
+  ).call
+  const goodPair = computeV2PairAddress(manifest.v2!.factory, TOKEN_A, TOKEN_B)
+  const goodCall = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+
+  const { client: base } = stubClient({
+    calls: {
+      // The bad pool prices at ~1/100th of the honest pool's rate. The other eleven fakes are
+      // unmapped and revert — the "unregistered call reverts" convention.
+      ...entryFor(badCall, v2Return(10n ** 24n, 10n ** 22n, zeroForOne)),
+      ...entryFor(goodCall, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
+    },
+  })
+  // The honest pool's envelope is the SLOW one: its quote call parks ~30ms while the vanguard's
+  // envelope settles instantly and emits its (bad) lead.
+  const client = {
+    ...base,
+    async request(args: { method: string; params: unknown[] }) {
+      const to = args.method === 'eth_call' ? String((args.params[0] as { to?: string }).to ?? '') : ''
+      if (to.toLowerCase() === goodPair.toLowerCase()) await new Promise((resolve) => setTimeout(resolve, 30))
+      return (base.request as (a: unknown) => Promise<unknown>)(args)
+    },
+  } as unknown as PublicClient
+
+  const router = createRouter({ client, manifest })
+  // Newest-first evidence order puts fakes[0] (the bad pricer) at the head of the vanguard.
+  router.ingestLogs(fakes.map((pair, i) => fakePairLog(pair, manifest.v2!.deploymentBlock + 100n - BigInt(i))))
+
+  // The streaming surface still delivers the partial first round's lead, stamped with the axis —
+  // and the settled round's lead after it. `getQuote`'s answer is the second one.
+  const leads: { pool: string; firstRoundComplete: boolean }[] = []
+  for await (const ev of router.quotes({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })) {
+    if (ev.type === 'progress') continue
+    if (ev.type === 'lead' && ev.result.status === 'quote') {
+      leads.push({
+        pool: ev.result.best.route.legs[0]!.pool.id,
+        firstRoundComplete: ev.result.search.firstRoundComplete,
+      })
+    }
+    if (ev.type === 'final') break
+  }
+  expect(leads[0]).toEqual({ pool: `v2:${fakes[0]!.toLowerCase()}`, firstRoundComplete: false })
+  expect(leads.some((l) => l.pool === `v2:${goodPair.toLowerCase()}` && l.firstRoundComplete)).toBe(true)
+
+  // And the promise surface returns the honest pool, not the vanguard's fast bad lead.
+  const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+  expect(res.status).toBe('quote')
+  if (res.status === 'quote') {
+    expect(res.best.route.legs[0]!.pool.id).toBe(`v2:${goodPair.toLowerCase()}`)
+    expect(res.search.firstRoundComplete).toBe(true)
+    // The bad pool is still reported — as a runner-up, where it belongs.
+    expect(res.alternatives.some((alt) => alt.route.legs[0]!.pool.id === `v2:${fakes[0]!.toLowerCase()}`)).toBe(true)
+  }
+  assertResultCoherent(res)
+})
+
 test('ingestLogs survives malformed entries: every valid log is still indexed, nothing throws (C4-H4)', async () => {
   // v2 AND v4 enabled, so all three parsers get handed the garbage, not just the one that matches.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n })

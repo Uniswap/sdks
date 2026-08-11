@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-hooked-promoted",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.402Z",
+  "recordedAt": "2026-08-11T18:44:03.391Z",
   "notes": "The simplicity margin, marked. A HOOKED v4 pool prices ~2bps above a plain v2 pool on the same pair — inside `SIMPLICITY_MARGIN_BPS` (5) — so ranking promotes the simple route to `best` and marks it `promotedOverComplex`. The only fixture whose `best` is deliberately outpriced by its own `alternatives`, which is exactly the shape `assertResultCoherent` accepts ONLY when that marker is set.",
   "manifest": {
     "chainId": 31337,
@@ -41,6 +41,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -116,29 +117,6 @@
         "kind": "success",
         "m": {
           "pool": {
-            "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002300",
-            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002300",
-            "currencies": [
-              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
-            ]
-          },
-          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          "amountIn": "$bigint:1000000",
-          "amountOut": "$bigint:996999"
-        }
-      }
-    },
-    {
-      "t": "measurement",
-      "o": {
-        "kind": "success",
-        "m": {
-          "pool": {
             "protocol": "v4",
             "poolId": "0x11826dcc8c4b37a18ebc5fd3d86f2424e217f1dbc38c34f00371d66597b38104",
             "poolKey": {
@@ -159,6 +137,29 @@
           "amountIn": "$bigint:1000000",
           "amountOut": "$bigint:997198",
           "gasEstimate": "$bigint:90000"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002300",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002300",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:996999"
         }
       }
     },
@@ -256,6 +257,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

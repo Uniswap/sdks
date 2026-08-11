@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-mx-invalidation",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.403Z",
+  "recordedAt": "2026-08-11T18:44:03.393Z",
   "notes": "The invalidation arm, pinned through a golden. A shallow (T_IN, WETH) pool sets m_X first and an out-leg is priced at that amount; then the adjacency scan — which only runs once the pump has gone dry — delivers a much deeper in-leg, m_X improves, and the out-leg measured at the old amount is outdated and re-measured at the new one. The log therefore contains the SAME out-leg pool at two different amounts, and the golden is the composition through the second.",
   "manifest": {
     "chainId": 31337,
@@ -36,6 +36,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -290,6 +291,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

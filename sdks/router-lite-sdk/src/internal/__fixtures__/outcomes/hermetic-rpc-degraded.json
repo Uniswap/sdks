@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-rpc-degraded",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.404Z",
+  "recordedAt": "2026-08-11T18:44:03.396Z",
   "notes": "The other half of the no-route contract: the same pair, but the gateway 429s every quote instead of the chain answering. Discovery still completes, so only the transport-loss axis separates this from an authoritative no-route — and it must, or a rate-limited provider would be indistinguishable from a chain with no liquidity.",
   "manifest": {
     "chainId": 31337,
@@ -36,6 +36,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -168,6 +169,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

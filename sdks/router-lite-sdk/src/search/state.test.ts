@@ -68,6 +68,8 @@ test('createState: every counter at zero, every axis unset, no outcome log unles
   expect(s.aborted).toBe(false)
   expect(counters(s)).toEqual({ attempted: 0, succeeded: 0, failed: 0, transportFailed: 0, unattempted: 0, legsMeasured: 0 })
   expect(s.pairCeilingHit).toBe(false)
+  // Written by the LOOP at the pump's first dry moment — never by any `apply*` writer here.
+  expect(s.firstRoundComplete).toBe(false)
   expect(s.intermediates).toEqual({ selected: [], discovered: 0, notch: 0 })
   expect(s.discovery.v2).toEqual({ complete: new Set(), failed: false })
   expect(s.verification).toEqual({ preflightAttempted: 0, preflightBudgetExhausted: false })

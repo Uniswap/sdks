@@ -108,8 +108,10 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
-      // first actionable lead — the same answer `getSwap` would give (see `quote.ts`'s header).
-      stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
+      // first actionable lead whose first measurement round has settled — the same answer `getSwap`
+      // would give (see `quote.ts`'s header).
+      stopAt: (result) =>
+        !watch && (result.status === 'ready' || result.status === 'needs-action') && result.search.firstRoundComplete,
       stream,
       trade: tradeCtx,
       renderCtx: trade.renderCtx,

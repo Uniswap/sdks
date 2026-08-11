@@ -1339,3 +1339,57 @@ test('a multi-envelope round leads at envelope cadence — the vanguard prices a
   expect(final.state.quoting.succeeded).toBe(60) // the held envelope's answers were harvested, not lost
   expect(final.ranked.length).toBe(60)
 })
+
+test('firstRoundComplete flips exactly when the initial round\'s last leg settles — and the flip itself emits a lead', async () => {
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const index = new PoolIndex(WETH)
+  // Same shape as the vanguard test above: 60 direct pools, insertion order preserved, pool 0 the
+  // strict maximum — so the post-vanguard legs can never change the leader, and the ONLY thing the
+  // last envelope's settlement can move is the first-round axis. The lead that must follow it is
+  // therefore the flip's own doing (leadSignature carries `firstRoundComplete`), not a leader change.
+  const pools: PoolRef[] = []
+  for (let i = 0; i < 60; i++) {
+    pools.push(newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n + BigInt(60 - i) * 10n ** 6n }))
+  }
+  const lateIds = new Set(pools.slice(PUMP_VANGUARD_LEGS).map((p) => p.id))
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const { client } = makeClient({
+    onQuote: async (key) => {
+      if (lateIds.has(key.split('|')[0]!)) await gate
+    },
+  })
+  const ctx = ctxOf(client, manifest, world, { index })
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
+
+  const gen = search(ctx, req, 'quote')
+  let first = await gen.next()
+  while (!first.done && first.value.type === 'progress') first = await gen.next()
+
+  // The vanguard's lead is a PARTIAL first round, and its report says so.
+  expect(first.value!.type).toBe('lead')
+  if (first.value!.type !== 'lead') throw new Error('unreachable')
+  expect(first.value!.report.firstRoundComplete).toBe(false)
+  expect(first.value!.state.firstRoundComplete).toBe(false)
+
+  release()
+  const rest = await collectAll(gen)
+
+  // The moment the round's last leg settled, a lead fired carrying the axis — with the SAME leader,
+  // because nothing in the held envelope out-priced pool 0. This is the event the facade answers on.
+  const flipLead = rest.find((e) => e.type === 'lead' && e.report.firstRoundComplete)
+  expect(flipLead).toBeDefined()
+  if (flipLead === undefined || flipLead.type !== 'lead') throw new Error('unreachable')
+  expect(flipLead.ranked[0]!.route.legs[0]!.pool.id).toBe(pools[0]!.id)
+  // ...and the round really was complete at that lead: all 60 legs settled.
+  expect(flipLead.report.enumeration.legsMeasured).toBe(60)
+
+  // Later rounds (the frontier keeps advancing after the flip) never reset the axis.
+  const final = rest[rest.length - 1]!
+  expect(final.type).toBe('final')
+  if (final.type !== 'final') throw new Error('unreachable')
+  expect(final.report.firstRoundComplete).toBe(true)
+})

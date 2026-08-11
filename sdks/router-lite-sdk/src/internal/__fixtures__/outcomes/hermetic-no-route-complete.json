@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-no-route-complete",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.400Z",
+  "recordedAt": "2026-08-11T18:44:03.385Z",
   "notes": "The authoritative negative: every pool on the pair is known and every one of them reverts with no data (the pool-absent shape), discovery completes on both endpoints, and nothing was lost in the transport — the four conditions that entitle a search to say no rather than \"could not tell\".",
   "manifest": {
     "chainId": 31337,
@@ -36,6 +36,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -123,13 +124,13 @@
       "t": "measurement",
       "o": {
         "kind": "reverted",
-        "key": "v2:0x0000000000000000000000000000000000002100|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "key": "v2:0x0000000000000000000000000000000000002102|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
         "pool": {
           "protocol": "v2",
-          "address": "0x0000000000000000000000000000000000002100",
+          "address": "0x0000000000000000000000000000000000002102",
           "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
           "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          "id": "v2:0x0000000000000000000000000000000000002100",
+          "id": "v2:0x0000000000000000000000000000000000002102",
           "currencies": [
             "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -161,13 +162,13 @@
       "t": "measurement",
       "o": {
         "kind": "reverted",
-        "key": "v2:0x0000000000000000000000000000000000002102|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "key": "v2:0x0000000000000000000000000000000000002100|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
         "pool": {
           "protocol": "v2",
-          "address": "0x0000000000000000000000000000000000002102",
+          "address": "0x0000000000000000000000000000000000002100",
           "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
           "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          "id": "v2:0x0000000000000000000000000000000000002102",
+          "id": "v2:0x0000000000000000000000000000000000002100",
           "currencies": [
             "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -245,6 +246,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

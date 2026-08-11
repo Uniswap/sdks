@@ -161,19 +161,33 @@ Three arms, and every one of them is total:
 | `final` | Exactly once, always last — the search settled: every process converged, or the caller's `AbortSignal` fired. (A consumer that simply stops pulling gets no `final`; it gets nothing more at all, which is the same guarantee seen from the other side.) | `result`: the settled result, identical in shape to what the promise surface answers with. |
 
 `getQuote`/`getSwap` are themselves consumers of this same stream: each stops at the first
-actionable `lead` (`quote` for quotes; `ready`/`needs-action` for swaps) or at `final`, whichever
-comes first. There is one search behind both shapes, so nothing about a promise-shaped call is a
-different code path from an iterated one.
+actionable `lead` (`quote` for quotes; `ready`/`needs-action` for swaps) **whose first measurement
+round has settled** (`search.firstRoundComplete`), or at `final`, whichever comes first. There is
+one search behind both shapes, so nothing about a promise-shaped call is a different code path from
+an iterated one.
 
 ### `getSwap` is anytime, and "first actionable" is a real choice
 
-Because `getSwap`/`getQuote` stop at the **first** actionable lead, they deliberately return before
-the search has converged — that is the point of an anytime algorithm, and it is what keeps a hinted
-or cached trade at one round trip. The consequence worth stating plainly: **a route through a pool
+Because `getSwap`/`getQuote` stop at the first actionable lead **of a settled first round**, they
+deliberately return before the search has converged — that is the point of an anytime algorithm,
+and it is what keeps a hinted or cached trade fast. The first answer is the settled first
+measurement **wave**, not the first envelope that happened to answer: the initial planning pass
+dispatches one round (the direct pair plus the first frontier batch's in-legs, evidence-ordered),
+its in-leg answers wake the two-hop out-legs, leads stream at envelope cadence throughout, and the
+promise surfaces answer at the first actionable lead stamped `search.firstRoundComplete: true` —
+the pump's first dry moment, typically **~400–800ms on a warm pair**, a couple of envelope round
+trips after the old first-envelope answer, and no longer at the mercy of whichever dozen legs
+settled first (a saturated pool that answers fast can no longer be the answer while the honest
+pools' envelopes — including the two-hop compositions — are still on the wire). The engine emits a
+`lead` the moment the axis flips, so the promise never waits past that moment; the streaming
+surfaces still deliver every envelope-cadence lead, each stamped with the axis, so a
+latency-shaped consumer can still act on the very first one. The consequence worth stating plainly: **a route through a pool
 that only a log scan could have found may not be in the index yet when the promise resolves.** If a hint, the
 index, or a speculative direct measurement can answer, the answer comes back before the coverage
 worker has walked the history that would have turned up a better pool — the price is real and
 verified, but it is the best of what was known *at that moment*, not the best that exists.
+Convergence is still asked for the same two ways: drain `quotes()`/`swaps()` to `final`, or spend a
+fixed `--budget`/`AbortSignal` and take the best answer it bought.
 
 A consumer that wants convergence rather than latency has two ways to ask for it, and both are the
 public API rather than a knob:
@@ -243,8 +257,10 @@ any result without narrowing first, and an empty `alternatives` means "nothing e
 than "this variant doesn't have the field". `SearchReport` has independent completeness axes:
 discovery coverage per protocol, how far the search space was explored (`enumeration`), leg
 measurements (`quoting`), a preflight-simulation budget (`search.verification`), whether the search
-was aborted, and whether its pinned head went backwards — so "no v2 route" is always distinguishable
-from "v2 wasn't searched."
+was aborted, whether its pinned head went backwards, and whether the first measurement round has
+settled (`firstRoundComplete` — the axis that separates a first-lead answer from a settled one, and
+the gate `getQuote`/`getSwap` answer behind) — so "no v2 route" is always distinguishable from "v2
+wasn't searched."
 
 ### Reading `search.enumeration`
 
@@ -815,7 +831,7 @@ failing rejects that first call with `RouterConfigError`. Everything else — no
 | --- | --- |
 | `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks?, assumeChainId? })` | Builds a `Router`. `index`/`maxPools` are optional PoolIndex-lifecycle knobs — see [PoolIndex lifecycle](#poolindex-lifecycle). `concurrency`/`logChunkBlocks` are transport-tuning knobs — see [Transport options](#transport-options). No policy object, no other mode/budget knobs. |
 | `assumeChainId?: number` | A validation *shortcut*, not a knob: the chain id you have **already read off this same client**, supplied so manifest validation skips its `eth_chainId` round trip. It replaces the read, never the check — the value is still compared against `manifest.chainId` and still throws `RouterConfigError` on a mismatch, and the `eth_getCode` immutable fingerprint behind it is untouched. **The misuse hazard is the whole story:** pass an id from a config file, an env var, or `manifest.chainId` itself and the cross-check becomes a tautology — you have disabled the one thing it exists to catch (a manifest pointed at the wrong chain) to save one round trip. Only a caller that probed *this* client for *this* value may pass it; a CLI that autodetects the chain from its endpoint is the motivating case, and it saves ~0.9s on the critical path of every invocation. |
-| `router.getQuote` / `router.getSwap` | Promises resolving at the first actionable result — an anytime answer, not a converged one; see [`getSwap` is anytime](#getswap-is-anytime-and-first-actionable-is-a-real-choice). |
+| `router.getQuote` / `router.getSwap` | Promises resolving at the first actionable result of a settled first measurement round (`search.firstRoundComplete`) — an anytime answer, not a converged one; see [`getSwap` is anytime](#getswap-is-anytime-and-first-actionable-is-a-real-choice). |
 | `router.quotes(req)` / `router.swaps(req)` | Async iterators over `SearchEvent<QuoteResult>` / `SearchEvent<SwapResult>` — a `lead` per improved best, coalesced `progress` when only the report moved, one terminal `final`. There is no options argument: `IterateOptions`/`onFirstRoute` are gone, because the first `lead` **is** that callback, in order, on the one stream. See [the event stream](#the-event-stream-lead--progress--final). |
 | `SearchEvent<R>` | The stream's closed union: `{ type: 'lead'; result: R }`, `{ type: 'progress'; search: SearchReport }`, `{ type: 'final'; result: R }`. Exported as a type from the package root. |
 | `router.ingestPool(hint)` | Validates a hint and upserts it into the router's index. |
@@ -1044,7 +1060,8 @@ bun scripts/recordOutcomes.ts --regold
 ```
 
 A **hermetic** fixture is a deterministic fake world (`scripts/hermeticWorlds.ts`) driven to `final`;
-a **live** fixture stops exactly where `getQuote`/`getSwap` stop, at the first actionable lead, since
+a **live** fixture stops exactly where `getQuote`/`getSwap` stop, at the first actionable lead of a
+settled first round, since
 driving a mainnet search to `final` would mean walking every factory's whole deployment history for a
 golden that is about the answer. Both go through the same recorder, and a header-authenticated
 gateway needs no extra step — `chainz exec` exports `$ETH_RPC_HEADERS` and the script reads it

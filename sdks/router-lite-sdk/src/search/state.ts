@@ -61,6 +61,22 @@ export type SearchState = {
   inFlightKeys: Set<string>
   /** Keys already given their one re-release after a transport loss. */
   transportRetried: Set<string>
+  /**
+   * True once the search's FIRST measurement wave has settled: the round the initial planning pass
+   * dispatches, PLUS everything that round's own answers make due before the pump first goes dry —
+   * the out-legs woken by its in-leg answers (re-planned as `m_X` improves), and each transport-lost
+   * key's one retry. Structurally: the first moment `pumpDry` holds (nothing due over current
+   * knowledge, nothing in flight). The axis `SearchReport.firstRoundComplete` reports and the
+   * facade's answer gate reads.
+   *
+   * WRITTEN BY THE LOOP, not by `apply*`: dryness is the pump's own verdict (its private cursor
+   * plus `inFlightKeys`), which only the loop observes once per cycle — the same single-writer
+   * arrangement as `intermediates`. Monotone: the loop only ever sets it true, so later rounds
+   * (frontier growth, post-gate scan discoveries) never reset it. An aborted search whose wave
+   * never settled keeps `false` (the abort dirties the pump forever), and a search with nothing
+   * measurable at all flips true vacuously on its first dry cycle.
+   */
+  firstRoundComplete: boolean
   /** Graph node -> the best in-leg reaching it. Written by the pump's composition step. */
   mX: Map<string, { amount: bigint; fromPoolId: string }>
   /** The two-hop intermediates frontier: what it has selected so far, how many it can see, and the
@@ -85,8 +101,10 @@ export type SearchState = {
    * below.
    *
    * IT IS COMPLETE FOR WHAT `apply*` OWNS AND NOTHING ELSE, which is the honest boundary rather than
-   * an omission. Five fields on this type are written by their owners directly — `indexVersion` and
-   * `pairCeilingHit` (the pump), `gateOpened` (the coverage worker's `demandFull`), `intermediates`
+   * an omission. Six fields on this type are written by their owners directly — `indexVersion` and
+   * `pairCeilingHit` (the pump), `firstRoundComplete` (the loop, at the pump's first dry moment; a
+   * fixture carries the final verdict in its context), `gateOpened` (the coverage worker's
+   * `demandFull`), `intermediates`
    * (two loop-cycle-synchronous writers: `loop.ts`'s `advanceIntermediates` AND `pump.ts`'s
    * `planDueLegs`), and `verification.preflightBudgetExhausted` (written directly by
    * `verifier.ts#Verifier.advance`, which clears it per walk and sets it on the cap branch) — plus the
@@ -108,6 +126,7 @@ export function createState(block: BlockRef, headRegressed: boolean, recording?:
     measuredKeys: new Set(),
     inFlightKeys: new Set(),
     transportRetried: new Set(),
+    firstRoundComplete: false,
     mX: new Map(),
     intermediates: { selected: [], discovered: 0, notch: 0 },
     quoting: zeroQuoting(),

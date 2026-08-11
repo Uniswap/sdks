@@ -62,8 +62,9 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
-      // first actionable lead — the same answer `getQuote` would give (see this file's header).
-      stopAt: (result) => !watch && result.status === 'quote',
+      // first actionable lead whose first measurement round has settled — the same answer `getQuote`
+      // would give (see this file's header).
+      stopAt: (result) => !watch && result.status === 'quote' && result.search.firstRoundComplete,
       stream,
       trade: tradeCtx,
       renderCtx: trade.renderCtx,

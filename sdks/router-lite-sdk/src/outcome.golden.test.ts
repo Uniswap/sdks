@@ -161,7 +161,15 @@ const OPTIONAL_ROUTE_KEYS = ['gasEstimate', 'promotedOverComplex', 'execution', 
  * `context` field that quietly stopped being written would make every fold read a default instead. */
 const REQUIRED_FIXTURE_KEYS = ['schemaVersion', 'label', 'chainId', 'kind', 'recordedAt', 'request', 'context', 'log', 'golden']
 const OPTIONAL_FIXTURE_KEYS = ['notes', 'manifest']
-const REQUIRED_CONTEXT_KEYS = ['block', 'headRegressed', 'intermediates', 'pairCeilingHit', 'hookData', 'index']
+const REQUIRED_CONTEXT_KEYS = [
+  'block',
+  'headRegressed',
+  'intermediates',
+  'pairCeilingHit',
+  'firstRoundComplete',
+  'hookData',
+  'index',
+]
 
 /**
  * The GOLDEN's own two levels, closing the gap the route-level pin above left open (C4-T14).
@@ -187,6 +195,7 @@ const REQUIRED_REPORT_KEYS = [
   'aborted',
   'verificationDegraded',
   'headRegressed',
+  'firstRoundComplete',
   'verification',
 ]
 const REQUIRED_ENUMERATION_KEYS = [

@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-two-hop-quote",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.400Z",
+  "recordedAt": "2026-08-11T18:44:03.383Z",
   "notes": "Composition and the gas rule in one fixture: a v3->v3 two-hop through the manifest core out-prices a v2 direct pool, so `best` carries the two legs' summed gasEstimate and its runner-up — priced by v2's local reserve math, which measures no gas — carries none.",
   "manifest": {
     "chainId": 31337,
@@ -41,6 +41,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -332,6 +333,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

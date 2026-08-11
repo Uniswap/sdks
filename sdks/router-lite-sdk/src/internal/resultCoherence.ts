@@ -37,6 +37,7 @@ export function emptyReport(): SearchReport {
     aborted: false,
     verificationDegraded: false,
     headRegressed: false,
+    firstRoundComplete: false,
     verification: zeroVerification(),
   }
 }
@@ -62,7 +63,8 @@ const INCONCLUSIVE_REASON_CODES: ReadonlySet<ReasonCode> = new Set([
  * `needs-action` on its own; `needs-action` always carries both requirements and a tx; `no-route`
  * never follows an incomplete or aborted search — nor one that lost calls to the transport, nor one
  * that ran against a head the router had already been past, both of which are evidence about the
- * provider and none about the chain; `inconclusive` always has a set
+ * provider and none about the chain, nor one that dispatched a measurement round whose first round
+ * never settled; `inconclusive` always has a set
  * incompleteness axis, never carries calldata for a route it does not also name, and never leads
  * with a route the chain authoritatively rejected; a quote's routes carry nothing beyond the quote
  * and its ranking, and a quote whose `best` is outpriced by one of its own `alternatives` says on
@@ -192,6 +194,12 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     // The quiet sibling of the two above (C4-H1): nothing failed, but the whole search ran against a
     // head this router had already been past, so none of its answers describe the current chain.
     if (r.search.headRegressed) throw new Error('no-route despite a regressed head')
+    // `firstRoundComplete: false` ⇒ the search is not complete: a completed search settled every
+    // key it ever dispatched (no aborts, no transport losses), so a dispatched-anything search
+    // claiming `no-route` with an unsettled first round is a bookkeeping bug, not a legal shape.
+    // `attempted > 0` scopes it: a search that never dispatched a round has no first round to settle.
+    if (r.search.quoting.attempted > 0 && !r.search.firstRoundComplete)
+      throw new Error('no-route despite an unsettled first round')
     // A completed search only ever names one of the two "nothing verified" codes (C4-P5) — never an
     // incompleteness code, which would contradict every check just above.
     if (r.reason.code !== 'no-viable-route' && r.reason.code !== 'no-route-verified')

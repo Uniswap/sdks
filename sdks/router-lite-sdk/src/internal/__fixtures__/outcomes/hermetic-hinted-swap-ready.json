@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "label": "hermetic-hinted-swap-ready",
   "chainId": 31337,
   "kind": "swap",
-  "recordedAt": "2026-08-11T09:43:31.398Z",
+  "recordedAt": "2026-08-11T18:44:03.379Z",
   "notes": "A hinted v2 pool nothing else can reach: the caller asserts it, the pump proves it by measuring it, readiness finds the trader funded and approved, and the preflight simulates cleanly. The golden pins the compiled Universal Router calldata, which the fold recompiles rather than copies.",
   "manifest": {
     "chainId": 31337,
@@ -50,6 +50,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
+    "firstRoundComplete": true,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -222,6 +223,7 @@
       "aborted": false,
       "verificationDegraded": false,
       "headRegressed": false,
+      "firstRoundComplete": true,
       "verification": {
         "preflightAttempted": 1,
         "preflightBudgetExhausted": false

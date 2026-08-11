@@ -45,6 +45,7 @@ export type ReportState = {
   block: BlockRef
   aborted: boolean
   headRegressed: boolean
+  firstRoundComplete: boolean
   discovery: Record<Protocol, { complete: ReadonlySet<string>; failed: boolean }>
   intermediates: { selected: { length: number }; discovered: number }
   legsMeasured: number
@@ -158,6 +159,7 @@ export function buildReport(
     aborted: state.aborted,
     verificationDegraded: state.verificationDegraded,
     headRegressed: state.headRegressed,
+    firstRoundComplete: state.firstRoundComplete,
     verification: { ...state.verification },
   }
 }

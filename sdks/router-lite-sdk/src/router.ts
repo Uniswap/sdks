@@ -799,6 +799,8 @@ function buildOutageReport(manifest: ChainManifest): SearchReport {
     // could have regressed.
     verificationDegraded: false,
     headRegressed: false,
+    // No measurement round was ever dispatched, let alone settled.
+    firstRoundComplete: false,
     // Nothing was ever simulated either — the outage stopped the search before its first measurement.
     verification: zeroVerification(),
   }
@@ -1083,8 +1085,9 @@ export function createRouter(opts: CreateRouterOptions): Router {
    * request" and "a stream of engine events" — parameterized by the two things that differ per pair
    * (quote/swap): which synchronous `validate*Request` runs, and which engine `kind` to search as.
    * Folding an event into the public vocabulary, and deciding when to stop consuming, stays with
-   * each of the four callers below: `getQuote`/`getSwap` stop at the first actionable lead (a
-   * different one each) or the final event, while `quotes`/`swaps` forward every event — that
+   * each of the four callers below: `getQuote`/`getSwap` stop at the first actionable lead of a
+   * settled first round (a different actionability test each) or the final event, while
+   * `quotes`/`swaps` forward every event — that
    * difference was always going to need call-site-specific code, so this helper does not try to
    * abstract it away.
    *
@@ -1146,8 +1149,12 @@ export function createRouter(opts: CreateRouterOptions): Router {
       if ('outage' in item) return rpcUnavailable(manifest)
       if (item.event.type === 'progress') continue
       const result = resultOf(item.event, classifyQuote)
-      // The first actionable lead — a priced best — or the final event, whichever comes first.
-      if (result.status === 'quote' || item.event.type === 'final') return result
+      // The first actionable lead — a priced best — WHOSE first measurement round has settled, or
+      // the final event, whichever comes first. Gating on `firstRoundComplete` is what keeps a
+      // promise caller's answer off a partial first round (a dozen fast legs leading a saturated
+      // pool while the rest of the round was still on the wire — the parity sweep's biggest deltas);
+      // the engine emits a `lead` the moment the axis flips, so this never waits past that moment.
+      if ((result.status === 'quote' && result.search.firstRoundComplete) || item.event.type === 'final') return result
     }
     /* istanbul ignore next -- the engine always yields a final event before returning */
     throw new Error('unreachable: the search completed without a final event')
@@ -1158,7 +1165,13 @@ export function createRouter(opts: CreateRouterOptions): Router {
       if ('outage' in item) return rpcUnavailable(manifest)
       if (item.event.type === 'progress') continue
       const result = resultOf(item.event, classifySwap)
-      if (result.status === 'ready' || result.status === 'needs-action' || item.event.type === 'final') return result
+      // Same first-round gate as `getQuote` — see the comment there.
+      if (
+        ((result.status === 'ready' || result.status === 'needs-action') && result.search.firstRoundComplete) ||
+        item.event.type === 'final'
+      ) {
+        return result
+      }
     }
     /* istanbul ignore next -- the engine always yields a final event before returning */
     throw new Error('unreachable: the search completed without a final event')

@@ -64,11 +64,13 @@ import { assertResultCoherent } from './resultCoherence'
 //
 //  1. THE PINNED BLOCK AND THE HEAD VERDICT (`block`, `headRegressed`) — decided
 //     by `loop.ts#fetchBlock` before any outcome exists.
-//  2. THE FRONTIER AND THE PAIR CEILING (`intermediates`, `pairCeilingHit`) —
-//     written by `loop.ts#advanceIntermediates` and `pump.ts#measurablePools`.
-//     `buildReport` reads both (the selected/discovered ratio, the
-//     exhaustiveness axis), so a fixture that omitted them would fold a report
-//     that describes a different search.
+//  2. THE FRONTIER, THE PAIR CEILING, AND THE FIRST-ROUND VERDICT
+//     (`intermediates`, `pairCeilingHit`, `firstRoundComplete`) — written by
+//     `loop.ts#advanceIntermediates`, `pump.ts#measurablePools`, and the pump's
+//     dispatch bookkeeping (`state.ts#beginFirstRound` + the settle countdown).
+//     `buildReport` reads all three (the selected/discovered ratio, the
+//     exhaustiveness axis, the first-round axis), so a fixture that omitted
+//     them would fold a report that describes a different search.
 //  3. THE INDEX (`index`, a `PoolIndexSnapshot` taken as the search left it) —
 //     the coverage cache `buildReport` derives `coveredRanges` from, and the
 //     negative cache `composeRoutes` excludes routes by. Both are CROSS-SEARCH
@@ -107,7 +109,7 @@ import { assertResultCoherent } from './resultCoherence'
  * migration path: fixtures are re-recorded, which is cheap for the hermetic corpus and one `chainz
  * exec` for the live one.
  */
-export const OUTCOME_LOG_SCHEMA_VERSION = 1
+export const OUTCOME_LOG_SCHEMA_VERSION = 2
 
 // ---------------------------------------------------------------------------
 // The fixture
@@ -133,6 +135,9 @@ export type FixtureContext = {
   headRegressed: boolean
   intermediates: { selected: string[]; discovered: number; notch: number }
   pairCeilingHit: boolean
+  /** The first-round verdict as the search left it (`state.firstRoundComplete`) — the loop's own
+   * observation of the pump's first dry moment, which the log has no entries for (schema v2). */
+  firstRoundComplete: boolean
   /** `req.hints`' v4 hookData, keyed by lowercased poolId — stamped onto v4 legs at composition. */
   hookData: [string, Hex][]
   /** The shared `PoolIndex` as this search left it: the coverage cache and the negative cache. */
@@ -228,6 +233,7 @@ export type CanonicalReport = {
   aborted: boolean
   verificationDegraded: boolean
   headRegressed: boolean
+  firstRoundComplete: boolean
   verification: { preflightAttempted: number; preflightBudgetExhausted: boolean }
 }
 
@@ -287,6 +293,7 @@ function canonicalReport(r: SearchReport): CanonicalReport {
     aborted: r.aborted,
     verificationDegraded: r.verificationDegraded,
     headRegressed: r.headRegressed,
+    firstRoundComplete: r.firstRoundComplete,
     verification: { ...r.verification },
   }
 }
@@ -480,6 +487,7 @@ export function foldOutcomes(entries: OutcomeEntry[], ctx: FoldContext): FoldOut
     notch: context.intermediates.notch,
   }
   state.pairCeilingHit = context.pairCeilingHit
+  state.firstRoundComplete = context.firstRoundComplete
 
   replayEntries(state, entries, manifest, request)
 
@@ -594,6 +602,7 @@ function snapshotFixture(args: RecordArgs, state: SearchState, live: QuoteResult
         notch: state.intermediates.notch,
       },
       pairCeilingHit: state.pairCeilingHit,
+      firstRoundComplete: state.firstRoundComplete,
       hookData: [...ctx.hookData],
       index: ctx.index.toSnapshot(),
     },
@@ -642,8 +651,11 @@ export async function recordOutcomeFixture(args: {
     const outcome = foldEvent(event.ranked, event.state, event.report)
     return kind === 'swap' ? classifySwap(outcome) : classifyQuote(outcome)
   }
+  // Mirrors the facade's own stop rule: an actionable lead only counts once the first measurement
+  // round has settled, exactly where `getQuote`/`getSwap` answer.
   const actionable = (result: QuoteResult | SwapResult): boolean =>
-    result.status === 'quote' || result.status === 'ready' || result.status === 'needs-action'
+    (result.status === 'quote' || result.status === 'ready' || result.status === 'needs-action') &&
+    result.search.firstRoundComplete
 
   let fixture: OutcomeFixture | undefined
   let live: QuoteResult | SwapResult | undefined
