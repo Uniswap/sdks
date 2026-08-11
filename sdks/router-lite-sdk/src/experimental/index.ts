@@ -84,10 +84,11 @@ export { buildHookData } from '../search/hookData'
 // header and `build.surface.test.ts`).
 export { assertResultCoherent, emptyReport } from '../internal/resultCoherence'
 
-// `DEFAULT_SLIPPAGE_BPS` is the slippage this package applies when a `SwapRequest` doesn't override
-// it; a caller reconstructing what a prior `getSwap` call used (canary's `simulateSwapE2E`, which
-// gets a `SwapResult` back but not the request that produced it) needs the same default rather than
-// a hardcoded guess.
+// `DEFAULT_SLIPPAGE_BPS` is the slippage this package applies when a `SwapRequest` omits
+// `slippageBps` (see `search/verifier.ts`). Exported for the caller who needs to PREDICT what an
+// un-overridden `getSwap` will encode — sizing a balance, showing a user the worst case, or asserting
+// against a `minAmountOut` before the call is made. A caller reading a `SwapResult` after the fact
+// needs nothing from here: the compiled floor is already on it as `limits.minAmountOut`.
 export { DEFAULT_SLIPPAGE_BPS } from '../constants'
 
 // `scanLogs` is the adaptive, bisecting `eth_getLogs` walker every discovery scan in this package is
@@ -147,7 +148,7 @@ export { intersectRanges } from '../internal/ranges'
 
 // `blockTimeSecondsOf` is `ChainManifest`'s own chain-physics accessor: seconds per block, either
 // stated on the manifest or defaulted to mainnet's 12 — the number every per-chain time window in
-// this package (wave 0's recent-launch scan, a CLI's own search budget) is computed from. Exported
+// this package (the eager recent-launch pair scan, a CLI's own search budget) is computed from. Exported
 // because it takes and returns only already-public types, and a caller sizing its own chain-relative
 // window has no other way to read the exact number the engine itself uses.
 export { blockTimeSecondsOf } from '../manifest'

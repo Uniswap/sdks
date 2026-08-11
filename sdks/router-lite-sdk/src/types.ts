@@ -82,6 +82,12 @@ export type PoolRecord = {
   // identity + index metadata (selection input)
   pool: PoolRef
   createdAtBlock?: bigint | undefined
+  /**
+   * How this pool's identity was learned. `'event'` is a creation log; `'hint'` is the caller's own
+   * assertion; `'factory'` is a DERIVED HYPOTHESIS PROVED BY A SUCCESSFUL QUOTE — the legacy wire
+   * name for what the pump calls a 'hypothesis' (see `search/pump.ts`'s `Provenance`), kept because
+   * `cli/` cache snapshots carry it on disk.
+   */
   source: 'event' | 'factory' | 'hint'
   lastQuoteSuccessBlock?: bigint | undefined
   /**
@@ -511,8 +517,10 @@ export type SearchReport = {
     intermediatesDiscovered: number
     intermediatesSelected: number
     /** Eligible two-hop intermediate NODES the frontier has not selected YET. Read it as "not
-     * reached", never as "capped": the frontier grows in batches, so a consumer that keeps pulling
-     * drives this to zero, where the old `MAX_INTERMEDIATES` cap held it above zero forever. */
+     * reached", never as "capped": the frontier grows by a batch per quiet cycle until it has
+     * selected everything it found, so a consumer that keeps pulling drives this to zero. A nonzero
+     * value on a settled search means the search ended before the frontier ran out, not that the
+     * engine refused to look. */
     intermediatesPruned: number
     /** Leg measurements that reached a terminal state — priced, reverted, or lost to the transport
      * past their one retry. Legs are deduped by (pool, direction, amount), so this counts work done
@@ -716,7 +724,7 @@ export type UniversalRouterDeployment = {
 export type ChainData = {
   /**
    * Seconds per block, used to convert this package's TIME-shaped policies into block counts — today
-   * only the eager exact-pair scan window (`WAVE0_RECENT_WINDOW_SECONDS`). Must be finite and
+   * only the eager exact-pair scan window (`EAGER_PAIR_WINDOW_SECONDS`). Must be finite and
    * greater than zero; sub-second chains use a fraction (Arbitrum ≈ `0.25`). Default: 12 (mainnet).
    */
   blockTimeSeconds?: number | undefined

@@ -235,14 +235,6 @@ export async function aggregateCalls(args: AggregateCallsArgs): Promise<Array<He
 }
 
 /**
- * Classifies a failed OUTER aggregate3 call into the one slot value shared across its chunk. An
- * abort and a real transport/node-state failure pass through as themselves (each already carries
- * the semantics every counting site keys on); anything else — an execution-shaped outer failure, or
- * outer bytes that would not decode — becomes a `TransportError`, per the header above: an anomaly
- * of the aggregation machinery says nothing about the chunk's calls, and the only safe direction to
- * be wrong in is the one that never fabricates on-chain evidence and never negative-caches.
- */
-/**
  * Should a failed OUTER aggregate3 be RE-ASKED as two halves rather than written off?
  *
  * Yes for exactly two shapes, and the reasoning is the same one for both: the failure is
@@ -280,6 +272,14 @@ function shouldBisect(err: unknown): boolean {
   return classifyRpcError(err) === 'execution'
 }
 
+/**
+ * Classifies a failed OUTER aggregate3 call into the one slot value shared across its chunk. An
+ * abort and a real transport/node-state failure pass through as themselves (each already carries
+ * the semantics every counting site keys on); anything else — an execution-shaped outer failure, or
+ * outer bytes that would not decode — becomes a `TransportError`, per the header above: an anomaly
+ * of the aggregation machinery says nothing about the chunk's calls, and the only safe direction to
+ * be wrong in is the one that never fabricates on-chain evidence and never negative-caches.
+ */
 function coarsenOuterFailure(err: unknown, chunkSize: number): Error {
   if (err instanceof AbortedCallError) return err
   if (err instanceof TransportError) return err

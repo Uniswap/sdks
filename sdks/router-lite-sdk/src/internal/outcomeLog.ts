@@ -119,8 +119,9 @@ export type FixtureRequest = {
   tokenOut: CurrencyRef
   amountIn: bigint
   hints?: QuoteRequest['hints']
-  /** Swap-only. Present exactly when `kind === 'swap'`. */
+  /** Swap-only, and present exactly when `kind === 'swap'` — a `SwapRequest` always carries a trader. */
   trader?: Address
+  /** Swap-only AND optional there: recorded only when the request overrode the facade's default. */
   recipient?: Address
   slippageBps?: number
   deadlineSeconds?: number
