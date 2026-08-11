@@ -9,7 +9,7 @@
 // still draining), and it was precisely the run with the most coverage to
 // bank — and the most ANSWER to show.
 //
-// The contract, and how it got here in two steps:
+// The contract, in two arms:
 //
 //   FIRST SIGINT/SIGTERM — abort the process-wide interrupt controller
 //   (`commands/context.ts` composes it into every search signal), print one
@@ -24,16 +24,16 @@
 //   rendered — exactly as on any other exit. `rl.ts` then overrides the exit
 //   code with 128+signo (`terminationExitCode`) — 130 for SIGINT — which is
 //   what a shell expects from an interrupted process however gracefully it
-//   wound down. The first version of this handler flushed and exited RIGHT
-//   HERE, which killed the process in the gap between the stream's last line
-//   and the command's result panel — the user watched "search complete — 434
-//   of 3,425 legs priced" scroll past and never got the route it was
-//   completing toward.
+//   wound down. FAILURE MODE THIS AVOIDS: flushing and exiting right here
+//   kills the process in the gap between the stream's last line and the
+//   command's result panel — the user watches "search complete — 434 of 3,425
+//   legs priced" scroll past and never gets the route it was completing
+//   toward.
 //
 //   SECOND — exit 128+signo immediately: no flush, no render. The user has
-//   said "now" twice; nothing gets a veto. (The v1 handler simply re-entered
-//   the flush on every ^C, which is why a slow cache save used to read as an
-//   infinite hang.)
+//   said "now" twice; nothing gets a veto. FAILURE MODE THIS AVOIDS:
+//   re-entering the flush on every ^C, which makes a slow cache save read as
+//   an infinite hang no keystroke can escape.
 //
 // SIGTERM gets the same treatment for the same reason — a `timeout 30s rl …`
 // or a killed CI step should not be uniquely punished by losing its progress.

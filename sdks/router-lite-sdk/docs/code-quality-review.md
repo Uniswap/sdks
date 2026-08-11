@@ -1,5 +1,8 @@
 # Router Lite SDK — Code Quality Review
 
+> ***HISTORICAL — this reviews the pre-refactor wave-engine tree; many of the files and findings below no longer exist.***
+> ***It is kept unedited as an input to the event-core redesign it fed; for current behavior see the package `README.md`. Index: [`docs/README.md`](./README.md).***
+
 *2026-08-10 · companion to `architecture-review.md`. Findings are ranked within each section; anything marked **confirmed** was reproduced during this review (live run or direct source verification).*
 
 ## Verdict

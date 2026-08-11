@@ -220,3 +220,70 @@ Adopted during implementation review as the smaller of two evils. `verify/prefli
 
 **Was:** "the verify function takes the settled readiness outcome as a parameter, so it cannot run before readiness resolves."
 **Is:** a loop-side ordering guard (`loop.ts` calls `verifier.consider(quoted)` only once `state.requirements !== undefined`) plus a verifier-side throw-assertion (`verifier.ts` throws if `consider()` ever runs before readiness settled) — the same guarantee, enforced structurally rather than by the function's signature. Adopted in the Task 7 review.
+
+## Addendum — post-v1 changes
+
+*2026-08-11.* Distinct from [Amendments](#amendments) above: those were adopted **during**
+implementation and the body was updated in place to match. The entries below are changes made
+**after** the design shipped, by later work with its own reviews. The body above is **not** edited
+for them — it stays the v1 design as approved — so where a bullet here contradicts a section, this
+addendum is what is true and the named section is superseded on exactly that point.
+
+- **§4 — `getQuote`/`getSwap` answer at a settled ROUND, and the report gained the axis that says
+  so.** §4 has them stopping "at the first actionable `lead` (`quote` / `ready` / `needs-action`) or
+  `final`". They now stop at the first actionable lead **whose first measurement round has settled**,
+  and `SearchReport` gains `firstRoundComplete: boolean` to carry it. A lead emitted mid-round is a
+  partial reading of a round still landing legs: without the gate, a saturated pool that answers
+  fast becomes the answer while the honest pools' envelopes — two-hop compositions included — are
+  still on the wire, which is a systematically worse answer, not merely an earlier one. The
+  streaming surfaces are unchanged: every envelope-cadence lead still ships, each stamped with the
+  axis, so a latency-shaped consumer can still take the first one.
+
+- **§3.2 ("Rounds") — a round is DETACHED, applies per settled envelope, and leads with an
+  evidence-ordered vanguard.** §3.2 has a pump cycle "dispatch[ing] one batched round" as a single
+  unit. `pump()` now returns without awaiting its round; each settled envelope's outcomes apply on
+  arrival and poke the wake, so the loop recomposes and can emit a lead after the FIRST envelope
+  rather than after the whole round. Planning order is dispatch order is envelope order, and
+  planning is **evidence-ordered** (well-evidenced pools ahead of bare hypotheses). A round wider
+  than one envelope therefore leads with a deliberate **vanguard** — its evidence-ordered head,
+  `PUMP_VANGUARD_LEGS` (12) — so the first lead is both fast and drawn from the best-evidenced legs
+  instead of from whichever heavy envelope won the race. `inFlightKeys` keeps `pumpDry` false while
+  a detached round is outstanding, which is what makes the `firstRoundComplete` gate above a real
+  one rather than a name for the first envelope.
+
+- **§3.2 ("Ranking is unchanged") — quote mode gained the returns-delta partition.** Ranking is no
+  longer unchanged. `rankRoutes` now stamps `QuotedRoute.quoteUnverifiable` — in **both** modes —
+  on any route one of whose legs is a v4 pool whose hook address carries a swap RETURNS_DELTA
+  permission bit, and in **quote** mode it also partitions on the marker: a marked route never
+  outranks an unmarked one, however large its claimed `amountOut` (if only marked routes exist they
+  still lead, wearing the marker). The quoter runs the hook's own code path, so such an
+  `amountOut` is the hook's claim rather than pool math — live Arbitrum echo hooks "quoted" a raw
+  `100e18` into a 6-decimals token and outranked every real route. **Swap** ordering is untouched:
+  preflight simulates the real trade and is the authority there. Tie-breaks and the simplicity
+  margin are otherwise as specified.
+
+- **§4 — the answer path may spend one extra envelope: `priceImpactBps`.** §4's hard-cut API had
+  quote mode issuing no calls beyond measurement. `RouteQuote` now carries an optional
+  `priceImpactBps`: when the facade is about to answer, it re-quotes the **answering route's own**
+  legs at a dust reference amount in ONE extra `measureLegs` envelope at the same pinned block and
+  composes the per-leg ratios. Leader-only, at answer time, at most one envelope per search; swap
+  mode folds it alongside the preflight it already issues. A reference measurement that reverts, is
+  lost, is cut off by an expired signal, or answers zero degrades the figure to absence — the
+  annotation can never block or fail the answer it annotates, and nothing ranks or classifies on it.
+
+- **§6 — `MAX_INTERMEDIATES` was renamed `INTERMEDIATES_BATCH`.** §6 kept the old name "with changed
+  meaning: the intermediates frontier's seed and batch size, no longer a permanent cap". A name that
+  still reads as a maximum is the drift risk the rename removes: the constant is
+  `INTERMEDIATES_BATCH` (8), and it is both the frontier's seed (the first batch is selected before
+  the first pump cycle runs) and its step (every quiet cycle adds another 8).
+
+- **§5 — abort/budget expiry cancels QUEUED work; one in-flight provider call may complete.** §5's
+  carve-out was written as a single blessed exception (one preflight `eth_call`). The general rule
+  is one notch weaker than "nothing else can outlive a search", and is worth stating as semantics
+  rather than as an exception list: an abort cancels everything queued, but any request already on
+  the wire may run to completion, because viem's `request` takes no per-call `AbortSignal`. It is
+  bounded rather than open-ended — the scanner checks the signal before dispatching **every** chunk,
+  so at most one call per in-flight worker is ever past the check — and it is structural, not a bug
+  to tune away. Measured: a drained 15s CLI budget returning at +5.8s on the tail of one wide
+  `eth_getLogs`. The at-receipt fold from the preflight carve-out is what keeps all of it inert: no
+  public result holds a live reference to `SearchState`.

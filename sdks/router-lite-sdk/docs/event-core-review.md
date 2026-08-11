@@ -1,8 +1,13 @@
 # Event-Driven Search Core — Branch Review
 
+> ***POINT-IN-TIME — accurate at the commit it was written against. Two things have since moved: the facade stop rule (`getQuote`/`getSwap` now answer at the first actionable lead **of a settled first measurement round**, `search.firstRoundComplete`) and every latency figure below.***
+> ***The package `README.md` is the current statement of both. The structural findings and the residual-risk list still hold. Index: [`docs/README.md`](./README.md).***
+
 *2026-08-11 · the capstone evaluation of the `feat/router-lite-sdk-v2` event-core refactor
-(spec: `docs/superpowers/specs/2026-08-10-event-driven-search-core-design.md`; plan ledger:
-`.superpowers/sdd/2026-08-10-event-driven-search-core/progress.md`). Three parts: a fresh-eyes
+(spec: `docs/superpowers/specs/2026-08-10-event-driven-search-core-design.md`; the plan ledger this
+was written beside, `.superpowers/sdd/2026-08-10-event-driven-search-core/progress.md`, was not
+kept — the branch's own commit history, `git log cf71a5be..`, is the surviving record of the task
+sequence). Three parts: a fresh-eyes
 coherence review of the whole branch, a live performance evaluation against the pre-refactor
 baseline (Task 0), and a test-suite verdict. Ends with the residual-risk list.*
 

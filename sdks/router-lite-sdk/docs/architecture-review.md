@@ -1,5 +1,8 @@
 # Router Lite SDK — Architecture Review
 
+> ***HISTORICAL — this reviews the pre-refactor wave engine (`search/waves.ts`), which no longer exists.***
+> ***It is kept unedited as an input to the event-core redesign it produced; for current behavior see the package `README.md`. Index: [`docs/README.md`](./README.md).***
+
 *2026-08-10 · reviewed from first principles: full read of the search core, five parallel deep-dives (CLI, tests, integration/canary/scripts, internal plumbing, protocols/encode/manifest), live runs against mainnet and Base.*
 
 ## Verdict

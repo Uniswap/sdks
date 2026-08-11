@@ -5,8 +5,9 @@
 // `ctx.router.quotes()`/`swaps()` and folds the SDK's own `SearchEvent`s
 // (`src/types.ts`) into the CLI's timeline. `src/router.ts` proves this is the
 // same search the promise surface runs (`getQuote`/`getSwap` are themselves
-// consumers of this stream, stopping at the first actionable `lead` — see that
-// file's header), so this changes NOTHING about what a default run returns or
+// consumers of this stream, stopping at the first actionable `lead` whose first
+// measurement round has settled — see that file's header), so this changes
+// NOTHING about what a default run returns or
 // how long it takes; it only keeps the event history the command layer needs
 // for the "how it went" timeline, which `getQuote`/`getSwap` throw away before
 // the CLI ever sees it. That is the whole reason `report.ts`'s timeline can be
@@ -30,9 +31,15 @@
 //  - `final`: the search settled. Closes the timeline.
 //
 // `stopAt` is the one thing that still differs per mode: default/`--verbose`
-// stop at the first actionable lead (`quote` for a quote, `ready`/
-// `needs-action` for a swap); `--watch` passes `() => false` to drain the whole
-// bounded search instead. `stream` (`--watch`/`--verbose`) controls whether
+// stop at the first actionable lead — `quote` for a quote, `ready`/
+// `needs-action` for a swap — **whose first measurement round has settled**
+// (`result.search.firstRoundComplete`; see `commands/quote.ts`, `commands/
+// swap.ts`), which is exactly the facade's own rule, so a default run's answer
+// is byte-for-byte the one `getQuote`/`getSwap` would have returned. A lead
+// that arrives mid-round is a partial reading of a round still landing legs, so
+// stopping on "has a quote" alone would answer with a strictly earlier and
+// systematically worse snapshot. `--watch` passes `() => false` to drain the
+// whole bounded search instead. `stream` (`--watch`/`--verbose`) controls whether
 // anything is PRINTED per event as it arrives — NDJSON under `--json`, a
 // narrative line otherwise — versus collected silently for a single
 // retrospective render (the default path). Either way the wording/shape is
