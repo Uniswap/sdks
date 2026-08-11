@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { MAX_INTERMEDIATES, maxPlausibleHeadRegression } from '../constants'
+import { INTERMEDIATES_BATCH, maxPlausibleHeadRegression } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import type { Semaphore } from '../internal/rpc'
 import { reorgOverlapBlocksOf, requireExecution } from '../manifest'
@@ -274,7 +274,7 @@ function reportSignature(report: SearchReport): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Grows `state.intermediates.selected` by one batch (`MAX_INTERMEDIATES`) from the pump's discovered
+ * Grows `state.intermediates.selected` by one batch (`INTERMEDIATES_BATCH`) from the pump's discovered
  * ordering — hinted → cores → newest-touching-pool — and refreshes `discovered` from the same walk,
  * so the selected/discovered ratio always describes one look at the index.
  *
@@ -295,7 +295,7 @@ function advanceIntermediates(state: SearchState, ctx: PumpCtx, req: QuoteReques
   const shifted = state.intermediates.discovered !== ordered.length
   state.intermediates.discovered = ordered.length
   const have = new Set(state.intermediates.selected)
-  const batch = ordered.filter((node) => !have.has(node)).slice(0, MAX_INTERMEDIATES)
+  const batch = ordered.filter((node) => !have.has(node)).slice(0, INTERMEDIATES_BATCH)
   if (batch.length === 0) return shifted
   state.intermediates.selected.push(...batch)
   state.intermediates.notch++
@@ -426,10 +426,11 @@ export async function* search(
   worker.demandEager() // the bounded latency guarantee for the new-asset case
   sources.launch('coverage', (signal) => worker.run(signal)) // launched EXACTLY ONCE per search
 
-  // Readiness has settled once its outcome landed (the normal path) or its source failed (a bug,
-  // recorded in `failures()`); either way the gate must not wait on it forever.
-  const readinessSettled = (): boolean =>
-    verifier === undefined || state.requirements !== undefined || sources.failures().some((f) => f.name === 'readiness')
+  // Readiness has settled once its outcome landed, and `state.requirements` is the ONE test that
+  // covers both paths: `launchReadiness`'s catch calls `applyReadiness` (degraded, no requirements)
+  // BEFORE it rethrows, so even the bug path sets it. The gate can therefore never wait forever on a
+  // source that threw, without this predicate having to consult `sources.failures()` at all.
+  const readinessSettled = (): boolean => verifier === undefined || state.requirements !== undefined
 
   let lastLead: string | undefined
   let lastReport = reportSignature(buildReport(state, ctx, req))

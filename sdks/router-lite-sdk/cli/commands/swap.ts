@@ -23,7 +23,7 @@ import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } 
 import { isSkipped, probeSimulateV1Support, simulateSwap } from '../simulate'
 import { consumeSearch } from '../stream'
 
-import { buildChainContext, classifyLeadOrigin, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
+import { buildChainContext, hydrateLegSymbols, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
 
 
 const SWAP_FLAGS = {
@@ -95,7 +95,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     }
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 
-    const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
+    const classify = makeLeadClassifier(ctx, trade)
     // `--watch`/`--verbose` PRINT per event (NDJSON under `--json`, a narrative line otherwise); the
     // default path stays silent until the end either way — see `stream.ts`'s header for why that is
     // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
@@ -113,7 +113,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       stream,
       trade: tradeCtx,
       renderCtx: trade.renderCtx,
-      classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
+      classify,
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
     })
     if (!final) return 2

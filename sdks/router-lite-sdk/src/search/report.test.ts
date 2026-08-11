@@ -256,7 +256,7 @@ test('buildReport: the demand floor is the deployment floor, not min(coveredRang
 // `enumeration`: the frontier ratio and the exhaustiveness verdict it drives.
 //
 // Ported from the deleted `waves.test.ts` (`intermediatesPruned (C4-P7)`),
-// which drove it through a whole wave engine over MAX_INTERMEDIATES + 1 core
+// which drove it through a whole wave engine over INTERMEDIATES_BATCH + 1 core
 // intermediates. The count is no longer re-derived from the index at report
 // time — the frontier writes both halves — so the fold is where the claim now
 // lives, and all three numbers still have to reconcile from one sample.

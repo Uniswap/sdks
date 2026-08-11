@@ -88,8 +88,9 @@ export type SearchState = {
    * an omission. Five fields on this type are written by their owners directly — `indexVersion` and
    * `pairCeilingHit` (the pump), `gateOpened` (the coverage worker's `demandFull`), `intermediates`
    * (two loop-cycle-synchronous writers: `loop.ts`'s `advanceIntermediates` AND `pump.ts`'s
-   * `planDueLegs`, pump.ts:330), and `verification.preflightBudgetExhausted` (written directly by the
-   * verifier at `verifier.ts:274,296`) — plus the `compiledById` memo. A fold therefore reproduces
+   * `planDueLegs`), and `verification.preflightBudgetExhausted` (written directly by
+   * `verifier.ts#Verifier.advance`, which clears it per walk and sets it on the cap branch) — plus the
+   * `compiledById` memo. A fold therefore reproduces
    * every counter, measurement and verdict from the log alone, and takes the rest from the fixture;
    * see `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
    */
@@ -155,6 +156,8 @@ export type PreflightOutcome =
 
 export type OutcomeEntry =
   | { t: 'measurement'; o: MeasurementOutcome }
+  /** `endpoint` is `applyCoverage`'s `scope` under its serialized name — every committed golden
+   * carries this spelling, so the wire field stays put while the parameter reads honestly. */
   | { t: 'coverage'; p: Protocol; endpoint: string; o: CoverageOutcome }
   | { t: 'readiness'; r: ReadinessOutcome }
   | { t: 'preflight'; routeId: string; o: PreflightOutcome }
@@ -164,7 +167,11 @@ function record(s: SearchState, entry: OutcomeEntry): void {
   s.outcomeLog?.push(entry)
 }
 
-/** A key reaches a terminal state exactly once, so `legsMeasured === measuredKeys.size` always. */
+/**
+ * A key reaches a terminal state exactly once, so `legsMeasured` counts DISTINCT KEYS EVER SETTLED and
+ * is monotone. It is not `measuredKeys.size`: that set can shrink, because the pump's `foldRoundInLegs`
+ * deletes out-leg keys invalidated by a better `m_X`. So `measuredKeys.size <= legsMeasured`.
+ */
 function settle(s: SearchState, key: string): void {
   s.inFlightKeys.delete(key)
   if (s.measuredKeys.has(key)) return
@@ -212,10 +219,18 @@ export function applyMeasurement(s: SearchState, o: MeasurementOutcome): void {
   }
 }
 
-/** `endpoint` is the graph node the scan covered, lowercased — completeness is judged by name. */
-export function applyCoverage(s: SearchState, p: Protocol, endpoint: string, o: CoverageOutcome): void {
-  record(s, { t: 'coverage', p, endpoint, o })
-  if (o.kind === 'complete') s.discovery[p].complete.add(endpoint)
+/**
+ * `scope` is the coverage scope the worker settled, lowercased. It plays two roles, and which one
+ * depends on the outcome: for `complete` it is the GRAPH NODE adjacency completeness is judged by
+ * name against (`discoveryStatus` needs both of the trade's endpoints in the set); for `failed` it is
+ * just the SCOPE KEY that failed, and only the protocol-wide flag is read.
+ *
+ * It rides into the outcome log as `endpoint` — the serialized name every committed fixture carries,
+ * kept so goldens stay foldable.
+ */
+export function applyCoverage(s: SearchState, p: Protocol, scope: string, o: CoverageOutcome): void {
+  record(s, { t: 'coverage', p, endpoint: scope, o })
+  if (o.kind === 'complete') s.discovery[p].complete.add(scope)
   else s.discovery[p].failed = true
 }
 

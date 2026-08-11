@@ -17,7 +17,7 @@ import {
   ROBINHOOD_MANIFEST,
   UNICHAIN_MANIFEST,
   validateManifest,
-  wave0PairScanBlocks,
+  eagerPairScanBlocks,
 } from './manifest'
 import type { ChainManifest } from './types'
 
@@ -128,8 +128,8 @@ describe('chain manifest', () => {
           expect(m.coreIntermediates).toContain(m.wrappedNative)
         })
 
-        test(`wave0PairScanBlocks derives ${wave0Blocks} from this chain's own block time`, () => {
-          expect(wave0PairScanBlocks(manifestFor(chainId))).toBe(wave0Blocks)
+        test(`eagerPairScanBlocks derives ${wave0Blocks} from this chain's own block time`, () => {
+          expect(eagerPairScanBlocks(manifestFor(chainId))).toBe(wave0Blocks)
         })
 
         test('assertChainData accepts the built-in chain bundle', () => {
@@ -202,12 +202,12 @@ describe('chain manifest', () => {
       expect(m.coreIntermediates).toContain('0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168')
     })
 
-    test("wave0PairScanBlocks derives 6,048,000 from this chain's own 0.1s block time", () => {
+    test("eagerPairScanBlocks derives 6,048,000 from this chain's own 0.1s block time", () => {
       // ceil(604800 / 0.1) — by far the largest wave-0 window of any built-in manifest, and the
       // honest cost of a 0.1s chain. `assertChainData` accepts 0.1 as a finite positive number well
       // under the milliseconds tripwire.
       expect(blockTimeSecondsOf(manifestFor(4663))).toBe(0.1)
-      expect(wave0PairScanBlocks(manifestFor(4663))).toBe(6_048_000n)
+      expect(eagerPairScanBlocks(manifestFor(4663))).toBe(6_048_000n)
       expect(reorgOverlapBlocksOf(manifestFor(4663))).toBe(3000n)
       expect(() => assertChainData(manifestFor(4663))).not.toThrow()
     })
@@ -358,7 +358,7 @@ describe('chain manifest', () => {
       const bare: ChainManifest = { chainId: 1, wrappedNative: MAINNET_MANIFEST.wrappedNative, execution: manifestFor(1).execution }
       expect(blockTimeSecondsOf(bare)).toBe(12)
       expect(reorgOverlapBlocksOf(bare)).toBe(32n)
-      expect(wave0PairScanBlocks(bare)).toBe(50_400n)
+      expect(eagerPairScanBlocks(bare)).toBe(50_400n)
     })
 
     test('the chain bundle is replaced WHOLESALE, like every other bundle', () => {
@@ -392,7 +392,7 @@ describe('chain manifest', () => {
     })
 
     describe('wave-0 window derivation: one week of THIS chain\'s blocks', () => {
-      // The whole point of C4-P1. The policy (`WAVE0_RECENT_WINDOW_SECONDS` = 7 days) is fixed; the
+      // The whole point of C4-P1. The policy (`EAGER_PAIR_WINDOW_SECONDS` = 7 days) is fixed; the
       // block count is not. The old hardcoded 50_000n was a mainnet number that silently became 28
       // hours on Base and 3.5 hours on Arbitrum — i.e. shorter than the launch it exists to catch.
       const cases: [label: string, blockTimeSeconds: number, blocks: bigint][] = [
@@ -402,14 +402,14 @@ describe('chain manifest', () => {
       ]
       for (const [label, blockTimeSeconds, blocks] of cases) {
         test(`${label} -> ${blocks} blocks`, () => {
-          expect(wave0PairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds } }))).toBe(blocks)
+          expect(eagerPairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds } }))).toBe(blocks)
         })
       }
 
       test('rounds UP — a short window is the failure that matters, so never a block too few', () => {
         // 604800 / 7 = 86400 exactly; 604800 / 11 = 54981.8... -> 54982.
-        expect(wave0PairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds: 7 } }))).toBe(86_400n)
-        expect(wave0PairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds: 11 } }))).toBe(54_982n)
+        expect(eagerPairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds: 7 } }))).toBe(86_400n)
+        expect(eagerPairScanBlocks(manifestFor(1, { chain: { blockTimeSeconds: 11 } }))).toBe(54_982n)
       })
     })
 

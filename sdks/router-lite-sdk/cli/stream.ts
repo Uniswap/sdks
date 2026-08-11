@@ -52,6 +52,7 @@ import type { QuotedRoute, QuoteResult, SearchEvent, SearchReport, SwapResult } 
 import {
   budgetNoteFor,
   jsonify,
+  progressBody,
   renderFirstLeadLine,
   renderTimelineLine,
   searchOf,
@@ -103,11 +104,11 @@ function leaderOf(result: SearchResult): QuotedRoute | undefined {
   return 'best' in result && result.best ? result.best : undefined
 }
 
-/** Exactly the counters a rendered `progress` line shows (`report.ts#renderTimelineLine`), as one
- * comparable string — two events with the same key render byte-identical lines but for the timing. */
+/** The rendered `progress` line's own body (`report.ts#progressBody`) IS the dedup key: two events
+ * with the same one render byte-identical lines but for the timing, by construction rather than by a
+ * counter tuple somebody has to remember to extend. */
 function progressKey(search: SearchReport): string {
-  const e = search.enumeration
-  return `${search.quoting.succeeded}/${e.legsMeasured}/${e.intermediatesSelected}/${e.intermediatesDiscovered}`
+  return progressBody(search)
 }
 
 /**

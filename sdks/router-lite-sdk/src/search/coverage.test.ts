@@ -5,7 +5,7 @@ import { pad } from 'viem'
 import { DEFAULT_REORG_OVERLAP_BLOCKS, MIN_CHUNK, SCAN_CHUNK_CONCURRENCY } from '../constants'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref } from '../internal/testing'
-import { wave0PairScanBlocks } from '../manifest'
+import { eagerPairScanBlocks } from '../manifest'
 import { PoolIndex } from '../pools/poolIndex'
 import type { ProtocolModule } from '../protocols/types'
 import type { BlockRange, ChainManifest, CurrencyRef, PoolRecord, Protocol, QuoteRequest } from '../types'
@@ -281,7 +281,7 @@ function blocksIn(ranges: BlockRange[]): bigint {
 
 describe('eager demand — the week window, and only it', () => {
   const DEPLOY = 100n
-  const WINDOW = wave0PairScanBlocks(manifestWith({ deploymentBlock: 100n, v4: true }))
+  const WINDOW = eagerPairScanBlocks(manifestWith({ deploymentBlock: 100n, v4: true }))
   const WINDOW_START = HEAD - WINDOW + 1n
 
   test('the eager gate scans the pair window alone: no adjacency, no fee history, nothing below the window', async () => {
@@ -346,7 +346,7 @@ describe('eager demand — the week window, and only it', () => {
 
 describe('demandFull — re-arming a settled run', () => {
   const DEPLOY = 100n
-  const WINDOW_START = HEAD - wave0PairScanBlocks(manifestWith({ deploymentBlock: 100n, v4: true })) + 1n
+  const WINDOW_START = HEAD - eagerPairScanBlocks(manifestWith({ deploymentBlock: 100n, v4: true })) + 1n
 
   test('the run stays pending after the eager demand settles, and completes the history once the gate opens', async () => {
     const { client, served } = stubClient({ answer: () => [] })

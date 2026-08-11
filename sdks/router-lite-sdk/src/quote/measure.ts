@@ -164,7 +164,12 @@ export type MeasureLegsArgs = {
   manifest: ChainManifest
   legs: LegRequest[]
   blockNumber: bigint
-  /** The router's global request semaphore (C4-P6). Omitted (unit tests), calls go ungated. */
+  /**
+   * The router's global request semaphore (C4-P6). Omitted (unit tests), calls go ungated — and
+   * combined with `onOutcomes` that means the dispatch GROUPS run with no meter at all, all of them at
+   * once. That combination is test-only config; production always threads the router's semaphore
+   * through, so the group fan-out multiplies against a bounded permit count.
+   */
   semaphore?: Semaphore | undefined
   /** The chain's PROBED Multicall3 deployment, when the router found one — routes the round through
    * `aggregate3`. Omitted, the per-call path runs. See {@link runQuoteRound}. */
@@ -249,8 +254,9 @@ export async function measureLegs(args: MeasureLegsArgs): Promise<LegOutcome[]> 
     return indices.map((legIndex, j) => toOutcome(legs[legIndex]!, results[j]!))
   }
 
+  const indices = legs.map((_, i) => i)
   if (onOutcomes === undefined) {
-    return run(legs.map((_, i) => i))
+    return run(indices)
   }
 
   // Chunk-granular dispatch: MULTICALL_CHUNK-sized groups, concurrently (the same shape
@@ -259,7 +265,7 @@ export async function measureLegs(args: MeasureLegsArgs): Promise<LegOutcome[]> 
   // delivered the moment IT settles; the return still carries all of them, index-aligned.
   const groups: number[][] = []
   for (let i = 0; i < legs.length; i += MULTICALL_CHUNK) {
-    groups.push(legs.map((_, j) => j).slice(i, i + MULTICALL_CHUNK))
+    groups.push(indices.slice(i, i + MULTICALL_CHUNK))
   }
   const all: LegOutcome[] = new Array<LegOutcome>(legs.length)
   await Promise.all(

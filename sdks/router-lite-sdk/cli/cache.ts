@@ -88,6 +88,10 @@ import type { Address } from 'viem'
 
 import { intersectRanges, parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
 import { PROTOCOLS, type BlockRange, type Protocol } from '../src/index'
+// A deep import, like `poolList.ts`'s `assertSnapshotShape`: this is the coverage cache's key FORMAT,
+// an internal detail of the snapshot the CLI reads back, not something a downstream caller should be
+// keying its own data with. Imported rather than re-spelled so the prefix below cannot drift from it.
+import { coverageScopeKey } from '../src/pools/poolIndex'
 
 import type { FlagSpec } from './args'
 
@@ -376,7 +380,10 @@ export function summarizeCacheCoverage(
       result[p] = { pct: 0, complete: false }
       continue
     }
-    const ranges = coverage.filter(([key]) => key.startsWith(`${p}:`)).flatMap(([, r]) => r)
+    // Every scope this protocol has ever been asked about — adjacency endpoints, the v4 pair scope,
+    // the fee factories — is exactly the keys under its `protocol:` prefix.
+    const prefix = coverageScopeKey(p, '')
+    const ranges = coverage.filter(([key]) => key.startsWith(prefix)).flatMap(([, r]) => r)
     const covered = mergedCoveredSpan(ranges, floor, approxHead)
     const span = approxHead - floor + 1n
     const fraction = span > 0n ? Number((covered * 1000n) / span) / 1000 : 0

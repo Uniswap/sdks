@@ -2857,7 +2857,7 @@ test('a warm dense index finds the route a cold search finds — warm and cold c
   // The engine has no leg slots any more and the intermediates frontier is a growing set rather
   // than a chosen one, so warm and cold have to converge — but "by construction" is a claim about
   // code, and this is the scenario that would have caught the old one: MORE intermediates than one
-  // frontier batch (MAX_INTERMEDIATES = 8), with the liquid pair sitting in the middle of them.
+  // frontier batch (INTERMEDIATES_BATCH = 8), with the liquid pair sitting in the middle of them.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
   const xs = Array.from({ length: 11 }, (_, i) => `0x${(0xd0 + i).toString(16)}${'0'.repeat(38)}` as Address)
   const LIQUID = xs[7]! // neither first nor last in any ordering the frontier might use

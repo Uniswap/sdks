@@ -3,11 +3,11 @@ import fc from 'fast-check'
 import type { Address, Hex, Log, PublicClient } from 'viem'
 import { encodeAbiParameters } from 'viem'
 
-import { DEFAULT_CONCURRENCY, MAX_INTERMEDIATES, PUMP_VANGUARD_LEGS } from '../constants'
+import { DEFAULT_CONCURRENCY, INTERMEDIATES_BATCH, PUMP_VANGUARD_LEGS } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
-import { wave0PairScanBlocks } from '../manifest'
+import { eagerPairScanBlocks } from '../manifest'
 import { PoolIndex } from '../pools/poolIndex'
 import { PROTOCOL_MODULES, routeId } from '../protocols'
 import type { ProtocolModule } from '../protocols/types'
@@ -378,7 +378,7 @@ test('a hinted swap resolves VERIFIED with zero unbounded eth_getLogs — only t
 
   // Let anything in flight settle, then judge the whole wire history by scope.
   await ticks(20)
-  const window = wave0PairScanBlocks(manifest)
+  const window = eagerPairScanBlocks(manifest)
   expect(served.length).toBeGreaterThan(0) // the eager pair scan DID run — the guarantee is scoped, not silent
   for (const scan of served) {
     expect(scan.scope).toBe('pair')
@@ -441,7 +441,7 @@ test('abandoning the iterator after the first lead aborts in-flight scans', asyn
 
   await ticks(30) // whatever was already dispatched settles
   const afterAbort = served.length
-  const totalChunks = Number(wave0PairScanBlocks(manifest) / 64n)
+  const totalChunks = Number(eagerPairScanBlocks(manifest) / 64n)
   expect(afterAbort).toBeLessThan(totalChunks / 2) // the walk stopped far short of the window
   await ticks(30)
   expect(served.length).toBe(afterAbort) // and nothing new goes out after the abort settles
@@ -526,14 +526,14 @@ test('intermediates are seeded before the first pump cycle: a cold two-hop leads
   }
 })
 
-test('the intermediates frontier advances by MAX_INTERMEDIATES per dry cycle and reaches everything eligible', async () => {
+test('the intermediates frontier advances by INTERMEDIATES_BATCH per dry cycle and reaches everything eligible', async () => {
   const world: World = new Map()
   const manifest = manifestOf({ v2: true })
   const index = new PoolIndex(WETH)
   newPool(index, world, T_IN, T_OUT)
-  // MAX_INTERMEDIATES + 3 eligible X nodes (plus WETH the core): more than one batch.
+  // INTERMEDIATES_BATCH + 3 eligible X nodes (plus WETH the core): more than one batch.
   const xs: Address[] = []
-  for (let i = 0; i < MAX_INTERMEDIATES + 3; i++) {
+  for (let i = 0; i < INTERMEDIATES_BATCH + 3; i++) {
     const x = addr(0xc100 + i)
     xs.push(x)
     newPool(index, world, T_IN, x, undefined, BigInt(i + 1))
@@ -551,7 +551,7 @@ test('the intermediates frontier advances by MAX_INTERMEDIATES per dry cycle and
     events.push(e)
   }
 
-  expect(selectedAt[0]).toBe(MAX_INTERMEDIATES) // the seed batch, in place before anything was measured
+  expect(selectedAt[0]).toBe(INTERMEDIATES_BATCH) // the seed batch, in place before anything was measured
   const final = events[events.length - 1]!
   expect(final.type).toBe('final')
   expect(final.state.intermediates.discovered).toBe(discovered)
@@ -840,7 +840,7 @@ test("the caller's own abort stops the eager scan, not only the iterator's aband
 
   await ticks(30)
   const afterAbort = served.length
-  const totalChunks = Number(wave0PairScanBlocks(manifest) / 64n)
+  const totalChunks = Number(eagerPairScanBlocks(manifest) / 64n)
   expect(afterAbort).toBeLessThan(totalChunks / 2)
   await ticks(30)
   expect(served.length).toBe(afterAbort) // and nothing new goes out once the abort settles
@@ -895,7 +895,7 @@ test('an abort mid-scan keeps the prices the landed chunks bought', async () => 
   expect(final.state.quoting.succeeded).toBeGreaterThan(0)
   expect(final.ranked[0]!.route.legs[0]!.pool.id).toBe(early.id)
   // …and the scan really was cut short rather than run to completion first.
-  const total = Number(wave0PairScanBlocks(manifest) / 64n)
+  const total = Number(eagerPairScanBlocks(manifest) / 64n)
   expect(served.filter((s) => s.scope === 'adjacency').length).toBeLessThan(total)
 })
 
@@ -1165,7 +1165,7 @@ test('termination survives a cross-search frontier shrink while parked quiet (st
  * sequencing across cycles, and a bigger graph buys more cycles, not more shapes. */
 const searchWorldArb = fc.record({
   direct: fc.boolean(),
-  xs: fc.array(fc.record({ inPrices: fc.boolean(), outPrices: fc.boolean() }), { maxLength: MAX_INTERMEDIATES + 2 }),
+  xs: fc.array(fc.record({ inPrices: fc.boolean(), outPrices: fc.boolean() }), { maxLength: INTERMEDIATES_BATCH + 2 }),
 })
 
 function buildSearchWorld(spec: { direct: boolean; xs: { inPrices: boolean; outPrices: boolean }[] }): {

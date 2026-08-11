@@ -102,7 +102,7 @@ export function robinhoodEnabled(): boolean {
  * the mainnet provider matrix) would be actively wrong here, since viem would then advertise chain 1
  * for a chain-4663 endpoint.
  *
- * The timeout is 4x {@link clientFor}'s: this is a 0.1s-block chain whose wave-0 window is 6,048,000
+ * The timeout is 4x {@link clientFor}'s: this is a 0.1s-block chain whose eager pair-scan window is 6,048,000
  * blocks, so a single `eth_getLogs` leg can be slower than a mainnet one even against a good
  * endpoint.
  */

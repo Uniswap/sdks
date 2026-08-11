@@ -375,6 +375,22 @@ function legsNote(search: SearchReport): string {
 }
 
 /**
+ * A `progress` line's BODY — everything but the timing and the budget note, which are the only two
+ * parts that differ between two otherwise-identical heartbeats.
+ *
+ * THAT IS ALSO WHY IT IS EXPORTED: `stream.ts` suppresses a live `progress` line identical to the
+ * previous one, and it decides that by comparing exactly this string. Held here rather than as a
+ * counter tuple over there, so the dedup key cannot drift from the line it is deduping — add a
+ * counter to the wording and the key follows it for free, where a separate tuple would silently start
+ * hiding real movement.
+ */
+export function progressBody(search: SearchReport): string {
+  const e = search.enumeration
+  const frontier = `explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens`
+  return `still searching — ${legsNote(search)}, ${frontier}`
+}
+
+/**
  * The full "how it went" block: the search's first lead (if it ever reported one), then every later
  * event framed as "did this beat what we had", then the search settling. Empty (no header, nothing)
  * when the search reported no events at all — an `rpc-unavailable` short-circuit has no story.
@@ -429,11 +445,8 @@ export function renderTimelineLine(
 ): string {
   const timing = `  ${timelineTiming(event.elapsedMs)}`
   switch (event.type) {
-    case 'progress': {
-      const e = event.search.enumeration
-      const frontier = `explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens`
-      return `${timing}${dim(`still searching — ${legsNote(event.search)}, ${frontier}`)}${budgetNote}`
-    }
+    case 'progress':
+      return `${timing}${dim(progressBody(event.search))}${budgetNote}`
     case 'lead':
       return `${timing}${renderLeadBody(event.result, previousBest, trade.tokenOut, ctx)}${budgetNote}`
     case 'final': {

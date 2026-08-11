@@ -1009,7 +1009,9 @@ export function createRouter(opts: CreateRouterOptions): Router {
           } finally {
             semaphore.release()
           }
-          const resolved = typeof code === 'string' && code !== '0x' && code.length > 2 ? address : null
+          // `length > 2` is the whole test: `'0x'` is exactly two characters, so any string longer
+          // than the prefix is bytecode and any shorter one is not an address with code.
+          const resolved = typeof code === 'string' && code.length > 2 ? address : null
           multicallResolved = { address: resolved }
           return resolved
         } catch {
@@ -1046,7 +1048,10 @@ export function createRouter(opts: CreateRouterOptions): Router {
    * once per resolved read. Nothing about the OUTCOME changes, only when the request goes out.
    */
   function dispatchPinnedBlock(): Promise<{ block: BlockRef; regressed: boolean }> {
-    return fetchBlock(client, maxPlausibleHeadRegression(reorgOverlapBlocksOf(manifest)), head, semaphore)
+    // `reorgOverlapBlocks` is this router's own already-computed chain fact (the same one the index
+    // was built/validated against above) — re-deriving it per request would be a second reading of a
+    // manifest that cannot change under a constructed router.
+    return fetchBlock(client, maxPlausibleHeadRegression(reorgOverlapBlocks), head, semaphore)
   }
 
   function buildContext(

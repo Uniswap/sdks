@@ -5,7 +5,8 @@ import { scanLogs } from '../internal/logScan'
 import type { ScanWidthMemory } from '../internal/logScan'
 import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from '../internal/ranges'
 import type { Semaphore } from '../internal/rpc'
-import { deploymentBlockOf, wave0PairScanBlocks } from '../manifest'
+import { deploymentBlockOf, eagerPairScanBlocks } from '../manifest'
+import { coverageScopeKey } from '../pools/poolIndex'
 import type { PoolIndex } from '../pools/poolIndex'
 import type { AdjacencyShape } from '../protocols/adjacency'
 import type { FeeDiscovery, ProtocolModule } from '../protocols/types'
@@ -28,7 +29,7 @@ import type { SearchState } from './state'
 //   DEMAND is a pure function of (scopes, gate state). The scopes are fixed for
 //   a search: adjacency for both endpoints per enabled protocol, the v4
 //   exact-pair scope, and each fee-factory scope. Pre-gate, demand is the
-//   exact-pair scope's recent week alone (`wave0PairScanBlocks`) — the bounded
+//   exact-pair scope's recent week alone (`eagerPairScanBlocks`) — the bounded
 //   latency guarantee for the new-asset case, and the reason a hinted search
 //   issues no unbounded scan at all. `demandFull()` opens every scope's whole
 //   `[deployBlock, head]`.
@@ -87,9 +88,10 @@ export type CoverageCtx = {
  * having learned something.
  *
  * `progress(gained)` is called ONCE PER INGESTED CHUNK (with the number of pool records that chunk
- * upserted) and once after each coverage or fee write (with 0). A nonzero `gained` is new knowledge:
- * the worker turns it into `state.indexVersion++` — the pump early-exits on an unchanged version, so
- * a missing bump makes it skip the very pools this scan just paid for.
+ * upserted) and once after each coverage or fee write. `gained` is nonzero for ANY NEW KNOWLEDGE —
+ * pool upserts, or a grown fee set (`runFeeScan` passes 1 for growth) — and 0 for a write that only
+ * moved coverage. A nonzero `gained` makes the worker do `state.indexVersion++`; the pump early-exits
+ * on an unchanged version, so a missing bump makes it skip the very pools this scan just paid for.
  */
 type ScanEnv = {
   index: PoolIndex
@@ -151,9 +153,18 @@ function headBackward(ranges: BlockRange[]): BlockRange[] {
   return [...ranges].sort((a, b) => (a.toBlock > b.toBlock ? -1 : a.toBlock < b.toBlock ? 1 : 0))
 }
 
-function ingestLogs(env: ScanEnv, module_: ProtocolModule, logs: Log[]): void {
+/**
+ * THE ONE INGESTION PATH: parse each log with whichever module `moduleFor` names for it, upsert what
+ * parses, and report the count as progress. Every scan in this file lands here — a single-protocol
+ * scan passes a constant `moduleFor`, a merged one passes {@link dispatchByEmitter} — so "a chunk's
+ * pools are in the index and `indexVersion` has moved" is one implementation rather than one per scan
+ * shape.
+ */
+function ingest(env: ScanEnv, moduleFor: (log: Log) => ProtocolModule | undefined, logs: Log[]): void {
   let gained = 0
   for (const log of logs) {
+    const module_ = moduleFor(log)
+    if (!module_) continue
     const record = module_.parsePoolLog(log, env.manifest)
     if (record) {
       env.index.upsert(record)
@@ -173,18 +184,8 @@ function ingestLogs(env: ScanEnv, module_: ProtocolModule, logs: Log[]): void {
  * not doing three decodes per log, and about a log from an address no enabled module claims being
  * dropped rather than tried three times.
  */
-function ingestMerged(env: ScanEnv, byEmitter: Map<string, ProtocolModule>, logs: Log[]): void {
-  let gained = 0
-  for (const log of logs) {
-    const module_ = typeof log?.address === 'string' ? byEmitter.get(log.address.toLowerCase()) : undefined
-    if (!module_) continue
-    const record = module_.parsePoolLog(log, env.manifest)
-    if (record) {
-      env.index.upsert(record)
-      gained++
-    }
-  }
-  env.progress(gained)
+function dispatchByEmitter(emitters: Map<string, ProtocolModule>): (log: Log) => ProtocolModule | undefined {
+  return (log) => (typeof log?.address === 'string' ? emitters.get(log.address.toLowerCase()) : undefined)
 }
 
 /**
@@ -225,7 +226,7 @@ async function runPairScan(env: ScanEnv, plan: ExactPairPlan, ranges: BlockRange
     if (env.signal?.aborted) break
     const scan = await scanLogs(env.client, plan.query, range, {
       ...scanOpts(env),
-      onLogs: (logs) => ingestLogs(env, plan.module_, logs),
+      onLogs: (logs) => ingest(env, () => plan.module_, logs),
     })
     for (const c of scan.covered) env.index.addCoverage('v4', plan.scope, c)
     covered.push(...scan.covered)
@@ -280,9 +281,10 @@ async function runPairScan(env: ScanEnv, plan: ExactPairPlan, ranges: BlockRange
 async function runAdjacencyScans(
   env: ScanEnv,
   demands: ScopeDemand[],
-  byEmitter: Map<string, ProtocolModule>,
+  emitters: Map<string, ProtocolModule>,
 ): Promise<Map<string, BlockRange[]>> {
   const opts = scanOpts(env)
+  const moduleFor = dispatchByEmitter(emitters)
   const covered = new Map<string, BlockRange[]>()
   await Promise.all(
     planAdjacencyScans(demands).map(async (scan) => {
@@ -295,7 +297,7 @@ async function runAdjacencyScans(
             // Chunk-by-chunk ingestion (see `runPairScan`): an adjacency scan is the longest thing
             // the engine does, and holding its pools back until the last chunk landed is what made a
             // cut-short pass worth nothing at all.
-            const result = await scanLogs(env.client, query, range, { ...opts, onLogs: (logs) => ingestMerged(env, byEmitter, logs) })
+            const result = await scanLogs(env.client, query, range, { ...opts, onLogs: (logs) => ingest(env, moduleFor, logs) })
             acc.push(...result.covered)
           }
           return mergeRanges(acc)
@@ -369,9 +371,10 @@ type WorkerScope = { protocol: Protocol; scope: string; floor: bigint } & (
   | { kind: 'fee'; module_: ProtocolModule; feeDiscovery: FeeDiscovery }
 )
 
-/** The same key space `adjacencyPlan.ts#scopeKey` uses, widened to the pair and fee scopes. */
+/** The same key space `adjacencyPlan.ts#scopeKey` uses, widened to the pair and fee scopes — both
+ * spellings go through `pools/poolIndex.ts#coverageScopeKey`, which owns the format. */
 function coverageKey(s: WorkerScope): string {
-  return `${s.protocol}:${s.scope.toLowerCase()}`
+  return coverageScopeKey(s.protocol, s.scope)
 }
 
 /** Resolves when `signal` aborts — the other half of every wait this worker does. */
@@ -456,7 +459,9 @@ export class CoverageWorker {
   }
 
   /** True when everything the CURRENT demand asks for is covered. Pre-gate that is a real answer, not
-   * a completeness claim: the limit demand is what the report is judged against. */
+   * a completeness claim: the limit demand is what the report is judged against.
+   *
+   * TEST-ONLY OBSERVABILITY — the loop reads `sources.settled()`, never this. */
   converged(): boolean {
     return this.scopes.every((s) => this.wanted(s, this.demandOf(s)).length === 0)
   }
@@ -530,9 +535,9 @@ export class CoverageWorker {
   private demandOf(s: WorkerScope): BlockRange[] {
     if (this.state.gateOpened) return this.limitOf(s)
     if (!this.eager || s.kind !== 'pair') return []
-    // Today's `WAVE0_RECENT_WINDOW_SECONDS`, surviving as this eager slice: how far back one week of
-    // this chain's own blocks reaches (`manifest.ts#wave0PairScanBlocks`).
-    const window = wave0PairScanBlocks(this.ctx.manifest)
+    // The eager slice: `EAGER_PAIR_WINDOW_SECONDS` of wall clock, in THIS chain's own blocks
+    // (`manifest.ts#eagerPairScanBlocks`).
+    const window = eagerPairScanBlocks(this.ctx.manifest)
     return [{ fromBlock: maxBig(s.floor, this.ctx.head - window + 1n), toBlock: this.ctx.head }]
   }
 
@@ -653,7 +658,10 @@ export class CoverageWorker {
       if (this.wanted(s, this.limitOf(s)).length === 0) {
         if (s.kind !== 'adjacency' || this.reported.has(`complete:${key}`)) continue
         this.reported.add(`complete:${key}`)
-        applyCoverage(this.state, s.protocol, s.endpoint.toLowerCase(), { kind: 'complete' })
+        // `s.scope`, not `s.endpoint`: identical for an adjacency scope (`buildScopes` sets both to
+        // the same node) and it is the ONE field every arm here reads, so the two verdicts cannot be
+        // keyed off different fields.
+        applyCoverage(this.state, s.protocol, s.scope.toLowerCase(), { kind: 'complete' })
       } else if (s.kind !== 'fee' && this.wanted(s, this.demandOf(s)).length > 0 && !this.reported.has(`failed:${key}`)) {
         this.reported.add(`failed:${key}`)
         applyCoverage(this.state, s.protocol, s.scope.toLowerCase(), { kind: 'failed' })

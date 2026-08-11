@@ -44,7 +44,7 @@ import { CANARY_TRADER, probeSimulateV1Support, simulateSwapE2E } from './simula
 //     only place the ur-2.1 encoder's output meets a real chain (mainnet forks can only execute
 //     ur-2.0, and this chain has no forkable archive endpoint), so simulation IS the execution
 //     proof here. The quote-only configuration is still exercised via override.
-//  2. A 0.1s BLOCK TIME. `wave0PairScanBlocks` is 6,048,000 blocks here — 2.5x Arbitrum's, 20x
+//  2. A 0.1s BLOCK TIME. `eagerPairScanBlocks` is 6,048,000 blocks here — 2.5x Arbitrum's, 20x
 //     Base's. Every budget in this file is sized for that, and the per-row `AbortSignal` is what
 //     keeps a row finite rather than open-ended.
 //  3. HINT-FREE DISCOVERY ON A FOREIGN CHAIN. The memecoin rows select their pool from logs but

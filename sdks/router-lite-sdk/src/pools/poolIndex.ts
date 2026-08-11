@@ -58,6 +58,22 @@ import { PROTOCOLS } from '../types'
 // ---------------------------------------------------------------------------
 
 /**
+ * THE COVERAGE/FEE CACHE'S KEY FORMAT, spelled in exactly one place: `protocol:scope`, scope
+ * lowercased. Every scope kind rides in the same space — an adjacency endpoint's address, a
+ * {@link PoolIndex.pairScope} string, or a fee factory's address (a factory is never one of a pool's
+ * currencies, so those two cannot collide).
+ *
+ * Exported because three callers outside this class key the same strings and must not re-spell the
+ * format: the coverage worker's per-scope bookkeeping (`search/coverage.ts`), the adjacency planner's
+ * merge keys (`search/adjacencyPlan.ts`), and `cli/cache.ts`, which reads the PREFIX alone to bucket a
+ * snapshot's coverage per protocol (`coverageScopeKey(p, '')`). A second spelling anywhere is a cache
+ * that silently misses.
+ */
+export function coverageScopeKey(protocol: Protocol, scope: string): string {
+  return `${protocol}:${scope.toLowerCase()}`
+}
+
+/**
  * Provenance axis, most-specific (most-authoritative) first: a caller's `hint` is never downgraded
  * by anything discovered later — 'event' (an on-chain creation log) is stronger provenance than
  * 'factory' (a quote probe that merely proved a pool responds) and so outranks it, but neither ever
@@ -768,13 +784,13 @@ export class PoolIndex {
 
   /** `scope` is either a token endpoint's address (adjacency) or a {@link pairScope} string. */
   addCoverage(p: Protocol, scope: string, r: BlockRange): void {
-    const key = `${p}:${scope.toLowerCase()}`
+    const key = coverageScopeKey(p, scope)
     const existing = this.coverage.get(key) ?? []
     this.coverage.set(key, mergeRanges([...existing, r]))
   }
 
   uncovered(p: Protocol, scope: string, deployBlock: bigint, head: bigint): BlockRange[] {
-    const key = `${p}:${scope.toLowerCase()}`
+    const key = coverageScopeKey(p, scope)
     const covered = this.coverage.get(key) ?? []
 
     // Clip covered ranges to the requested domain [deployBlock, head]; they arrive sorted/disjoint.
@@ -812,7 +828,7 @@ export class PoolIndex {
    * never collide because a factory is never one of a pool's currencies.
    */
   addEnabledFees(p: Protocol, factory: string, fees: number[]): void {
-    const key = `${p}:${factory.toLowerCase()}`
+    const key = coverageScopeKey(p, factory)
     let set = this.fees.get(key)
     if (!set) {
       set = new Set()
@@ -823,7 +839,7 @@ export class PoolIndex {
 
   /** Fee tiers discovered for `factory` so far, ascending (empty until a fee scan has run). */
   enabledFees(p: Protocol, factory: string): number[] {
-    return [...(this.fees.get(`${p}:${factory.toLowerCase()}`) ?? [])].sort((a, b) => a - b)
+    return [...(this.fees.get(coverageScopeKey(p, factory)) ?? [])].sort((a, b) => a - b)
   }
 
   markSuccess(ref: PoolRef, block: bigint): void {

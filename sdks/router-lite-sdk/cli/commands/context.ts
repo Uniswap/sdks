@@ -537,6 +537,25 @@ export function classifyLeadOrigin(route: QuotedRoute, preExistingDirect: Readon
 }
 
 /**
+ * Binds {@link classifyLeadOrigin} to one search: takes the pre-search snapshot and hands back the
+ * closure `consumeSearch`'s `classify` option expects. Both `quote` and `swap` want exactly this, and
+ * holding it here is what keeps the two commands from drifting on WHEN the snapshot is taken.
+ *
+ * CALL IT BEFORE THE SEARCH STARTS. The snapshot is of what the index already knew about this EXACT
+ * pair before the search touches it — the only way `classifyLeadOrigin` can tell "the cache already
+ * had this" from "this search's own probe just found it". Taken any later, the probe's own discovery
+ * is already in the set and every lead reads `cache`.
+ */
+export function makeLeadClassifier(
+  ctx: ChainContext,
+  trade: TradeContextResolved,
+): (route: QuotedRoute) => 'cache' | 'hint' | 'probe' {
+  const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
+  const hasHints = trade.hints.length > 0
+  return (route) => classifyLeadOrigin(route, preExistingDirect, hasHints)
+}
+
+/**
  * Fills the render context with symbols/decimals for every intermediate token appearing in the
  * results' route legs (two-hop routes traverse tokens the user never named). Bounded and
  * best-effort: an unresolvable leg token renders as a shortened address, never an error.

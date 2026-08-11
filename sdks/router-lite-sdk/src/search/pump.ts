@@ -25,7 +25,7 @@ import { PROTOCOLS } from '../types'
 
 import type { Notifier } from './notify'
 import type { LegDirection, Measurement, SearchState } from './state'
-import { applyMeasurement, legKey } from './state'
+import { applyMeasurement, measurementKey } from './state'
 
 // ---------------------------------------------------------------------------
 // The pricing pump (spec §3.2) — the engine's one convergence process over
@@ -99,7 +99,9 @@ export type PumpCtx = {
 }
 
 /** Where a planned leg's pool identity came from — decides the on-success index bookkeeping
- * (`index` pools are merely re-touched; proven hypotheses upsert as 'factory', hints as 'hint'). */
+ * (`index` pools are merely re-touched; proven hypotheses upsert as 'factory', hints as 'hint').
+ * 'factory' IS this vocabulary's 'hypothesis' under the older wire name `PoolRecord.source` uses —
+ * see `types.ts#PoolRecord.source`. */
 type Provenance = 'index' | 'hypothesis' | 'hint'
 
 export type PlannedLeg = {
@@ -196,11 +198,20 @@ function hintHypotheses(ctx: PumpCtx): PoolRef[] {
 function materializeLeg(pool: PoolRef, fromNode: Address, wrappedNative: Address, hookData: Map<string, Hex>): RouteLeg {
   const [c0, c1] = pool.currencies
   const [currencyIn, currencyOut] = toGraphNode(c0, wrappedNative) === fromNode ? [c0, c1] : [c1, c0]
-  const leg: RouteLeg = { pool, currencyIn, currencyOut }
-  if (pool.protocol === 'v4') {
-    const stamped = hookData.get(pool.poolId.toLowerCase())
-    if (stamped !== undefined) leg.hookData = stamped
-  }
+  return stampHookData({ pool, currencyIn, currencyOut }, hookData)
+}
+
+/**
+ * Stamps the caller's `hookData` (keyed by lowercased poolId) onto a v4 leg, in place, and hands the
+ * leg back. THE ONLY PLACE THE STAMP HAPPENS: planning materializes a leg from a pool ref
+ * ({@link materializeLeg}), composition rebuilds one from a measurement ({@link legOf}), and both
+ * must produce byte-identical hookData or the leg the search PRICED is not the leg it ENCODES.
+ * Non-v4 legs have no hookData slot and pass through untouched.
+ */
+function stampHookData(leg: RouteLeg, hookData: Map<string, Hex>): RouteLeg {
+  if (leg.pool.protocol !== 'v4') return leg
+  const stamped = hookData.get(leg.pool.poolId.toLowerCase())
+  if (stamped !== undefined) leg.hookData = stamped
   return leg
 }
 
@@ -334,7 +345,10 @@ export function planDueLegs(state: SearchState, ctx: PumpCtx, req: QuoteRequest)
   const planPair = (a: CurrencyRef, b: CurrencyRef, fromNode: Address, amountIn: bigint, role: PlannedLeg['role']): void => {
     for (const { ref, provenance } of measurablePools(state, ctx, a, b, hintRefs)) {
       const shaped = materializeLeg(ref, fromNode, wrappedNative, ctx.hookData)
-      const key = legKey(ref.id, shaped.currencyIn.toLowerCase(), amountIn)
+      // Keyed through the SAME function `applyMeasurement` keys the answer with, so "a dispatcher and
+      // `applyMeasurement` can never key one leg two ways" is structural rather than two call sites
+      // that happen to agree on a format.
+      const key = measurementKey({ pool: ref, currencyIn: shaped.currencyIn, currencyOut: shaped.currencyOut, amountIn })
       if (state.measurements.has(key) || state.measuredKeys.has(key) || state.inFlightKeys.has(key) || dueKeys.has(key)) continue
       dueKeys.add(key)
       const leg: LegRequest = {
@@ -605,14 +619,10 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
   return true
 }
 
-/** The v4 hookData stamp for a measurement's leg, applied at composition exactly as at planning. */
+/** The v4 hookData stamp for a measurement's leg, applied at composition exactly as at planning —
+ * literally the same {@link stampHookData} call, so "exactly as" is structural. */
 function legOf(m: Measurement, ctx: PumpCtx): RouteLeg {
-  const leg: RouteLeg = { pool: m.pool, currencyIn: m.currencyIn, currencyOut: m.currencyOut }
-  if (m.pool.protocol === 'v4') {
-    const stamped = ctx.hookData.get(m.pool.poolId.toLowerCase())
-    if (stamped !== undefined) leg.hookData = stamped
-  }
-  return leg
+  return stampHookData({ pool: m.pool, currencyIn: m.currencyIn, currencyOut: m.currencyOut }, ctx.hookData)
 }
 
 /**

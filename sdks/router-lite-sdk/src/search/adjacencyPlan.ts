@@ -1,6 +1,7 @@
 import type { Address } from 'viem'
 
 import { mergeRanges } from '../internal/ranges'
+import { coverageScopeKey } from '../pools/poolIndex'
 import { adjacencyQueries } from '../protocols/adjacency'
 import type { AdjacencyShape } from '../protocols/adjacency'
 import type { BlockRange, MergedLogQuery, Protocol } from '../types'
@@ -68,8 +69,10 @@ type MergedScan = {
   covers: AdjacencyScope[]
 }
 
+/** An adjacency scope's key in the index's coverage key space — the format is owned by
+ * `pools/poolIndex.ts#coverageScopeKey`, never re-spelled here. */
 export function scopeKey(scope: AdjacencyScope): string {
-  return `${scope.protocol}:${scope.endpoint.toLowerCase()}`
+  return coverageScopeKey(scope.protocol, scope.endpoint)
 }
 
 function contains(ranges: BlockRange[], block: bigint): boolean {

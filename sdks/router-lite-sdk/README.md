@@ -64,7 +64,7 @@ merely "the pump has nothing due", is what makes the launcher promise structural
 that is a counted contract test rather than a timing accident.
 
 **The intermediates frontier.** Two-hop intermediates are not capped — they are a frontier whose
-batch size is `MAX_INTERMEDIATES` (8), ordered hinted → manifest cores → newest-pool-touching
+batch size is `INTERMEDIATES_BATCH` (8), ordered hinted → manifest cores → newest-pool-touching
 discovered node. That 8 is the **seed as well as the step**: the first batch is selected *before*
 the first pump cycle runs, so a cold two-hop never waits for a dry cycle to learn that the manifest's
 cores exist and the very first measurement round already covers as many intermediates as the old
@@ -254,7 +254,7 @@ Four counts and two verdicts, all of them about *how much of the space this answ
 | --- | --- |
 | `intermediatesDiscovered` | Eligible two-hop intermediate nodes the index currently knows about, refreshed every cycle. |
 | `intermediatesSelected` | How many of them the frontier has actually reached and priced legs for. |
-| `intermediatesPruned` | `discovered − selected` — read it as **"not reached yet"**, never as "capped". The frontier advances a batch per quiet cycle, so a consumer that keeps pulling drives this to zero; the old `MAX_INTERMEDIATES` cap held it above zero forever. |
+| `intermediatesPruned` | `discovered − selected` — read it as **"not reached yet"**, never as "capped". The frontier advances a batch per quiet cycle, so a consumer that keeps pulling drives this to zero. A nonzero value means the search settled before the frontier ran out, not that the engine refused to look. |
 | `legsMeasured` | Leg measurements that reached a terminal state — priced, reverted, or lost to the transport past their one retry. Legs are deduped by (pool, direction, amount), so this counts **work done**, not routes considered: one leg serves every candidate that crosses it. |
 | `pairCeilingHit` | The abuse backstop fired: some pair held more pools than `MEASUREMENT_PAIR_CEILING` (128) and the excess was never measured. Not a selection cap — a pair that trips it is a pool-spam pair, and the search is no longer exhaustive over it. |
 | `exhaustiveWithinMaxHops` | True only when nothing measurable was left out: discovery complete on every enabled protocol, the frontier having reached every intermediate it found, the pair ceiling untouched, no abort, and no leg left unattempted or lost to the transport. |
@@ -917,7 +917,7 @@ Both fields are facts about the chain, not tuning knobs, and both default to mai
 
 | Field | Default | What reads it |
 | --- | --- | --- |
-| `blockTimeSeconds` | `12` | Converts this package's time-shaped policies into block counts. Today: the eager pre-gate pair-scan window (`wave0PairScanBlocks`, a surviving code identifier), which is one week of wall-clock — `ceil(604800 / blockTimeSeconds)` blocks, so 50,400 on mainnet, 302,400 at 2s, 2,419,200 at 0.25s. Leaving it at the mainnet default on a 2s chain shrinks that window to ~28 hours, and a token launched the day before yesterday stops being visible to the fast path. The unit is **seconds** — values above 3,600 are rejected as a milliseconds mix-up. |
+| `blockTimeSeconds` | `12` | Converts this package's time-shaped policies into block counts. Today: the eager pre-gate pair-scan window (`eagerPairScanBlocks`), which is one week of wall-clock — `ceil(604800 / blockTimeSeconds)` blocks, so 50,400 on mainnet, 302,400 at 2s, 2,419,200 at 0.25s. Leaving it at the mainnet default on a 2s chain shrinks that window to ~28 hours, and a token launched the day before yesterday stops being visible to the fast path. The unit is **seconds** — values above 3,600 are rejected as a milliseconds mix-up. |
 | `reorgOverlapBlocks` | `32n` | How much already-covered tip every warm scan re-opens, and the unit the head-regression guard is 4x of. Mainnet's 32 is one beacon epoch; on an L2 the depth that matters is an unsafe-head rewind, usually much larger in that chain's faster blocks. |
 
 Because `reorgOverlapBlocks` is baked into a `PoolIndex` when it is constructed, injecting an index

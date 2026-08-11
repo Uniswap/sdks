@@ -169,10 +169,9 @@ export const HINT_DISCREDIT_FAILURE_BLOCKS = 2
  * Per-cycle growth batch for the intermediates frontier (`search/loop.ts#advanceIntermediates`) — the
  * seed size selected before the first pump cycle, and the batch added on each subsequent quiet cycle.
  * NOT a permanent cap: the frontier keeps growing by this many nodes every dry cycle until every
- * eligible intermediate is selected, unlike the old constant of the same name that held the set at
- * this size forever (see `types.ts#intermediatesPruned`'s docstring).
+ * eligible intermediate is selected (see `types.ts#intermediatesPruned`'s docstring).
  */
-export const MAX_INTERMEDIATES = 8
+export const INTERMEDIATES_BATCH = 8
 
 /** basis: policy
  * Max pools measured on one pair — an abuse backstop against pool-spam pairs, not a selection cap. */
@@ -263,7 +262,7 @@ export const MAX_CONCURRENCY = 1024
  * Seconds per block on mainnet — the default when a manifest carries no `chain.blockTimeSeconds`.
  *
  * Post-merge Ethereum produces a block every 12s by protocol, modulo missed slots. Every window this
- * package expresses in TIME (today: {@link WAVE0_RECENT_WINDOW_SECONDS}) is converted to blocks
+ * package expresses in TIME (today: {@link EAGER_PAIR_WINDOW_SECONDS}) is converted to blocks
  * through this, so a chain that supplies its own value gets the same policy in its own units rather
  * than mainnet's block count reinterpreted as if its blocks were 12s apart.
  */
@@ -308,6 +307,8 @@ export const NEGATIVE_CACHE_BLOCKS = 2n
  * A FUNCTION, not a constant, because the multiplicand is per-chain (C4-P1): the multiple of 4 is
  * the policy — "no honest lag runs four reorg depths deep" — and `reorgOverlapBlocks` is the chain
  * fact it multiplies. Callers pass `reorgOverlapBlocksOf(manifest)`, never the mainnet default.
+ *
+ * basis: policy
  */
 export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
   return reorgOverlapBlocks * 4n
@@ -591,7 +592,7 @@ export const MAX_BACKOFF_TOTAL_MS = 60_000
  * as "~a week of mainnet blocks"; on Base (2s blocks) the same number is 28 hours and on Arbitrum
  * (~0.25s) 3.5 hours, so on exactly the chains where new launches are most common the new-launch fast
  * path silently stopped covering the launch. The block count is derived per-search from the
- * manifest's block time instead — see `manifest.ts#wave0PairScanBlocks`, which on mainnet's default
+ * manifest's block time instead — see `manifest.ts#eagerPairScanBlocks`, which on mainnet's default
  * 12s yields 50,400 blocks (the old constant, to within 1% — the window was always approximate).
  */
-export const WAVE0_RECENT_WINDOW_SECONDS = 604_800
+export const EAGER_PAIR_WINDOW_SECONDS = 604_800

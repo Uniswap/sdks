@@ -4,7 +4,7 @@ import { isAddress, isAddressEqual, keccak256 } from 'viem'
 import {
   DEFAULT_BLOCK_TIME_SECONDS,
   DEFAULT_REORG_OVERLAP_BLOCKS,
-  WAVE0_RECENT_WINDOW_SECONDS,
+  EAGER_PAIR_WINDOW_SECONDS,
 } from './constants'
 import { RouterConfigError } from './errors'
 import type { ChainManifest, Protocol, UniversalRouterDeployment } from './types'
@@ -475,7 +475,7 @@ export const ROBINHOOD_MANIFEST: ChainManifest = {
 // 9 and 10 candidates attempted; ALL succeeded; zero quote failures, zero
 // transport failures), while full log-scan discovery over these chains' eager
 // pair windows — 302,400 blocks on Base, 604,800 on Unichain, 2,419,200 on
-// Arbitrum, per `wave0PairScanBlocks` — does not finish in 60 seconds. This is
+// Arbitrum, per `eagerPairScanBlocks` — does not finish in 60 seconds. This is
 // the same "first actionable latency is stable, completion is not" finding the
 // mainnet canary recorded, reproduced on three L2s: quote quality came from the
 // cheap path, and the caller's `AbortSignal` is what bounds the rest.
@@ -607,7 +607,7 @@ export function manifestFor(chainId: number, overrides?: Partial<ChainManifest>)
 // Chain-data accessors (C4-P1).
 //
 // The ONLY readers of `constants.ts`'s two mainnet defaults. Everything that
-// needs a chain fact — the wave-0 scan window, the pool index's reorg overlap,
+// needs a chain fact — the eager pair-scan window, the pool index's reorg overlap,
 // the head watermark's plausibility bound — goes through one of these, so a
 // manifest is the single place a new chain states its own answers and no
 // module has to be taught about chains one at a time.
@@ -619,7 +619,7 @@ export function manifestFor(chainId: number, overrides?: Partial<ChainManifest>)
  * Not a claim that a chain cannot be slower — it is a UNIT-CONFUSION TRIPWIRE. `blockTimeSeconds` is
  * the one field here a caller might plausibly fill in from a different unit (milliseconds, which is
  * how much chain metadata publishes block times), and the mistake is otherwise silent in the
- * safe-looking direction: `blockTimeSeconds: 12000` for mainnet yields a 51-block wave-0 window
+ * safe-looking direction: `blockTimeSeconds: 12000` for mainnet yields a 51-block eager pair-scan window
  * instead of 50,400, which does not throw, does not degrade, and simply stops finding pools. No real
  * EVM chain produces a block less often than hourly, so anything above this is a bug in the manifest
  * rather than an unusual chain.
@@ -634,8 +634,8 @@ const MAX_BLOCK_TIME_SECONDS = 3_600
 /**
  * Rejects a `chain` bundle whose values cannot produce a usable window, synchronously and before any
  * RPC — the same posture as every other manifest check. Every failure here is silent otherwise: a
- * `blockTimeSeconds` of 0 makes {@link wave0PairScanBlocks} `Infinity` (and `BigInt(Infinity)` a
- * `RangeError` thrown from inside a search), an implausibly large one collapses the wave-0 window to
+ * `blockTimeSeconds` of 0 makes {@link eagerPairScanBlocks} `Infinity` (and `BigInt(Infinity)` a
+ * `RangeError` thrown from inside a search), an implausibly large one collapses the eager pair-scan window to
  * nothing while looking perfectly well-formed (see {@link MAX_BLOCK_TIME_SECONDS}), and a negative
  * `reorgOverlapBlocks` re-opens coverage *ahead* of the tip, which reads as "nothing to scan" rather
  * than as a configuration mistake.
@@ -780,7 +780,7 @@ export function deploymentBlockOf(m: ChainManifest, p: Protocol): bigint | undef
 }
 
 /**
- * The eager exact-pair scan window, in blocks: {@link WAVE0_RECENT_WINDOW_SECONDS} of wall-clock
+ * The eager exact-pair scan window, in blocks: {@link EAGER_PAIR_WINDOW_SECONDS} of wall-clock
  * converted through this chain's block time and rounded UP (a short window is the failure that
  * matters — it is what makes a just-launched pool invisible to the fast path — so the rounding error
  * is spent on scanning a block too many, never a block too few).
@@ -789,8 +789,8 @@ export function deploymentBlockOf(m: ChainManifest, p: Protocol): bigint | undef
  * which is also the honest cost of the policy on a fast chain, and the reason the eager scan is
  * bounded by the index's coverage cache rather than re-walked from scratch each search.
  */
-export function wave0PairScanBlocks(m: ChainManifest): bigint {
-  return BigInt(Math.ceil(WAVE0_RECENT_WINDOW_SECONDS / blockTimeSecondsOf(m)))
+export function eagerPairScanBlocks(m: ChainManifest): bigint {
+  return BigInt(Math.ceil(EAGER_PAIR_WINDOW_SECONDS / blockTimeSecondsOf(m)))
 }
 
 /**
