@@ -138,7 +138,7 @@ export const CACHE_FLAGS: FlagSpec = {
  * from 356 to 14 — the 14 being the standing reorg-overlap re-scans, i.e. the floor. The cost lands
  * on the other side: `rl quote eth usdc 1` is 0.4s cold and 4.5s against a maximal cache, of which
  * ~2s is snapshot I/O and the rest is the search legitimately doing more (82 candidates priced
- * instead of 10, off 7,824 known intermediates instead of none). A major pair resolves in wave 0
+ * instead of 10, off 7,824 known intermediates instead of none). A major pair resolves on the first measurement round
  * from speculative direct probes and genuinely does not need the index; a long-tail pair — what this
  * SDK is actually for — falls through to exactly the adjacency scans the cache eliminates. Anyone
  * measuring cold latency, or who wants neither cost, passes `--no-cache`; deleting the file is
@@ -322,7 +322,7 @@ export async function saveCache(chainId: number, index: PoolIndex): Promise<stri
 // `report.ts#renderCacheLine`, which is the actual string formatting.
 //
 // Computed PRE-SEARCH, from the snapshot alone, with no new RPC call: the
-// live chain head is a search's own first read, a whole wave away, and the
+// live chain head is a search's own first read, one round trip away, and the
 // cache line has to be printable before that. So "head" here is a PROXY —
 // the highest block ANY coverage range in the whole snapshot reaches, across
 // every protocol and scope — not the chain's real tip. That makes the
@@ -330,7 +330,7 @@ export async function saveCache(chainId: number, index: PoolIndex): Promise<stri
 // caught up is this cache with the live chain": a snapshot that is a month
 // stale but was fully scanned up to the block it stopped at still reads
 // 100% here, and correctly so — the real staleness is exactly the delta the
-// upcoming search's first wave will close, and is not this line's job to
+// upcoming search's own scans will close, and is not this line's job to
 // guess at.
 // ---------------------------------------------------------------------------
 

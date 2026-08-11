@@ -2,8 +2,8 @@
 // `rl swap <tokenIn> <tokenOut> <amount> --trader 0x…` — build (and
 // optionally prove) executable Universal Router calldata.
 //
-// Same wave semantics as `quote` (see that file's header for why every mode
-// — default, `--verbose`, `--watch` — now iterates the same generator and
+// Same event semantics as `quote` (see that file's header for why every mode
+// — default, `--verbose`, `--watch` — iterates the same event stream and
 // always collects the "how it went" timeline), plus:
 //  - the full tx (to / value / calldata) and the compiled limits the SDK
 //    asserts inside it (`minAmountOut`, `deadline` — echoed, not re-derived);
@@ -19,9 +19,9 @@ import { blockTimeSecondsOf } from '../../src/experimental/index'
 import type { SwapRequest, SwapResult } from '../../src/index'
 import { bold, dim, green, red, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
-import { amountFor, exitCodeFor, jsonify, renderSwapResult, type FirstLeadInfo, type TradeContext } from '../report'
-import { probeSimulateV1Support, simulateSwap } from '../simulate'
-import { firstRouteReporter, iterateWaves } from '../waves'
+import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } from '../report'
+import { isSkipped, probeSimulateV1Support, simulateSwap } from '../simulate'
+import { consumeSearch } from '../stream'
 
 import { buildChainContext, classifyLeadOrigin, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
 
@@ -96,36 +96,24 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 
     const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
-    let first: FirstLeadInfo | undefined
-    // `--watch`/`--verbose` PRINT per wave (NDJSON under `--json`, a narrative line otherwise); the
-    // default path stays silent until the end either way — see `waves.ts`'s header for why that is
+    // `--watch`/`--verbose` PRINT per event (NDJSON under `--json`, a narrative line otherwise); the
+    // default path stays silent until the end either way — see `stream.ts`'s header for why that is
     // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
     const stream = watch || verbose
 
     // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
-    // simulated yet) — the timeline's `(unverified)` suffix already says so; see
-    // `src/router.ts#IterateOptions`.
-    const results = ctx.router.swaps(request, {
-      onFirstRoute: firstRouteReporter({
-        json,
-        stream,
-        started,
-        classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
-        record: (info) => {
-          first = info
-        },
-      }),
-    })
-    const { final, history } = await iterateWaves(results, {
+    // simulated yet) — the timeline's `(unverified)` suffix says so, and the later lead that turns
+    // it into a `ready`/`needs-action` result is the one that reads "confirmed executable on-chain".
+    const { final, first, timeline } = await consumeSearch(ctx.router.swaps(request), {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
-      // first actionable wave — the same answer `getSwap` would give (see `quote.ts`'s header).
+      // first actionable lead — the same answer `getSwap` would give (see `quote.ts`'s header).
       stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
       stream,
       trade: tradeCtx,
       renderCtx: trade.renderCtx,
-      getFirst: () => first,
+      classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
     })
     if (!final) return 2
@@ -139,11 +127,10 @@ export async function cmdSwap(argv: string[]): Promise<number> {
         renderSwapResult(final, tradeCtx, trade.renderCtx, {
           elapsedMs: Date.now() - started,
           addresses,
-          verbose,
           ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
           blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
           ...(first !== undefined ? { first } : {}),
-          waves: history,
+          timeline,
         }).join('\n'),
       )
     }
@@ -185,6 +172,13 @@ async function runSimulation(
     return 'skipped'
   }
   const outcome = await simulateSwap(ctx.client, ctx.router, final, trader, recipient)
+  // A routing/liquidity outcome on the FUNDING leg — same class as the unsupported-endpoint skip
+  // above, and deliberately not an error: the tx under test was built and nothing disproved it.
+  if (isSkipped(outcome)) {
+    if (!json) console.log(yellow(`--simulate skipped: ${outcome.skipped}`))
+    else console.log(jsonify({ simulate: outcome }, false))
+    return 'skipped'
+  }
   if (json) {
     console.log(jsonify({ simulate: outcome }, false))
     return outcome.ok ? 'proved' : 'disproved'

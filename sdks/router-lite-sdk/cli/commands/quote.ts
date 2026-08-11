@@ -3,12 +3,12 @@
 // search got there.
 //
 // Every mode — default, `--verbose`, `--watch` — iterates the SAME
-// `ctx.router.quotes()` generator now (see `waves.ts`'s header for why that
+// `ctx.router.quotes()` event stream (see `stream.ts`'s header for why that
 // is provably identical to the old default path's `getQuote` call), so the
 // "how it went" timeline is available whether or not it is also streamed
 // live:
-//  - default: stop at the first actionable wave (a leader exists) — same
-//    answer `getQuote` would give, timeline rendered once at the end;
+//  - default: stop at the first actionable `lead` — same answer `getQuote`
+//    would give, timeline rendered once at the end;
 //  - `--verbose`: identical stop condition, timeline streamed live too;
 //  - `--watch`: drains the whole bounded search, timeline streamed live and
 //    then recapped in the final panel.
@@ -17,8 +17,8 @@
 import { blockTimeSecondsOf } from '../../src/experimental/index'
 import type { QuoteRequest } from '../../src/index'
 import { parseArgs } from '../args'
-import { exitCodeFor, jsonify, renderQuoteResult, type FirstLeadInfo, type TradeContext } from '../report'
-import { firstRouteReporter, iterateWaves } from '../waves'
+import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
+import { consumeSearch } from '../stream'
 
 import { buildChainContext, classifyLeadOrigin, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS } from './context'
 
@@ -55,44 +55,28 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     // — the only way `classifyLeadOrigin` can tell "the cache already had this" from "this search's
     // own probe just found it".
     const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
-    let first: FirstLeadInfo | undefined
-    // `--watch`/`--verbose` PRINT per wave (NDJSON under `--json`, a narrative line otherwise); the
-    // default path stays silent until the end either way — see `waves.ts`'s header for why that is
+    // `--watch`/`--verbose` PRINT per event (NDJSON under `--json`, a narrative line otherwise); the
+    // default path stays silent until the end either way — see `stream.ts`'s header for why that is
     // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
     const stream = watch || verbose
 
-    // The SDK prices a direct route a whole wave before the search's FIRST wave yields (its probes
-    // are one round trip; the wave also waits on a log scan). `onFirstRoute` is how a streaming view
-    // gets to say so at the moment it becomes true instead of seconds later — see
-    // `src/router.ts#IterateOptions`.
-    const results = ctx.router.quotes(request, {
-      onFirstRoute: firstRouteReporter({
-        json,
-        stream,
-        started,
-        classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
-        record: (info) => {
-          first = info
-        },
-      }),
-    })
-    const { final, history } = await iterateWaves(results, {
+    const { final, first, timeline } = await consumeSearch(ctx.router.quotes(request), {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
-      // first actionable wave — the same answer `getQuote` would give (see this file's header).
+      // first actionable lead — the same answer `getQuote` would give (see this file's header).
       stopAt: (result) => !watch && result.status === 'quote',
       stream,
       trade: tradeCtx,
       renderCtx: trade.renderCtx,
-      getFirst: () => first,
+      classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
     })
     if (!final) return 2
 
     if (json) {
       if (!stream) console.log(jsonify(final))
-      // `--watch`/`--verbose` already streamed every wave as NDJSON; nothing more to print.
+      // `--watch`/`--verbose` already streamed every event as NDJSON; nothing more to print.
       return exitCodeFor(final.status)
     }
 
@@ -102,11 +86,10 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       renderQuoteResult(final, tradeCtx, trade.renderCtx, {
         elapsedMs: Date.now() - started,
         addresses,
-        verbose,
         ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
         blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
         ...(first !== undefined ? { first } : {}),
-        waves: history,
+        timeline,
       }).join('\n'),
     )
     return exitCodeFor(final.status)

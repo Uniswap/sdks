@@ -23,7 +23,7 @@ import {
   renderTimeline,
   type FirstLeadInfo,
   type RenderCtx,
-  type WaveEvent,
+  type TimelineEvent,
 } from './report'
 
 
@@ -101,11 +101,14 @@ const REPORT: SearchReport = {
       demandFloor: 21_000_000n,
     },
   },
+  // Coherent with the axes above and with the engine's own fold (`src/search/report.ts`):
+  // `intermediatesPruned` IS `discovered - selected`, and a frontier that has not reached everything
+  // it found — like a `partial` protocol — forfeits exhaustiveness.
   enumeration: {
-    exhaustiveWithinMaxHops: true,
+    exhaustiveWithinMaxHops: false,
     intermediatesDiscovered: 5_992,
     intermediatesSelected: 8,
-    intermediatesPruned: 4,
+    intermediatesPruned: 5_984,
     legsMeasured: 127,
     pairCeilingHit: false,
   },
@@ -119,24 +122,28 @@ describe('renderConfidencePanel', () => {
       'confidence',
       '  priced at block #23,456,789 · 2025-01-01 00:00 UTC',
       '  pool knowledge   v2 ▰▰▰▰▰▰▰▰▰▰ complete · v3 ▱▱▱▱▱▱▱▱▱▱ disabled · v4 ▰▰▰▰▰▰▱▱▱▱ 63.3% since #21.0M (~Jan 2024)',
-      "  routes checked   127 = 90 priced · 37 probed pools that don't exist · 0 lost to RPC",
-      '  breadth          explored 8 of 5,992 intermediate tokens — exhaustive within 2 hops',
+      "  legs measured    127 settled · 90 priced · 37 couldn't price · 0 lost to RPC",
+      '  breadth          explored 8 of 5,992 intermediate tokens, still widening — not exhaustive',
       '  verification     2 preflight simulations',
     ])
   })
 
-  it('dims the zero-valued revert/transport-loss terms while keeping the invariant sum visible', () => {
-    const clean = { ...REPORT, quoting: { attempted: 90, succeeded: 90, failed: 0, transportFailed: 0, unattempted: 0 } }
+  it('dims the zero-valued revert/transport-loss terms while keeping every outcome visible', () => {
+    const clean = {
+      ...REPORT,
+      enumeration: { ...REPORT.enumeration, legsMeasured: 90 },
+      quoting: { attempted: 90, succeeded: 90, failed: 0, transportFailed: 0, unattempted: 0 },
+    }
     const lines = renderConfidencePanel(clean, { mode: 'swap' })
-    const routesLine = lines.find((l) => l.startsWith('  routes checked'))!
-    expect(routesLine).toBe("  routes checked   90 = 90 priced · 0 probed pools that don't exist · 0 lost to RPC")
+    const legsLine = lines.find((l) => l.startsWith('  legs measured'))!
+    expect(legsLine).toBe("  legs measured    90 settled · 90 priced · 0 couldn't price · 0 lost to RPC")
   })
 
   it('keeps the never-attempted warning only when nonzero', () => {
     const withUnattempted = { ...REPORT, quoting: { ...REPORT.quoting, unattempted: 3 } }
     const lines = renderConfidencePanel(withUnattempted, { mode: 'swap' })
-    expect(lines.find((l) => l.startsWith('  routes checked'))).toContain('3 never attempted')
-    expect(renderConfidencePanel(REPORT, { mode: 'swap' }).find((l) => l.startsWith('  routes checked'))).not.toContain('never attempted')
+    expect(lines.find((l) => l.startsWith('  legs measured'))).toContain('3 never attempted')
+    expect(renderConfidencePanel(REPORT, { mode: 'swap' }).find((l) => l.startsWith('  legs measured'))).not.toContain('never attempted')
   })
 
   it('quote mode dims the verification line to a mode note instead of a zero count', () => {
@@ -185,18 +192,22 @@ describe('renderConfidencePanel', () => {
     expect(lines.some((l) => l.includes('nothing covered yet'))).toBe(false)
   })
 
-  it('shows the measurement counters only under --verbose', () => {
-    const quiet = renderConfidencePanel(REPORT, { mode: 'swap' })
-    expect(quiet.some((l) => l.includes('legs measured'))).toBe(false)
-    const loud = renderConfidencePanel(REPORT, { mode: 'swap', verbose: true })
-    expect(loud.some((l) => l.includes('127 legs measured · 4 intermediates not reached yet'))).toBe(true)
-    // The abuse backstop is named only when it actually fired.
-    expect(loud.some((l) => l.includes('pair ceiling hit'))).toBe(false)
-    const capped = renderConfidencePanel(
-      { ...REPORT, enumeration: { ...REPORT.enumeration, pairCeilingHit: true } },
-      { mode: 'swap', verbose: true },
+  it('drops the "still widening" note once the frontier has reached everything it found', () => {
+    const settled = {
+      ...REPORT,
+      enumeration: { ...REPORT.enumeration, exhaustiveWithinMaxHops: true, intermediatesSelected: 5_992, intermediatesPruned: 0 },
+    }
+    expect(renderConfidencePanel(settled, { mode: 'swap' }).find((l) => l.startsWith('  breadth'))).toBe(
+      '  breadth          explored 5,992 of 5,992 intermediate tokens — exhaustive within 2 hops',
     )
-    expect(capped.some((l) => l.includes('pair ceiling hit'))).toBe(true)
+  })
+
+  it('warns on its own line when the pair ceiling fired, and says nothing about it otherwise', () => {
+    expect(renderConfidencePanel(REPORT, { mode: 'swap' }).some((l) => l.includes('pair ceiling'))).toBe(false)
+    const capped = renderConfidencePanel({ ...REPORT, enumeration: { ...REPORT.enumeration, pairCeilingHit: true } }, { mode: 'swap' })
+    expect(capped.find((l) => l.startsWith('  pair ceiling'))).toBe(
+      '  pair ceiling     hit — a pair held more pools than the measurement ceiling; the excess was never measured',
+    )
   })
 
   it('approximates a partial protocol\'s demand floor age from the pinned block\'s own timestamp', () => {
@@ -506,75 +517,99 @@ describe('the "how it went" timeline', () => {
     quote: { amountIn: 10n ** 18n, amountOut: 1_877_840_000n, intermediateAmounts: [] },
   }
 
-  function quoteWith(amountOut: bigint, attempted: number, succeeded: number, aborted = false): QuoteResult {
+  function searchWith(legsMeasured: number, succeeded: number, aborted = false): SearchReport {
+    return {
+      ...REPORT,
+      enumeration: { ...REPORT.enumeration, legsMeasured },
+      quoting: { ...REPORT.quoting, attempted: legsMeasured, succeeded, failed: legsMeasured - succeeded },
+      aborted,
+    }
+  }
+
+  function quoteWith(amountOut: bigint, legsMeasured: number, succeeded: number, aborted = false): QuoteResult {
     return {
       status: 'quote',
       best: { ...bestRoute, quote: { ...bestRoute.quote, amountOut } },
       alternatives: [],
-      search: { ...REPORT, quoting: { ...REPORT.quoting, attempted, succeeded }, aborted },
+      search: searchWith(legsMeasured, succeeded, aborted),
     }
   }
 
-  it('renders nothing when there is no first lead and no waves', () => {
+  const FIRST: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
+
+  it('renders nothing when there is no first lead and no events', () => {
     expect(renderTimeline(undefined, [], trade, CTX)).toEqual([])
   })
 
-  it('renders the first-lead line, labeled by origin, always marked unverified', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const lines = renderTimeline(first, [], trade, CTX)
+  it('opens with the first-lead line, labeled by origin and carrying the price it led with', () => {
+    const lines = renderTimeline(FIRST, [], trade, CTX)
     expect(lines[0]).toBe('how it went')
-    expect(lines[1]).toContain('lead from cache')
-    expect(lines[1]).toContain('unverified')
+    expect(lines[1]).toBe('  82ms    lead from cache — 1,877.84 USDC')
   })
 
   it('labels a hinted vs. a freshly-probed lead differently', () => {
-    const hint: FirstLeadInfo = { elapsedMs: 10, route: bestRoute, origin: 'hint' }
-    const probe: FirstLeadInfo = { elapsedMs: 10, route: bestRoute, origin: 'probe' }
+    const hint: FirstLeadInfo = { ...FIRST, origin: 'hint' }
+    const probe: FirstLeadInfo = { ...FIRST, origin: 'probe' }
     expect(renderTimeline(hint, [], trade, CTX)[1]).toContain('lead from a hinted pool')
     expect(renderTimeline(probe, [], trade, CTX)[1]).toContain('lead from a fresh probe')
   })
 
-  it('the confirmation wave (index 0) reports quoting counters and whether the lead held', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const held: WaveEvent = { elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86) }
-    const lines = renderTimeline(first, [held], trade, CTX)
-    expect(lines[2]).toContain('confirmed on-chain')
-    expect(lines[2]).toContain('86 of 124 candidate routes priced')
-    expect(lines[2]).toContain('lead holds')
+  it('a later lead reports the signed improvement over the leader it replaced', () => {
+    const better: TimelineEvent = { type: 'lead', elapsedMs: 5_000, result: quoteWith(1_880_000_000n, 130, 95) }
+    const lines = renderTimeline(FIRST, [better], trade, CTX)
+    expect(lines[2]).toContain('found a better route')
+    expect(lines[2]).toContain('+2.16 USDC')
   })
 
-  it('reports "lead changed" when the confirmed wave leader differs from the first lead', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const changed: WaveEvent = { elapsedMs: 700, result: quoteWith(1_900_000_000n, 124, 86) }
-    const lines = renderTimeline(first, [changed], trade, CTX)
-    expect(lines[2]).toContain('lead changed')
+  it('a lead that only changed route (same price) says so instead of claiming an improvement', () => {
+    const sideways: TimelineEvent = { type: 'lead', elapsedMs: 900, result: quoteWith(1_877_840_000n, 130, 95) }
+    expect(renderTimeline(FIRST, [sideways], trade, CTX)[2]).toContain('new lead at the same price')
   })
 
-  it('a scan wave after confirmation reports "nothing beat it" when the leader is unchanged', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const confirm: WaveEvent = { elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86) }
-    const scan: WaveEvent = { elapsedMs: 62_600, result: quoteWith(1_877_840_000n, 127, 90, true) }
-    const lines = renderTimeline(first, [confirm, scan], trade, CTX, { budgetMs: 60_000 })
-    expect(lines[3]).toContain('scanned pool history for anything better')
-    expect(lines[3]).toContain('nothing beat it')
-    expect(lines[3]).toContain('budget reached')
-    expect(lines[3]).toContain('60.0s')
+  it('a swap lead that became executable reads as the confirmation it is', () => {
+    const ready: SwapResult = {
+      status: 'ready',
+      best: { ...bestRoute, execution: 'verified' },
+      tx: { to: POOL, data: '0x', value: 0n },
+      execution: { verifiedAtBlock: REPORT.block },
+      limits: { minAmountOut: 1n, deadline: 2_000_000_000n },
+      alternatives: [],
+      search: searchWith(130, 95),
+    }
+    const line = renderTimeline(FIRST, [{ type: 'lead', elapsedMs: 700, result: ready }], trade, CTX)[2]!
+    expect(line).toContain('confirmed executable on-chain')
+    expect(line).toContain('· executable')
   })
 
-  it('a scan wave reports the signed improvement when a later wave beats the leader', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const confirm: WaveEvent = { elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86) }
-    const better: WaveEvent = { elapsedMs: 5_000, result: quoteWith(1_880_000_000n, 130, 95) }
-    const lines = renderTimeline(first, [confirm, better], trade, CTX)
-    expect(lines[3]).toContain('found a better route')
-    expect(lines[3]).toContain('+2.16 USDC')
+  it('the final event closes with the measurement counters, and carries the budget note when it aborted', () => {
+    const events: TimelineEvent[] = [{ type: 'final', elapsedMs: 62_600, result: quoteWith(1_877_840_000n, 127, 90, true) }]
+    const lines = renderTimeline(FIRST, events, trade, CTX, { budgetMs: 60_000 })
+    expect(lines[2]).toContain('search complete — 90 of 127 legs priced')
+    expect(lines[2]).toContain('budget reached')
+    expect(lines[2]).toContain('60.0s')
   })
 
-  it('never appends a budget note to a wave the search did not actually abort on', () => {
-    const first: FirstLeadInfo = { elapsedMs: 82, route: bestRoute, origin: 'cache' }
-    const confirm: WaveEvent = { elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86, false) }
-    const lines = renderTimeline(first, [confirm], trade, CTX, { budgetMs: 60_000 })
-    expect(lines[2]).not.toContain('budget')
+  it('a progress event reports the frontier without pretending the answer moved', () => {
+    const progress: TimelineEvent = { type: 'progress', elapsedMs: 1_400, search: searchWith(88, 60) }
+    expect(renderTimeline(FIRST, [progress], trade, CTX)[2]).toBe(
+      '  1.4s    still searching — 60 of 88 legs priced, explored 8 of 5,992 intermediate tokens',
+    )
+  })
+
+  it('never appends a budget note to an event the search did not actually abort on', () => {
+    const events: TimelineEvent[] = [{ type: 'final', elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86, false) }]
+    expect(renderTimeline(FIRST, events, trade, CTX, { budgetMs: 60_000 })[2]).not.toContain('budget')
+  })
+
+  it('reports "nothing priced" on a final that never found a leader', () => {
+    const noRoute: QuoteResult = {
+      status: 'no-route',
+      reason: { code: 'no-viable-route', detail: 'search complete: no viable route found' },
+      alternatives: [],
+      search: searchWith(12, 0),
+    }
+    const lines = renderTimeline(undefined, [{ type: 'final', elapsedMs: 400, result: noRoute }], trade, CTX)
+    expect(lines[1]).toContain('nothing priced — 0 of 12 legs priced')
   })
 })
 

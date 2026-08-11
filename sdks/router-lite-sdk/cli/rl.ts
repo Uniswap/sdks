@@ -87,7 +87,7 @@ ${bold('common options')}
                           name (case-insensitive). Values are credentials: never printed, never
                           cached, scrubbed out of any error text that echoes one back.
   --budget, -b <dur>      best-effort budget for the SEARCH (unit required: 900ms, 10s, 2m) — an
-                          AbortSignal the search honors between waves; transport timeouts/retries
+                          AbortSignal the search observes between cycles; transport timeouts/retries
                           derive from it. The clock starts when the search does: chain detection,
                           the cache load and token metadata are NOT charged to it.
   --concurrency <n>       max in-flight RPC requests, 1-1024 (SDK default: 20). Raise it for an
@@ -104,7 +104,7 @@ ${bold('common options')}
   --watch, -w             stream the "how it went" timeline live, to the end of the bounded search,
                           instead of only printing it once at the end.
   --verbose, -v           stream the timeline live, stop at the first actionable result
-  --json                  machine output (NDJSON per wave with --watch)
+  --json                  machine output (NDJSON, one line per search event, with --watch/--verbose)
   --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
                           It is ON by default: a warm second run re-scans only the block delta,
                           never the history. --verbose reports what it loaded and saved.

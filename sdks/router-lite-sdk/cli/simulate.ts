@@ -41,7 +41,7 @@ import {
 
 import type { CurrencyRef, EncodedTx, ExecutionRequirement, NeedsActionSwap, ReadySwap, Router } from '../src/index'
 
-import { UsageError } from './args'
+import { RpcError } from './tokens'
 
 /** Native balance the trader is given INSIDE the simulation only. */
 export const SIM_NATIVE_BALANCE = parseEther('100')
@@ -69,6 +69,25 @@ export type SimulateCallResult = { status: Hex; returnData: Hex; gasUsed: Hex; l
 export type SimulateBlockResult = { calls: SimulateCallResult[] }
 
 export type SimulateOutcome = { ok: boolean; outputReceived: bigint; failedCallIndex?: number; callCount: number }
+
+/**
+ * The simulation could not be SET UP — and that is a routing/liquidity fact about this chain, not a
+ * verdict on the tx and not a mistake the user made.
+ *
+ * BOTH CASES USED TO BE `UsageError`, WHICH EXITS 3 ("fix your arguments"). Neither is fixable that
+ * way: `--simulate` funds the trader by buying `tokenIn` with native inside the simulated block, and
+ * whether such a route exists — and whether it buys enough — is a property of the pools that happen
+ * to be deployed, identical in kind to the `no-route` this CLI reports as *data* (exit 1) rather than
+ * as usage. Reporting them as `skipped` keeps the run's exit code the SWAP's own (the tx was built
+ * and is what the user asked about), exactly as an endpoint with no `eth_simulateV1` already does.
+ */
+export type SimulateSkipped = { skipped: string }
+
+export type SimulateResult = SimulateOutcome | SimulateSkipped
+
+export function isSkipped(result: SimulateResult): result is SimulateSkipped {
+  return 'skipped' in result
+}
 
 /** Cheapest possible "does this provider implement eth_simulateV1" probe. Never throws. */
 export async function probeSimulateV1Support(client: Pick<PublicClient, 'request'>): Promise<boolean> {
@@ -192,7 +211,7 @@ export async function simulateSwap(
   result: ReadySwap | NeedsActionSwap,
   trader: Address,
   recipient: Address,
-): Promise<SimulateOutcome> {
+): Promise<SimulateResult> {
   const tokenIn = traderInputCurrency(result)
 
   let acquisitionTx: EncodedTx | undefined
@@ -200,12 +219,10 @@ export async function simulateSwap(
     const acquire = await router.getSwap({ tokenIn: 'native', tokenOut: tokenIn, amountIn: ACQUIRE_NATIVE_BUDGET, trader })
     if (acquire.status !== 'ready' && acquire.status !== 'needs-action') {
       const reason = 'reason' in acquire ? ` (${acquire.reason.code})` : ''
-      throw new UsageError(
-        `--simulate: no acquisition route native → tokenIn for the trader${reason} — cannot fund the simulated swap`,
-      )
+      return { skipped: `no acquisition route native → tokenIn${reason} — nothing can fund the simulated swap` }
     }
     if (acquire.best.quote.amountOut < result.best.quote.amountIn) {
-      throw new UsageError('--simulate: the acquisition leg cannot buy enough tokenIn to fund the swap — try a smaller amount')
+      return { skipped: 'the acquisition leg cannot buy enough tokenIn to fund the swap — try a smaller amount' }
     }
     acquisitionTx = acquire.tx
   }
@@ -213,6 +230,9 @@ export async function simulateSwap(
   const payload = buildSimulatePayload(result, trader, acquisitionTx ? { acquisitionTx } : undefined)
   const blocks = (await client.request({ method: 'eth_simulateV1', params: [payload, 'latest'] } as never)) as SimulateBlockResult[]
   const block = blocks[0]
-  if (!block) throw new UsageError('--simulate: eth_simulateV1 returned no block results — the endpoint may not really support it')
+  // A fact about the ENDPOINT (it answered the request with nothing), so `RpcError` → exit 2, the
+  // code that means "the provider could not answer a read this needed". Never `UsageError`/exit 3:
+  // the arguments were fine, and telling a script to fix them would be wrong advice.
+  if (!block) throw new RpcError('--simulate: eth_simulateV1 returned no block results — the endpoint may not really support it')
   return evaluateSimulateResult(block, recipient, result.limits.minAmountOut)
 }

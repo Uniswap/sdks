@@ -3,12 +3,12 @@
 //
 // Mechanism: the CLI always injects its own `PoolIndex` into the router
 // (`context.ts`), so this command runs one full bounded search (token → a
-// counterparty, `focusToken` pinned to the token so the adjacency wave scans
-// ITS neighborhood) and then reads the index back: every pool discovery
-// proved, probed, or was hinted into existence, per protocol, with each
-// pool's provenance (`event`/`factory`/`hint`) and quote history — including
-// hints the chain has discredited. This answers the question a `no-route`
-// alone can't: "is my pool invisible, or visible and failing?"
+// counterparty, which is what puts the token's own neighborhood on the
+// search's coverage demand) and then reads the index back: every pool
+// discovery proved, probed, or was hinted into existence, per protocol, with
+// each pool's provenance (`event`/`factory`/`hint`) and quote history —
+// including hints the chain has discredited. This answers the question a
+// `no-route` alone can't: "is my pool invisible, or visible and failing?"
 // ---------------------------------------------------------------------------
 
 import type { Address } from 'viem'
@@ -50,16 +50,20 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
       tokenIn: token.ref,
       tokenOut: via.ref,
       amountIn: 10n ** BigInt(token.decimals),
-      focusToken: token.ref,
       ...(signal ? { signal } : {}),
     }
 
     let final: QuoteResult | undefined
-    for await (const result of ctx.router.quotes(request)) {
-      final = result
+    // Every event, to the end of the bounded search — this command wants the INDEX the search fills,
+    // not its answer, so it never stops early. `--verbose` narrates each event with the two numbers
+    // that actually move here: legs settled and pools learned.
+    for await (const event of ctx.router.quotes(request)) {
+      const search = event.type === 'progress' ? event.search : event.result.search
+      if (event.type !== 'progress') final = event.result
       if (!json && parsed.booleans.has('verbose')) {
-        const q = result.search.quoting
-        console.log(dim(`wave: ${q.succeeded}/${q.attempted} quotes ok, ${ctx.index.stats().pools} pools indexed`))
+        console.log(
+          dim(`${event.type}: ${search.quoting.succeeded}/${search.enumeration.legsMeasured} legs priced, ${ctx.index.stats().pools} pools indexed`),
+        )
       }
     }
 
@@ -82,13 +86,14 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
       return 0
     }
 
+    const wrappedNative = ctx.chain.manifest.wrappedNative
     const renderCtx = await counterpartyViews(ctx, token, records)
     console.log(bold(`pools seen for ${token.symbol} on ${ctx.chain.label} (${records.length} total)`))
     for (const p of PROTOCOLS) {
       const recs = byProtocol.get(p)!
       console.log(`  ${bold(p)} ${dim(`(${recs.length})`)}`)
       const shown = recs.slice(0, 50)
-      for (const rec of shown) console.log(`    ${renderRecord(rec, token, renderCtx)}`)
+      for (const rec of shown) console.log(`    ${renderRecord(rec, token, renderCtx, wrappedNative)}`)
       if (recs.length > shown.length) console.log(dim(`    … and ${recs.length - shown.length} more`))
     }
 
@@ -148,20 +153,29 @@ async function counterpartyViews(ctx: ChainContext, token: ResolvedToken, record
   const renderCtx: RenderCtx = { views }
   const unknown = new Set<Address>()
   for (const rec of records) {
-    const other = counterpartOf(ctx, rec, token)
+    const other = counterpartOf(rec, token, ctx.chain.manifest.wrappedNative)
     if (other !== 'native' && !views.has(viewKey(other))) unknown.add(other)
   }
   await hydrateViews(ctx, renderCtx, unknown, MAX_COUNTERPARTY_METADATA_FETCHES)
   return renderCtx
 }
 
-function counterpartOf(ctx: ChainContext, rec: PoolRecord, token: ResolvedToken): CurrencyRef {
+/**
+ * The side of the pool that ISN'T the queried token — by currency FAMILY, never by exact identity.
+ *
+ * The distinction is the whole command's honesty: querying `eth` and finding a WETH/USDT pool, an
+ * identity test ("which currency differs from `native`?") answers with whichever side the pool sorted
+ * first, so half of a native query's rows named WETH — the queried token itself — as their own
+ * counterparty. `sameFamily` is what the SDK's graph normalizes on, so it is what this reads by.
+ */
+function counterpartOf(rec: PoolRecord, token: ResolvedToken, wrappedNative: Address): CurrencyRef {
   const [a, b] = rec.pool.currencies
-  return sameFamily(a, token.ref, ctx.chain.manifest.wrappedNative) ? b : a
+  return sameFamily(a, token.ref, wrappedNative) ? b : a
 }
 
-function renderRecord(rec: PoolRecord, token: ResolvedToken, renderCtx: RenderCtx): string {
-  const other = rec.pool.currencies.find((c) => viewKey(c) !== viewKey(token.ref)) ?? rec.pool.currencies[0]
+/** One pool's row. Exported for the counterparty regression test — a pure string, given a record. */
+export function renderRecord(rec: PoolRecord, token: ResolvedToken, renderCtx: RenderCtx, wrappedNative: Address): string {
+  const other = counterpartOf(rec, token, wrappedNative)
   const otherView = renderCtx.views.get(viewKey(other))
   const counterpart = otherView?.symbol ?? (other === 'native' ? 'native' : shortHex(other))
   const provenance = rec.source === 'hint' ? cyan('hint') : dim(rec.source)

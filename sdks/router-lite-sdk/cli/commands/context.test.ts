@@ -155,7 +155,7 @@ describe('the budget signal', () => {
 
   test('THE CLOCK DOES NOT START DURING SETUP — only when the command starts its search', async () => {
     // The regression this pins, measured live: with the timer started inside `buildChainContext`, a
-    // `--budget 15s` run against a warm 115 MB mainnet cache reached the first `searchWaves` call at
+    // `--budget 15s` run against a warm 115 MB mainnet cache reached the first search call at
     // t=16.7s — the search was born aborted and returned `inconclusive/aborted` without issuing a
     // single quote. `--budget` names a SEARCH budget, so `buildChainContext` may only PARSE it.
     stubFetch(chainIdThen('0x1'))

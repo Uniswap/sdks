@@ -137,7 +137,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   assertChainMatches(asserted, chainId)
   const chain = resolveManifest(chainId)
 
-  // `--budget` is a COOPERATIVE bound: the SDK consults its AbortSignal between waves, but a
+  // `--budget` is a COOPERATIVE bound: the SDK observes its AbortSignal between search cycles, but a
   // single stalled transport call would otherwise sit through viem's full per-request timeout
   // times its default retries before the signal is ever looked at — measured at ~2 minutes of
   // real time under `--budget 3s` against a stalled endpoint. So a budgeted run also derives the
@@ -149,7 +149,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // `batch: false` IS THE MEASUREMENT, NOT THE DEFAULT-BY-OMISSION. This used to be `batch: true`, on
   // the reasonable-sounding theory that coalescing concurrent JSON-RPC calls into one POST is
   // strictly cheaper than making them separately. Against a real endpoint it is the opposite, and by
-  // a lot, because of what this tool's heaviest phase looks like: an adjacency wave runs six scans at
+  // a lot, because of what this tool's heaviest phase looks like: an adjacency round runs six scans at
   // once, each dispatching up to `SCAN_CHUNK_CONCURRENCY` chunks, so ~20 `eth_getLogs` are in flight
   // together — and viem's batcher turns those into ONE request that the provider serves more or less
   // serially and that cannot return until its slowest member does. Twenty independent requests over a
@@ -206,7 +206,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     // run makes that self-evident. It now also carries what the cache actually KNOWS — pool count,
     // per-protocol coverage, and how stale the file is — computed purely from the loaded snapshot
     // (`summarizeCacheCoverage`; see its header for why that is a proxy for "caught up", not "caught
-    // up with the live chain") since the real head is a search's own read, a whole wave away.
+    // up with the live chain") since the real head is a search's own read, one round trip away.
     //
     // `ageMs` comes from a SEPARATE `stat`, not `loadMs`/`loaded`: neither the load path nor
     // `CacheLoad` carries the file's mtime, and reaching for it is best-effort — a failed `stat`
@@ -338,7 +338,7 @@ function parseLogChunk(raw: string | undefined): bigint | undefined {
 // search: the chain-detection probe, the on-disk cache load (a 115 MB mainnet
 // snapshot is real seconds), manifest validation, and both tokens' metadata
 // reads. Measured on a warm mainnet cache, `--budget 15s` reached the first
-// `searchWaves` call at t=16.7s — the search was born aborted and the run
+// search call at t=16.7s — the search was born aborted and the run
 // returned `inconclusive/aborted` having never issued a quote. `--budget`
 // names a SEARCH budget in `--help` and in the README, and a bound that can be
 // consumed entirely by setup does not mean that.
@@ -346,7 +346,7 @@ function parseLogChunk(raw: string | undefined): bigint | undefined {
 // So the parse stays in `buildChainContext` (it also shapes the transport's
 // timeout, which must be decided when the client is built) and only the TIMER
 // moves: each command calls {@link startBudget} on the line before it starts
-// iterating, which is also the origin its `+Nms` wave lines are measured from.
+// iterating, which is also the origin its `+Nms` timeline lines are measured from.
 // Setup latency is still visible — the final panel's elapsed time and
 // `--verbose`'s cache line both report it — it is simply no longer charged to
 // a budget the user asked to spend on searching.
@@ -366,8 +366,7 @@ function parseLogChunk(raw: string | undefined): bigint | undefined {
 // t=60.4s and exited. Shorter budgets (20s, 45s) fired reliably either way,
 // which is why this went unnoticed: the failure needs a loop that has been
 // busy for long enough, and until the fee-discovery scan stopped eating whole
-// budgets (`constants.ts#FEE_DISCOVERY_MAX_REQUESTS`) nothing here ever ran the
-// adjacency waves that keep it that busy.
+// budgets nothing here ever ran the adjacency scans that keep it that busy.
 //
 // A ref'd timer would hold the process open for the remainder of the budget
 // after a fast command finishes, so the caller must clear it — which is why
@@ -474,7 +473,7 @@ export async function hydrateViews(
   }
 }
 
-/** Cap for {@link hydrateLegSymbols}: a wave line and a result panel render ONE route plus a handful
+/** Cap for {@link hydrateLegSymbols}: a result panel renders ONE route plus a handful
  * of alternatives, each at most two hops — a dozen distinct leg tokens already covers every token
  * that can appear on screen, and every fetch beyond that is latency the user waits on for nothing. */
 const MAX_LEG_METADATA_FETCHES = 12

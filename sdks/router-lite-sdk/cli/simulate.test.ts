@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'bun:test'
-import { encodeAbiParameters, pad, toHex, type Address, type Hex } from 'viem'
+import { encodeAbiParameters, pad, toHex, type Address, type Hex, type PublicClient } from 'viem'
 
 import { emptyReport } from '../src/experimental/index'
-import type { NeedsActionSwap, ReadySwap, SearchReport } from '../src/index'
+import type { NeedsActionSwap, QuoteResult, ReadySwap, Router, SearchReport, SwapResult } from '../src/index'
 
+import { UsageError } from './args'
 import {
   buildSimulatePayload,
   evaluateSimulateResult,
+  isSkipped,
   SIM_NATIVE_BALANCE,
+  simulateSwap,
   traderInputCurrency,
   type SimulateBlockResult,
 } from './simulate'
+import { RpcError } from './tokens'
 
 
 const TRADER: Address = '0x1111111111111111111111111111111111111111'
@@ -134,5 +138,74 @@ describe('evaluateSimulateResult', () => {
     const outcome = evaluateSimulateResult(block, TRADER, 99_000_000_000_000_000n)
     expect(outcome.ok).toBe(false)
     expect(outcome.outputReceived).toBe(1n)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Which failures are which KIND of failure.
+//
+// `rl.ts` maps error classes straight onto exit codes (`UsageError` → 3 "fix
+// your arguments", `RpcError` → 2 "the endpoint could not answer"), so the class
+// a failure is reported as IS the scripting contract. The funding leg's two
+// dead ends are routing/liquidity outcomes — nothing the caller can fix by
+// retyping the command — so they are a `skipped` RESULT, not an error at all;
+// only the endpoint answering with no block results is an error, and it is the
+// endpoint's, not the user's.
+// ---------------------------------------------------------------------------
+
+/** A router that answers `getSwap` (the acquisition leg) with `answer`, and asserts nothing else. */
+function routerAnswering(answer: SwapResult): Router {
+  return {
+    getSwap: async () => answer,
+    getQuote: async () => ({}) as QuoteResult,
+    quotes: () => ({}) as never,
+    swaps: () => ({}) as never,
+    ingestPool: async () => {},
+    ingestLogs: async () => {},
+    ingestReceipt: async () => {},
+    stats: () => ({ pools: 0, adjacencyEdges: 0, coverageScopes: 0 }),
+    clearIndex: () => {},
+  } as unknown as Router
+}
+
+function clientReturning(blocks: unknown): PublicClient {
+  return { request: async () => blocks } as unknown as PublicClient
+}
+
+describe('simulateSwap failure classes', () => {
+  const noAcquisitionRoute: SwapResult = {
+    status: 'no-route',
+    reason: { code: 'no-viable-route', detail: 'search complete: no viable route found' },
+    search: SEARCH,
+    alternatives: [],
+  }
+
+  it('a missing acquisition route is a SKIPPED simulation, never a usage error', async () => {
+    const outcome = await simulateSwap(clientReturning([]), routerAnswering(noAcquisitionRoute), NEEDS_ACTION, TRADER, TRADER)
+    expect(isSkipped(outcome)).toBe(true)
+    expect(isSkipped(outcome) && outcome.skipped).toContain('no acquisition route')
+    // The reason code travels, so the note says WHY nothing could fund it.
+    expect(isSkipped(outcome) && outcome.skipped).toContain('no-viable-route')
+  })
+
+  it('an acquisition leg too small to fund the swap is also SKIPPED', async () => {
+    // Buys 1 wei-worth of tokenIn against a swap that needs 250 USDC.
+    const tooSmall: SwapResult = {
+      ...READY_NATIVE,
+      best: { ...BEST, execution: 'verified', quote: { ...BEST.quote, amountOut: 1n } },
+    }
+    const outcome = await simulateSwap(clientReturning([]), routerAnswering(tooSmall), NEEDS_ACTION, TRADER, TRADER)
+    expect(isSkipped(outcome)).toBe(true)
+    expect(isSkipped(outcome) && outcome.skipped).toContain('cannot buy enough')
+  })
+
+  it('an endpoint that returns no block results is an RpcError (exit 2), not a UsageError (exit 3)', async () => {
+    // READY_NATIVE's input is native, so the funding leg is skipped entirely and the endpoint's empty
+    // answer is the only thing that can fail.
+    const thrown = await simulateSwap(clientReturning([]), routerAnswering(READY_NATIVE), READY_NATIVE, TRADER, TRADER).catch(
+      (err: unknown) => err,
+    )
+    expect(thrown).toBeInstanceOf(RpcError)
+    expect(thrown).not.toBeInstanceOf(UsageError)
   })
 })

@@ -6,8 +6,9 @@
 //   2. the route, as a path — no addresses inline; the leading route's own
 //      pool address(es) demoted to a dim detail line beneath it (`--addresses`
 //      restores them inline everywhere, alternatives included)
-//   3. "how it went" — a short timeline: the first (unverified) lead, the
-//      wave that confirmed it on-chain, then whatever later waves changed
+//   3. "how it went" — a short timeline, one line per search EVENT: the first
+//      lead and where it came from, then every later lead framed as "did this
+//      beat what we had", then the search settling
 //   4. "runners-up" — the alternatives as a delta table (Δ amount + Δ bps
 //      vs. the best, aligned columns)
 //   5. "confidence" — the SDK's `SearchReport` (four independent completeness
@@ -18,7 +19,7 @@
 // snapshot-tested against canned data with color forced off. The command
 // layer (`commands/quote.ts`/`swap.ts`) owns the only two things a pure
 // renderer cannot know on its own: whether an abort came from ITS OWN
-// `--budget` timer (vs. an external signal), and the per-wave timestamps
+// `--budget` timer (vs. an external signal), and the per-event timestamps
 // that make the timeline retrospectively renderable even outside `--watch`.
 // ---------------------------------------------------------------------------
 
@@ -311,16 +312,37 @@ function visibleLength(s: string): number {
 // "How it went" — the timeline.
 // ---------------------------------------------------------------------------
 
-/** Where the search's first (unverified) lead came from — classified by the command layer, which is
- * the only place that knows what the index held BEFORE the search started and what the trade's own
+/** Where the search's first lead came from — classified by the command layer, which is the only
+ * place that knows what the index held BEFORE the search started and what the trade's own
  * `--hint`s named (see `commands/context.ts`). */
 export type LeadOrigin = 'cache' | 'hint' | 'probe'
 
 export type FirstLeadInfo = { elapsedMs: number; route: QuotedRoute; origin: LeadOrigin }
 
-/** One search wave's result plus the elapsed time it landed at — exactly what `iterateWaves`
- * (`waves.ts`) already collects per wave, just handed to a renderer instead of printed on the spot. */
-export type WaveEvent = { elapsedMs: number; result: QuoteResult | SwapResult }
+/**
+ * One narratable moment of a streaming search: the SDK's own `SearchEvent` vocabulary
+ * (`src/types.ts`) plus the elapsed time it landed at — exactly what `stream.ts` folds out of
+ * `quotes()`/`swaps()`, handed to a renderer instead of printed on the spot.
+ *
+ * The three arms are the SDK's own, unrenamed, because the CLI's story is now the SEARCH's story
+ * rather than a per-wave transcript of it: a `lead` is the answer improving, a `progress` is an axis
+ * of the report moving without it, and `final` is the search settling. (`progress` is live-only —
+ * `stream.ts` never collects one, since a retrospective panel wants the answer's history, not the
+ * engine's heartbeat.)
+ */
+export type TimelineEvent =
+  | { type: 'lead'; elapsedMs: number; result: QuoteResult | SwapResult }
+  | { type: 'progress'; elapsedMs: number; search: SearchReport }
+  | { type: 'final'; elapsedMs: number; result: QuoteResult | SwapResult }
+
+/** The report an event carries, whichever arm it is — the one thing all three have in common. */
+export function searchOf(event: TimelineEvent): SearchReport {
+  return event.type === 'progress' ? event.search : event.result.search
+}
+
+function leaderOf(result: QuoteResult | SwapResult): QuotedRoute | RankedRoute | undefined {
+  return 'best' in result && result.best ? result.best : undefined
+}
 
 const LEAD_ORIGIN_LABEL: Record<LeadOrigin, string> = {
   cache: 'lead from cache',
@@ -335,103 +357,116 @@ function timelineTiming(elapsedMs: number): string {
 }
 
 /**
- * The trailing "(budget reached — Ns)" a wave's line earns when ITS OWN report says `aborted`.
- * Needs no "is this the last wave" bookkeeping at either call site (the retrospective render or
- * `waves.ts`'s live stream): `aborted` can only be `true` on the wave a bounded search actually
+ * The trailing "(budget reached — Ns)" an event's line earns when ITS OWN report says `aborted`.
+ * Needs no "is this the last event" bookkeeping at either call site (the retrospective render or
+ * `stream.ts`'s live stream): `aborted` can only be `true` on the event a bounded search actually
  * stopped at, by construction — the generator never yields again after that.
  */
-export function budgetNoteFor(result: QuoteResult | SwapResult, budgetMs: number | undefined): string {
-  if (!result.search.aborted || budgetMs === undefined) return ''
+export function budgetNoteFor(search: SearchReport, budgetMs: number | undefined): string {
+  if (!search.aborted || budgetMs === undefined) return ''
   return ` ${yellow(`(budget reached — ${humanizeDuration(budgetMs)})`)}`
 }
 
+/** `90 of 127 legs priced` — the measurement counters as one clause, for a timeline line that wants
+ * to say how much work is behind the number it just reported. `legsMeasured` counts SETTLED legs, so
+ * `succeeded` can never exceed it (see `SearchReport.enumeration` in `src/types.ts`). */
+function legsNote(search: SearchReport): string {
+  return `${groupThousands(search.quoting.succeeded)} of ${groupThousands(search.enumeration.legsMeasured)} legs priced`
+}
+
 /**
- * The full "how it went" block: the first unverified lead (if the engine ever reported one), the
- * wave that turned it into a real on-chain-priced result, and every wave after that framed as "did
- * this beat what we had". Empty (no header, nothing) when the search reported no waves at all — an
- * `rpc-unavailable` short-circuit before a single wave ran has no story to tell.
+ * The full "how it went" block: the search's first lead (if it ever reported one), then every later
+ * event framed as "did this beat what we had", then the search settling. Empty (no header, nothing)
+ * when the search reported no events at all — an `rpc-unavailable` short-circuit has no story.
  *
- * Used BOTH retrospectively (the command layer renders this once, after the search, from the wave
- * history it collected regardless of `--watch`) and as the source of truth `--watch`'s live stream
- * mirrors line-for-line ({@link renderTimelineWaveLine}) — the two are the same wording so a
+ * Used BOTH retrospectively (the command layer renders this once, after the search, from the event
+ * history `stream.ts` collected regardless of `--watch`) and as the source of truth `--watch`'s live
+ * stream mirrors line-for-line ({@link renderTimelineLine}) — the two are the same wording so a
  * `--watch` run and its own retrospective summary never disagree.
  */
 export function renderTimeline(
   first: FirstLeadInfo | undefined,
-  waves: WaveEvent[],
+  events: TimelineEvent[],
   trade: TradeContext,
   ctx: RenderCtx,
   opts: { budgetMs?: number } = {},
 ): string[] {
-  if (!first && waves.length === 0) return []
+  if (!first && events.length === 0) return []
   const lines = [bold('how it went')]
-  if (first) lines.push(renderFirstLeadLine(first))
+  if (first) lines.push(renderFirstLeadLine(first, trade.tokenOut, ctx))
 
   let previousBest: bigint | undefined = first?.route.quote.amountOut
-  waves.forEach((wave, i) => {
-    const budgetNote = budgetNoteFor(wave.result, opts.budgetMs)
-    lines.push(renderTimelineWaveLine(i, wave, previousBest, first !== undefined, trade, ctx, budgetNote))
-    const best = 'best' in wave.result && wave.result.best
+  for (const event of events) {
+    lines.push(renderTimelineLine(event, previousBest, trade, ctx, budgetNoteFor(searchOf(event), opts.budgetMs)))
+    if (event.type === 'progress') continue
+    const best = leaderOf(event.result)
     if (best) previousBest = best.quote.amountOut
-  })
+  }
   return lines
 }
 
 /**
- * The timeline's first line, standalone — exported so `waves.ts`'s LIVE `--watch`/`--verbose` stream
- * can print it at the moment `onFirstRoute` fires, using the exact wording {@link renderTimeline}
- * would produce for it retrospectively.
+ * The timeline's opening line, standalone — exported so `stream.ts`'s LIVE `--watch`/`--verbose`
+ * stream can print it the moment the first `lead` event lands, using the exact wording
+ * {@link renderTimeline} would produce for it retrospectively.
  */
-export function renderFirstLeadLine(first: FirstLeadInfo): string {
-  return `  ${timelineTiming(first.elapsedMs)}${dim(`${LEAD_ORIGIN_LABEL[first.origin]} (unverified)`)}`
-}
-
-function renderConfirmationLine(
-  wave: WaveEvent,
-  leadBefore: bigint | undefined,
-  hadFirst: boolean,
-  budgetNote: string,
-): string {
-  const { result } = wave
-  const q = result.search.quoting
-  const best = 'best' in result && result.best
-  const timing = `  ${timelineTiming(wave.elapsedMs)}`
-  if (!best) {
-    return `${timing}still nothing priced — ${groupThousands(q.succeeded)} of ${groupThousands(q.attempted)} candidate routes checked${budgetNote}`
-  }
-  const holdNote = !hadFirst ? '' : best.quote.amountOut === leadBefore ? ', lead holds' : ', lead changed'
-  return `${timing}confirmed on-chain — ${groupThousands(q.succeeded)} of ${groupThousands(q.attempted)} candidate routes priced${holdNote}${budgetNote}`
+export function renderFirstLeadLine(first: FirstLeadInfo, out: CurrencyRef, ctx: RenderCtx): string {
+  return `  ${timelineTiming(first.elapsedMs)}${dim(LEAD_ORIGIN_LABEL[first.origin])} — ${bold(amountFor(ctx, out, first.route.quote.amountOut))}`
 }
 
 /**
- * One timeline line for wave index `i` — the confirmation wording for the first wave, the scan
- * wording for every one after. Exported so `waves.ts`'s live stream and {@link renderTimeline}'s
- * retrospective render share one implementation and can never disagree about wording.
+ * One timeline line for one event. Exported so `stream.ts`'s live stream and
+ * {@link renderTimeline}'s retrospective render share one implementation and can never disagree
+ * about wording. `previousBest` is the leading amount BEFORE this event — the only state a line
+ * needs beyond the event itself, and the reason improvements can be reported as a delta.
  */
-export function renderTimelineWaveLine(
-  i: number,
-  wave: WaveEvent,
+export function renderTimelineLine(
+  event: TimelineEvent,
   previousBest: bigint | undefined,
-  hadFirst: boolean,
   trade: TradeContext,
   ctx: RenderCtx,
   budgetNote: string,
 ): string {
-  return i === 0
-    ? renderConfirmationLine(wave, previousBest, hadFirst, budgetNote)
-    : renderScanLine(wave, previousBest, trade.tokenOut, ctx, budgetNote)
+  const timing = `  ${timelineTiming(event.elapsedMs)}`
+  switch (event.type) {
+    case 'progress': {
+      const e = event.search.enumeration
+      const frontier = `explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens`
+      return `${timing}${dim(`still searching — ${legsNote(event.search)}, ${frontier}`)}${budgetNote}`
+    }
+    case 'lead':
+      return `${timing}${renderLeadBody(event.result, previousBest, trade.tokenOut, ctx)}${budgetNote}`
+    case 'final': {
+      const best = leaderOf(event.result)
+      const body = best ? legsNote(event.result.search) : `nothing priced — ${legsNote(event.result.search)}`
+      return `${timing}search complete — ${body}${budgetNote}`
+    }
+  }
 }
 
-function renderScanLine(wave: WaveEvent, previousBest: bigint | undefined, out: CurrencyRef, ctx: RenderCtx, budgetNote: string): string {
-  const { result } = wave
-  const best = 'best' in result && result.best
-  const timing = `  ${timelineTiming(wave.elapsedMs)}`
-  if (!best) return `${timing}scanned pool history for anything better — nothing priced yet${budgetNote}`
-  const improved = previousBest !== undefined && best.quote.amountOut > previousBest
-  const outcome = improved
-    ? `found a better route: ${bold(signedAmountFor(ctx, out, best.quote.amountOut - previousBest!))}`
-    : 'nothing beat it'
-  return `${timing}scanned pool history for anything better — ${outcome}${budgetNote}`
+/** What a `lead` event means to a reader who already knows the previous leader: a first price, an
+ * improvement over it, or the same price reached a different way (a route swap, or — for a swap — a
+ * leader that just became executable, which {@link leadStatusNote} names). */
+function renderLeadBody(result: QuoteResult | SwapResult, previousBest: bigint | undefined, out: CurrencyRef, ctx: RenderCtx): string {
+  const best = leaderOf(result)
+  // A `lead` is by construction the leader changing, so it always carries one; the guard is for a
+  // hand-built result, and says the honest thing rather than crashing on it.
+  if (!best) return `still nothing priced — ${legsNote(result.search)}`
+  if (previousBest === undefined) return `first price — ${bold(amountFor(ctx, out, best.quote.amountOut))}${leadStatusNote(result)}`
+  if (best.quote.amountOut > previousBest) {
+    return `found a better route: ${bold(signedAmountFor(ctx, out, best.quote.amountOut - previousBest))}${leadStatusNote(result)}`
+  }
+  const actionable = result.status === 'ready' || result.status === 'needs-action'
+  return actionable ? `confirmed executable on-chain${leadStatusNote(result)}` : `new lead at the same price${leadStatusNote(result)}`
+}
+
+/** How far a lead has got, in the result unions' own vocabulary — nothing at all for a quote (there
+ * is no verification step to report on) and the execution verdict for a swap. */
+function leadStatusNote(result: QuoteResult | SwapResult): string {
+  if (result.status === 'ready') return ` ${green('· executable')}`
+  if (result.status === 'needs-action') return ` ${yellow('· executable once approved')}`
+  const best = leaderOf(result)
+  return best && isRanked(best) && best.execution === 'unverified' ? ` ${dim('(unverified)')}` : ''
 }
 
 // ---------------------------------------------------------------------------
@@ -479,8 +514,6 @@ export type ConfidencePanelOpts = {
   /** From the chain manifest (`chain.manifest.chain?.blockTimeSeconds`) — drives the pool-knowledge
    * age approximation. Falls back to the SDK's own mainnet default when the manifest names none. */
   blockTimeSeconds?: number
-  /** Surfaces the pruning counters that otherwise live under `--verbose` only. */
-  verbose?: boolean
 }
 
 /**
@@ -496,23 +529,34 @@ export function renderConfidencePanel(report: SearchReport, opts: ConfidencePane
   const knowledge = PROTOCOLS.map((p) => poolKnowledgeSegment(p, report.discovery[p], report.block, blockTimeSeconds)).join(' · ')
   lines.push(`  pool knowledge   ${knowledge}`)
 
+  // THE UNIT IS A LEG, NOT A ROUTE. Legs are deduped by (pool, direction, amount) and composed into
+  // routes afterwards, so this counts the measurement work the search actually did — one leg serves
+  // every candidate that crosses it. The leading number is `legsMeasured` (legs that SETTLED); the
+  // outcome terms come from the quoting counters, which count DISPATCHES, so the two are stated side
+  // by side rather than as a sum: a leg lost to the transport and re-dispatched successfully settles
+  // once but dispatches twice (see `SearchReport.quoting` in `src/types.ts`).
   const q = report.quoting
-  const reverted = q.failed > 0 ? `${groupThousands(q.failed)} probed pools that don't exist` : dim("0 probed pools that don't exist")
+  const e = report.enumeration
+  const reverted = q.failed > 0 ? `${groupThousands(q.failed)} couldn't price` : dim("0 couldn't price")
   const lost = q.transportFailed > 0 ? yellow(`${groupThousands(q.transportFailed)} lost to RPC`) : dim('0 lost to RPC')
   const unattempted = q.unattempted > 0 ? yellow(` · ${groupThousands(q.unattempted)} never attempted`) : ''
   lines.push(
-    `  routes checked   ${groupThousands(q.attempted)} = ${green(`${groupThousands(q.succeeded)} priced`)} · ${reverted} · ${lost}${unattempted}`,
+    `  legs measured    ${groupThousands(e.legsMeasured)} settled · ${green(`${groupThousands(q.succeeded)} priced`)} · ${reverted} · ${lost}${unattempted}`,
   )
 
-  const e = report.enumeration
+  // The frontier, not a cap: `intermediatesPruned` counts eligible intermediates this search has not
+  // REACHED yet, and a search that kept pulling would drive it to zero — so an unfinished frontier
+  // reads as "still widening", never as "pruned away". (It is exactly the reason the search is not
+  // exhaustive, which is why the two are on one line.)
   const exhaustive = e.exhaustiveWithinMaxHops ? green('exhaustive within 2 hops') : yellow('not exhaustive')
+  const widening = e.intermediatesPruned > 0 ? yellow(', still widening') : ''
   lines.push(
-    `  breadth          explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens — ${exhaustive}`,
+    `  breadth          explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens${widening} — ${exhaustive}`,
   )
-  if (opts.verbose) {
-    const notReached = e.intermediatesPruned > 0 ? ` · ${e.intermediatesPruned} intermediates not reached yet` : ''
-    const ceiling = e.pairCeilingHit ? ' · pair ceiling hit' : ''
-    lines.push(dim(`                   ${groupThousands(e.legsMeasured)} legs measured${notReached}${ceiling}`))
+  // The abuse backstop, and the only cap in the enumeration that leaves real pools unmeasured — so it
+  // gets its own line rather than a note, on the runs (pool-spam pairs) where it fires at all.
+  if (e.pairCeilingHit) {
+    lines.push(`  pair ceiling     ${yellow('hit — a pair held more pools than the measurement ceiling; the excess was never measured')}`)
   }
 
   const v = report.verification
@@ -667,16 +711,15 @@ export type RenderOpts = {
    * phrasing and the timeline's final "budget reached" note. */
   budgetMs?: number
   blockTimeSeconds?: number
-  verbose?: boolean
-  /** The first unverified lead and the per-wave history — both optional because a caller that never
+  /** The first lead and the event history after it — both optional because a caller that never
    * streamed the search (a plain unit test constructing a result by hand) has neither, and the
    * timeline simply renders as nothing. */
   first?: FirstLeadInfo
-  waves?: WaveEvent[]
+  timeline?: TimelineEvent[]
 }
 
 function renderTimelineBlock(trade: TradeContext, ctx: RenderCtx, opts: RenderOpts): string[] {
-  const timeline = renderTimeline(opts.first, opts.waves ?? [], trade, ctx, opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {})
+  const timeline = renderTimeline(opts.first, opts.timeline ?? [], trade, ctx, opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {})
   return timeline.length > 0 ? ['', ...timeline] : []
 }
 
@@ -687,7 +730,6 @@ function confidenceOpts(mode: ConfidencePanelOpts['mode'], opts: RenderOpts): Co
     mode,
     ...(opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {}),
     ...(opts.blockTimeSeconds !== undefined ? { blockTimeSeconds: opts.blockTimeSeconds } : {}),
-    ...(opts.verbose !== undefined ? { verbose: opts.verbose } : {}),
   }
 }
 

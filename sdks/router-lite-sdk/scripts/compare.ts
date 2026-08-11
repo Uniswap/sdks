@@ -288,9 +288,10 @@ export type LiteSideResult =
   | { kind: 'error'; message: string; finalMs: number }
 
 /**
- * Runs one pair through the router's `quotes()` iterator to the end of its OWN budget (like
- * `rl quote --watch`), recording the first-actionable moment via `onFirstRoute` (like `rl quote
- * --verbose`'s `first` line) and the final best after the budget expires. Each pair gets its own
+ * Runs one pair through the router's `quotes()` event stream to the end of its OWN budget (like
+ * `rl quote --watch`), recording the first-actionable moment as the first `lead` event's arrival
+ * (like `rl quote --verbose`'s opening line) and the final best after the budget expires. Each pair
+ * gets its own
  * fresh budget clock (`startBudget`, `cli/commands/context.ts`) rather than sharing one across the
  * whole matrix — a slow pair must not eat into the next pair's allowance.
  */
@@ -306,12 +307,14 @@ async function quoteLite(ctx: ChainContext, renderCtx: RenderCtx, pair: Resolved
       amountIn: pair.amountIn,
       ...(budget.signal ? { signal: budget.signal } : {}),
     }
-    const iter = ctx.router.quotes(request, {
-      onFirstRoute: () => {
-        if (firstActionableMs === undefined) firstActionableMs = Date.now() - started
-      },
-    })
-    for await (const result of iter) final = result
+    for await (const event of ctx.router.quotes(request)) {
+      if (event.type === 'progress') continue
+      // The first `lead` IS the first-actionable moment: a lead carries the full interim result
+      // `getQuote` would have resolved with had the search stopped there. A `final` that never had a
+      // lead before it priced nothing, so it must not backfill this.
+      if (event.type === 'lead' && firstActionableMs === undefined) firstActionableMs = Date.now() - started
+      final = event.result
+    }
   } catch (err) {
     return { kind: 'error', message: err instanceof Error ? err.message : String(err), finalMs: Date.now() - started }
   } finally {

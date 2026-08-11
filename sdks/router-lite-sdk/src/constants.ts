@@ -135,8 +135,8 @@ export const MAX_PERMIT2_UINT160 = 2n ** 160n
  * `hookData` is opaque caller bytes, copied verbatim into every quote call and into the final
  * calldata for the route. Nothing in this package can interpret it, so the only defensible bound is
  * a size one: 4 KiB is generous for anything a hook actually reads (a signature, a permit, a small
- * struct) while keeping a single hint from inflating every `eth_call` in a search — a hint is used
- * once per candidate per wave, so its bytes are paid for repeatedly.
+ * struct) while keeping a single hint from inflating every `eth_call` in a search — its bytes ride
+ * along on every leg measurement the hinted pool takes part in, so they are paid for repeatedly.
  */
 export const MAX_HOOK_DATA_BYTES = 4096
 
