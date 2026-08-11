@@ -520,7 +520,7 @@ const NO_VIABLE_ROUTE_REASON: Reason = { code: 'no-viable-route', detail: 'searc
  *  2. `alternatives` already makes the exhaustion inferable: every attempted-and-failed candidate is
  *     right there, with its `revertData`, so a caller who cares whether the budget was the limiting
  *     factor can see exactly how many candidates were tried and that more existed
- *     (`report.enumeration.candidatesGenerated` vs `report.verification.preflightAttempted`) — the
+ *     (`alternatives.length` vs `report.verification.preflightAttempted`) — the
  *     report already carries the evidence a stricter classification would merely be restating as a
  *     verdict.
  *  3. Folding it in here would make `no-route` depend on `PREFLIGHT_TOP_K`, a policy constant with no

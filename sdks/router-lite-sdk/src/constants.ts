@@ -188,6 +188,9 @@ export const HINT_DISCREDIT_FAILURE_BLOCKS = 2
 /** Max intermediate tokens considered when searching one-intermediate (2-hop) routes. */
 export const MAX_INTERMEDIATES = 8
 
+/** Max pools measured on one pair. policy — abuse backstop against pool-spam pairs, not a selection cap. */
+export const MEASUREMENT_PAIR_CEILING = 128
+
 /**
  * Max route candidates quoted in a single search (C4-P7) — DERIVED, never a bare literal, so it can
  * never silently drift out of sync with the caps that actually generate candidates.

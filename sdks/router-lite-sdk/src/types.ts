@@ -486,64 +486,39 @@ export type SearchReport = {
     { status: 'complete' | 'partial' | 'disabled' | 'failed'; coveredRanges: BlockRange[]; demandFloor: bigint }
   >
   enumeration: {
+    /** True only when nothing measurable was left out: discovery complete on every enabled protocol,
+     * the intermediates frontier having reached everything it found, the pair ceiling untouched, no
+     * abort, and no leg left unattempted or lost to the transport. */
     exhaustiveWithinMaxHops: boolean
     intermediatesDiscovered: number
     intermediatesSelected: number
-    candidatesGenerated: number
-    /** Pools dropped by the per-pair cap (`MAX_POOLS_DIRECT` for the direct pair, `MAX_POOLS_PER_LEG`
-     * for a two-hop leg selection), summed across every direct pair and two-hop leg selection — a
-     * pool-count, never a candidate-count. */
-    poolsPruned: number
-    /** Whole candidates dropped by the total-candidate cap (`MAX_QUOTE_CANDIDATES`) once direct and
-     * two-hop candidates are combined — a candidate-count, never a pool-count. Kept apart from
-     * `poolsPruned` because the two caps bite at different granularities; summing them would mix units.
-     *
-     * STRUCTURALLY ZERO AT TODAY'S CONSTANTS (C4-P7): `MAX_QUOTE_CANDIDATES` is DERIVED
-     * (`constants.ts`) to exactly bound what `generateRoutes` can ever produce
-     * (`MAX_POOLS_DIRECT + MAX_INTERMEDIATES × MAX_POOLS_PER_LEG²`), so this field cannot currently
-     * observe a nonzero value through that function's own per-pair/intermediate caps — it is a drift
-     * backstop (`search/candidates.ts`'s own comment on the final trim), reported here in case a
-     * future change to the enumeration shape (a third hop, a cap relaxed independently of the
-     * derivation) outpaces the derived ceiling, not because it is expected to fire today. */
-    candidatesPruned: number
-    /** Eligible two-hop intermediate NODES dropped by `MAX_INTERMEDIATES` — symmetric with
-     * `poolsPruned`/`candidatesPruned`, and kept apart from both for the same reason: a node-count is
-     * neither a pool-count nor a candidate-count. The value already existed internally
-     * (`prunedIntermediates`, threaded through `search/waves.ts`'s `EngineState.enumeration`) and drove
-     * `exhaustiveWithinMaxHops` before it was surfaced here — this is the same number, just made
-     * observable rather than only used to decide a boolean. */
+    /** Eligible two-hop intermediate NODES the frontier has not selected YET. Read it as "not
+     * reached", never as "capped": the frontier grows in batches, so a consumer that keeps pulling
+     * drives this to zero, where the old `MAX_INTERMEDIATES` cap held it above zero forever. */
     intermediatesPruned: number
+    /** Leg measurements that reached a terminal state — priced, reverted, or lost to the transport
+     * past their one retry. Legs are deduped by (pool, direction, amount), so this counts work done
+     * rather than routes considered: one leg serves every candidate that crosses it. */
+    legsMeasured: number
+    /** The abuse backstop fired: a pair held more pools than `MEASUREMENT_PAIR_CEILING`, and the
+     * excess was never measured. Not a selection cap (`constants.ts` says why) — a pair that trips it
+     * is a pool-spam pair, and the search is no longer exhaustive over it. */
+    pairCeilingHit: boolean
   }
   /**
-   * `failed` is on-chain evidence: the quote call reverted, so that route cannot price at this
+   * Leg-measurement outcomes, on ONE channel: every one of these five counts a (pool, direction,
+   * amount) measurement, never a route. A route is composed from legs the search already measured,
+   * so there is no separate route-quote or probe channel to reconcile against.
+   *
+   * `failed` is on-chain evidence: the quote call reverted, so that leg cannot price at this
    * block. `transportFailed` is evidence about the *provider* — a 429, a timeout, a dropped socket —
    * and evidence about the chain of exactly none. A search with `transportFailed > 0` is never
    * reported `no-route`, however complete its other axes look.
    *
-   * Invariant: `attempted === succeeded + failed + transportFailed`. `unattempted` counts candidates
-   * that were never dispatched at all (an abort landed first) and is not part of that sum.
-   *
-   * READ THIS AS PROBE-INCLUSIVE, NOT ROUTE-FRAMED, OR `succeeded` WILL MISLEAD. Three separate
-   * channels feed these five counters (`search/waves.ts`):
-   *
-   *  1. Route quotes (`runRouteProbes`) — wave 0's direct-pair probes, where the quote call *is* the
-   *     existence check and a success *is* a route. Counted here AND in `enumeration.candidatesGenerated`.
-   *  2. Enumerated quotes (`quoteNew`) — candidates `generateRoutes` built from discovered pools.
-   *     Counted here AND in `enumeration.candidatesGenerated`.
-   *  3. Discovery probes (`runDiscoveryProbes`) — single-leg, half-pair existence checks
-   *     (`tokenIn -> core`, `neighbor -> tokenOut`) run purely to learn whether a hinted or
-   *     newly-scanned pool exists, so a fabricated hint accumulates the failure history
-   *     `isDiscredited` reads. Counted HERE ONLY: `candidatesGenerated` never sees them, because a
-   *     half-pair leg is not a route and can NEVER become one — its priced amount is for one leg at
-   *     the full input, not a quote for anything the caller asked about, and is discarded on success.
-   *
-   * The consequence: `quoting.succeeded > 0 && alternatives.length === 0` (or `best` absent
-   * entirely) is a NORMAL shape, not a bug — every one of `succeeded` may be a discovery probe that
-   * confirmed a pool exists and nothing more. `candidatesGenerated` excludes channel 3 by
-   * construction, so comparing it against `quoting.succeeded`/`attempted` directly (as if they
-   * counted the same thing with a different label) will never reconcile; treat the two as answering
-   * different questions — "how many candidates were built" vs. "how many on-chain calls resolved,
-   * across all three channels" — rather than as the same count reported twice.
+   * Invariant: `attempted === succeeded + failed + transportFailed`. `unattempted` counts legs that
+   * were planned and never dispatched at all (an abort landed first) and is not part of that sum.
+   * These count DISPATCHES, so a leg re-dispatched after a transport loss is counted twice;
+   * `enumeration.legsMeasured` counts settled legs and therefore never exceeds `attempted`.
    */
   quoting: { attempted: number; succeeded: number; failed: number; transportFailed: number; unattempted: number }
   aborted: boolean
@@ -618,21 +593,18 @@ export function zeroVerification(): SearchReport['verification'] {
 }
 
 /**
- * The report-shaped enumeration block. Deliberately NOT shared with the engine's
- * `EngineState.enumeration`, which is a different type: it names its pruning counters
- * `prunedPools`/`prunedCandidates`/`prunedIntermediates` (the report renames them
- * `poolsPruned`/…) and carries no `exhaustiveWithinMaxHops`, because that field is a VERDICT
- * `buildReport` derives from four other axes rather than a counter the engine accumulates.
+ * The report-shaped enumeration block. Deliberately NOT the engine's own state: every field here is
+ * either a VERDICT `search/report.ts` derives (`exhaustiveWithinMaxHops`) or a count it folds out of
+ * `SearchState` (`intermediatesPruned` is `discovered - selected`, not a stored counter).
  */
 export function zeroReportEnumeration(): SearchReport['enumeration'] {
   return {
     exhaustiveWithinMaxHops: false,
     intermediatesDiscovered: 0,
     intermediatesSelected: 0,
-    candidatesGenerated: 0,
-    poolsPruned: 0,
-    candidatesPruned: 0,
     intermediatesPruned: 0,
+    legsMeasured: 0,
+    pairCeilingHit: false,
   }
 }
 

@@ -1,11 +1,11 @@
 import type { Address } from 'viem'
 
 import { intersectAll, subtractRanges } from '../internal/ranges'
-import type { BlockRange, Protocol, SearchReport } from '../types'
+import type { BlockRange, BlockRef, Protocol, QuoteRequest, SearchReport } from '../types'
 import { protocolRecord } from '../types'
 
 import { deploymentBlockOf, node } from './context'
-import type { Run } from './waves'
+import type { EngineState, SearchContext } from './waves'
 
 // ---------------------------------------------------------------------------
 // Engine-side report assembly: what the finished (or abandoned) search can
@@ -24,17 +24,64 @@ import type { Run } from './waves'
 // ---------------------------------------------------------------------------
 
 /**
+ * The slice of `search/state.ts`'s `SearchState` a report is folded from — structural rather than a
+ * `Pick`, so this module stays out of the event-core's import graph until the loop lands, and so the
+ * wave engine can hand over its own state through one adapter until Task 9 deletes it.
+ * `intermediates.selected` is read for its length alone: the report prints a count, never the nodes.
+ */
+export type ReportState = {
+  block: BlockRef
+  aborted: boolean
+  headRegressed: boolean
+  discovery: Record<Protocol, { complete: ReadonlySet<string>; failed: boolean }>
+  intermediates: { selected: { length: number }; discovered: number }
+  legsMeasured: number
+  pairCeilingHit: boolean
+  quoting: SearchReport['quoting']
+  verificationDegraded: boolean
+  verification: SearchReport['verification']
+}
+
+/**
+ * TRANSITIONAL, deleted with `waves.ts` in Task 9: the wave engine's state folded into the shape the
+ * report now reads.
+ *
+ * `legsMeasured` is its `quoting.attempted` — the wave engine keeps no leg ledger, so every quote
+ * call it dispatched and got a settlement for counts as one (which double-counts a transport-retried
+ * candidate, where the new engine settles a key once). `pairCeilingHit` carries its per-pair pool
+ * caps: `MAX_POOLS_DIRECT`/`MAX_POOLS_PER_LEG` (and the derived total-candidate backstop) drop pools
+ * from a pair without measuring them, which is the same forfeit of exhaustiveness the ceiling names.
+ */
+export function engineReportState(state: EngineState): ReportState {
+  return {
+    block: state.block,
+    aborted: state.aborted,
+    headRegressed: state.headRegressed,
+    discovery: state.discovery,
+    intermediates: {
+      discovered: state.enumeration.intermediatesDiscovered,
+      selected: { length: state.enumeration.intermediatesSelected },
+    },
+    legsMeasured: state.quoting.attempted,
+    pairCeilingHit: state.enumeration.prunedPools > 0 || state.enumeration.prunedCandidates > 0,
+    quoting: state.quoting,
+    verificationDegraded: state.verificationDegraded,
+    verification: state.verification,
+  }
+}
+
+/**
  * Completeness is judged against *this trade's two endpoints by name*. A count of scanned endpoints
  * would let any two scans (say, a focus token that is not an endpoint, plus one endpoint) satisfy
  * it while the other endpoint's adjacency was never touched — reporting `complete` for a search
  * that never looked, which the facade would then classify as an authoritative `no-route`.
  */
 export function discoveryStatus(
-  run: Run,
+  ctx: SearchContext,
+  state: ReportState,
   protocol: Protocol,
   endpointNodes: [Address, Address],
 ): SearchReport['discovery'][Protocol]['status'] {
-  const { ctx, state } = run
   if (!ctx.modules[protocol].enabled(ctx.manifest)) return 'disabled'
   const d = state.discovery[protocol]
   if (d.failed) return 'failed'
@@ -60,8 +107,13 @@ export function discoveryStatus(
  * A protocol with no deployment block configured (disabled on this chain) reports no coverage: there
  * is no demand to measure against.
  */
-function coveredRangesFor(run: Run, protocol: Protocol, endpointNodes: Address[], deployBlock: bigint | undefined): BlockRange[] {
-  const { ctx, state } = run
+function coveredRangesFor(
+  ctx: SearchContext,
+  state: ReportState,
+  protocol: Protocol,
+  endpointNodes: Address[],
+  deployBlock: bigint | undefined,
+): BlockRange[] {
   if (deployBlock === undefined) return []
   const head = state.block.number
   const endpoints = new Map(endpointNodes.map((n) => [n.toLowerCase(), n]))
@@ -71,17 +123,19 @@ function coveredRangesFor(run: Run, protocol: Protocol, endpointNodes: Address[]
   )
 }
 
-export function buildReport(run: Run): SearchReport {
-  const { ctx, req, state } = run
-
+export function buildReport(
+  state: ReportState,
+  ctx: SearchContext,
+  req: Pick<QuoteRequest, 'tokenIn' | 'tokenOut'>,
+): SearchReport {
   const inNode = node(req.tokenIn, ctx.manifest)
   const outNode = node(req.tokenOut, ctx.manifest)
 
   const discovery = protocolRecord<SearchReport['discovery'][Protocol]>((p) => {
     const deployBlock = deploymentBlockOf(ctx.manifest, p)
     return {
-      status: discoveryStatus(run, p, [inNode, outNode]),
-      coveredRanges: coveredRangesFor(run, p, [inNode, outNode], deployBlock),
+      status: discoveryStatus(ctx, state, p, [inNode, outNode]),
+      coveredRanges: coveredRangesFor(ctx, state, p, [inNode, outNode], deployBlock),
       // Fixed per protocol regardless of which sub-ranges this run scanned — the denominator a
       // percentage is built from must not wander between otherwise-identical runs.
       demandFloor: deployBlock ?? state.block.number,
@@ -89,6 +143,9 @@ export function buildReport(run: Run): SearchReport {
   })
 
   const discoveryComplete = Object.values(discovery).every((d) => d.status === 'complete' || d.status === 'disabled')
+  // Not "capped": the frontier grows in batches, so an intermediate it has not selected yet is one
+  // this search has not reached — which is exactly why it forfeits exhaustiveness below.
+  const intermediatesPruned = Math.max(0, state.intermediates.discovered - state.intermediates.selected.length)
 
   return {
     block: state.block,
@@ -97,32 +154,21 @@ export function buildReport(run: Run): SearchReport {
       exhaustiveWithinMaxHops:
         discoveryComplete &&
         !state.aborted &&
-        // The per-pair cap and the total-candidate cap bite at different granularities (pools vs.
-        // whole candidates); either one pruning anything means the enumeration wasn't exhaustive, so
-        // both separated counters are checked rather than a single mixed-unit sum.
-        state.enumeration.prunedPools === 0 &&
-        state.enumeration.prunedCandidates === 0 &&
-        state.enumeration.prunedIntermediates === 0 &&
+        intermediatesPruned === 0 &&
+        // The abuse backstop left pools on a pair unmeasured.
+        !state.pairCeilingHit &&
         state.quoting.unattempted === 0 &&
-        // A candidate whose quote never got an answer was enumerated but not evaluated.
+        // A leg whose measurement never got an answer was planned but not evaluated.
         state.quoting.transportFailed === 0,
-      // BOTH halves of the ratio come from the same `generateRoutes` call, threaded through
-      // `state.enumeration`. `intermediatesSelected` always did; `intermediatesDiscovered` used to be
-      // re-derived HERE, by re-walking the neighbor intersection against the index as it looked at
-      // report-assembly time — which is the same drift the `intermediatesSelected` note has always
-      // warned about, one field over. Two numbers rendered as one ratio (`selected/discovered`) must
-      // be sampled from one moment by one piece of code, or the ratio describes nothing that ever
-      // happened. `candidates.test.ts` pins that the two walks agreed, so this is the same number.
-      //
-      // The one place it now reads differently, and correctly so: a search aborted before its first
-      // enumeration reports `0/0` rather than "0 selected out of N the index happened to hold" — the
-      // enumeration never ran, so it discovered nothing.
-      intermediatesDiscovered: state.enumeration.intermediatesDiscovered,
-      intermediatesSelected: state.enumeration.intermediatesSelected,
-      candidatesGenerated: state.enumeration.candidatesGenerated,
-      poolsPruned: state.enumeration.prunedPools,
-      candidatesPruned: state.enumeration.prunedCandidates,
-      intermediatesPruned: state.enumeration.prunedIntermediates,
+      // BOTH halves of the ratio come from one sample of the frontier. Two numbers rendered as one
+      // ratio (`selected/discovered`) must be sampled from one moment by one piece of code, or the
+      // ratio describes nothing that ever happened — so neither half is re-walked against the index
+      // here. A search aborted before the frontier moved reports `0/0`: it discovered nothing.
+      intermediatesDiscovered: state.intermediates.discovered,
+      intermediatesSelected: state.intermediates.selected.length,
+      intermediatesPruned,
+      legsMeasured: state.legsMeasured,
+      pairCeilingHit: state.pairCeilingHit,
     },
     quoting: { ...state.quoting },
     aborted: state.aborted,

@@ -8,7 +8,7 @@ import { rankRoutes } from '../quote/quote'
 import type { EncodedTx, QuotedRoute, RankedRoute } from '../types'
 import { preflightTx } from '../verify/preflight'
 
-import { buildReport } from './report'
+import { buildReport, engineReportState } from './report'
 import type { InternalResult, Run } from './waves'
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ export async function evaluate(run: Run, done: boolean): Promise<InternalResult>
   // of stale-report bug `SearchReport` exists to never produce (see `report.ts`'s header).
   const leaderId = ranked.length > 0 && run.kind === 'swap' ? await verifyLeader(run, ranked, !state.aborted) : undefined
 
-  const report = buildReport(run)
+  const report = buildReport(engineReportState(state), run.ctx, run.req)
   const base = {
     report,
     done,

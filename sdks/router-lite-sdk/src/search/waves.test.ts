@@ -2097,20 +2097,21 @@ test('a scan-bound wave quotes what it discovers WHILE it discovers it, so an ab
   expect(quoting.succeeded).toBe(1)
   expect(quoting.unattempted).toBeGreaterThan(0)
   expect(quoting.attempted).toBe(quoting.succeeded + quoting.failed + quoting.transportFailed)
-  expect(final.report.enumeration.candidatesGenerated).toBeGreaterThanOrEqual(quoting.unattempted)
 
   const result = classify('quote', final)
   assertResultCoherent(result)
 })
 
 test('an abort mid-WAVE-0 leaves no generated candidate unaccounted for: skipped route probes are `unattempted`', async () => {
-  // THE ACCOUNTING HOLE, in the one channel that had it. `runRouteProbes` counted
-  // `candidatesGenerated += fresh.length` and then only `stats.attempted` — never the shortfall — so
-  // an abort that skipped queued probes produced a report claiming N candidates and accounting for
-  // fewer than N quoting outcomes, with no field anywhere saying where the rest went. `quoteNew` had
-  // always differenced `fresh.length - stats.attempted` into `unattempted`; wave 0's probes, which
-  // feed `candidatesGenerated` on exactly the same terms (`types.ts#SearchReport.quoting`, channel
-  // 1), did not.
+  // THE ACCOUNTING HOLE, in the one channel that had it. `runRouteProbes` counted its candidates and
+  // then only `stats.attempted` — never the shortfall — so an abort that skipped queued probes
+  // produced a report accounting for fewer outcomes than it had work, with no field anywhere saying
+  // where the rest went. `quoteNew` had always differenced `fresh.length - stats.attempted` into
+  // `unattempted`; wave 0's probes did not.
+  //
+  // The generated-candidate counter that made the shortfall nameable is gone from the report (the
+  // event core counts LEG MEASUREMENTS, not candidates), so what is pinned here is the surviving
+  // half: the dispatched probe settles, the skipped one is reported as never sent.
   //
   // The shortfall is REAL, not theoretical: `probeQuotes` returns `attempted < probes.length`
   // whenever `ethCall` raises `AbortedCallError` for a call that queued behind the semaphore and was
@@ -2131,11 +2132,10 @@ test('an abort mid-WAVE-0 leaves no generated candidate unaccounted for: skipped
 
   expect(final.report.aborted).toBe(true)
   // Two speculative direct probes (the v2 and v3 stub modules); exactly one was ever dispatched.
-  expect(enumeration.candidatesGenerated).toBe(2)
   expect(quoting.attempted).toBe(1)
+  expect(enumeration.legsMeasured).toBe(1)
   // The point of the fix: the probe that was never sent is REPORTED as never sent.
   expect(quoting.unattempted).toBe(1)
-  expect(enumeration.candidatesGenerated).toBe(quoting.attempted + quoting.unattempted)
 
   assertCoherent('quote', events)
 })
@@ -2239,9 +2239,9 @@ test('a chunk lost to a 429 is re-quoted by a later pass — one outer failure m
   // The transport failure is still REPORTED — a retry that succeeded does not erase the round that
   // failed, and `rpc-degraded` remains the honest verdict about this search's provider.
   expect(last.report.quoting.transportFailed).toBeGreaterThan(0)
-  // And the accounting still closes. A retried candidate is DISPATCHED twice, so it is counted twice
-  // in `candidatesGenerated` — which is exactly what keeps the per-call increments equal and both
-  // conservation bounds intact (see `waves.ts#retryTransportFailures`).
+  // And the accounting still closes. A retried candidate is DISPATCHED twice, so it counts twice in
+  // `attempted` — which is why the surviving conservation bound is `legsMeasured <= attempted` rather
+  // than an equality (see `waves.ts#retryTransportFailures`).
   assertCoherent('quote', events)
 })
 

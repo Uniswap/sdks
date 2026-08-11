@@ -251,12 +251,11 @@ describe.skipIf(!RUN)('pool discovery (fork)', () => {
     const ready = readySwap(result)
 
     expect(ready.best.route.legs[0]!.pool).toEqual(newest.ref)
-    // Seven pools, six slots (MAX_POOLS_DIRECT): the one that lost is reported as pruned rather than
-    // silently dropped. This is a per-pair pool drop (MAX_POOLS_DIRECT), not a total-candidate drop,
-    // so it counts in poolsPruned, not candidatesPruned — the two counters are separate units and
-    // must not conflate.
-    expect(ready.search.enumeration.poolsPruned).toBe(1) // 7 pools - cap of 6 = 1 dropped
-    expect(ready.search.enumeration.candidatesPruned).toBe(0)
+    // Seven pools, six slots (MAX_POOLS_DIRECT): the one that lost is reported rather than silently
+    // dropped. The report no longer counts pruned pools by name — pools left unmeasured on a pair are
+    // what `pairCeilingHit` says, and it is what forfeits `exhaustiveWithinMaxHops` here.
+    expect(ready.search.enumeration.pairCeilingHit).toBe(true)
+    expect(ready.search.enumeration.exhaustiveWithinMaxHops).toBe(false)
     // All six standard pools quoted successfully, which is what puts every one of them AHEAD of the
     // newest pool in the per-pair priority order (a recent quote success outranks a recent creation).
     // With a cap of six, ordinary priority would therefore have dropped the newest pool outright — so

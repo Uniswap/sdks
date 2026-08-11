@@ -163,10 +163,9 @@
         "exhaustiveWithinMaxHops": false,
         "intermediatesDiscovered": 0,
         "intermediatesSelected": 0,
-        "candidatesGenerated": 10,
-        "poolsPruned": 6,
-        "candidatesPruned": 0,
-        "intermediatesPruned": 0
+        "intermediatesPruned": 0,
+        "legsMeasured": 10,
+        "pairCeilingHit": true
       },
       "quoting": {
         "attempted": 10,

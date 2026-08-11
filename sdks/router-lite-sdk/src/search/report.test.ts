@@ -7,8 +7,9 @@ import type { ProtocolModule } from '../protocols/types'
 import type { BlockRef, ChainManifest, Protocol, SwapRequest } from '../types'
 
 import { buildReport, discoveryStatus } from './report'
-import { initialState } from './waves'
-import type { Run, SearchContext } from './waves'
+import { createState } from './state'
+import type { SearchState } from './state'
+import type { SearchContext } from './waves'
 
 // ---------------------------------------------------------------------------
 // C4-T1 mutation-audit kill: M15.
@@ -55,7 +56,11 @@ function enabledModule(id: Protocol): ProtocolModule {
   }
 }
 
-function makeRun(): Run {
+/** The three things the report fold reads. `buildReport` takes them separately (`state, ctx, req`);
+ * these tests carry them as one bag so each scenario can reach in and seed one of them. */
+type Fold = { ctx: SearchContext; state: SearchState; req: SwapRequest }
+
+function makeRun(): Fold {
   const modules = { v2: enabledModule('v2'), v3: enabledModule('v3'), v4: enabledModule('v4') }
   const ctx: SearchContext = {
     client: {
@@ -68,9 +73,9 @@ function makeRun(): Run {
     index: new PoolIndex(WETH), // discoveryStatus never touches the index; a real one is cheapest to build
     hookData: new Map(),
   }
-  const state = initialState(BLOCK, false)
+  const state = createState(BLOCK, false)
   const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: 1n, trader: TRADER }
-  return { ctx, state, kind: 'swap', req }
+  return { ctx, state, req }
 }
 
 test('discoveryStatus: both endpoints complete -> complete', () => {
@@ -78,13 +83,13 @@ test('discoveryStatus: both endpoints complete -> complete', () => {
   run.state.discovery.v2.complete.add(TOKEN_A.toLowerCase())
   run.state.discovery.v2.complete.add(TOKEN_B.toLowerCase())
 
-  expect(discoveryStatus(run, 'v2', [TOKEN_A, TOKEN_B])).toBe('complete')
+  expect(discoveryStatus(run.ctx, run.state, 'v2', [TOKEN_A, TOKEN_B])).toBe('complete')
 })
 
 test('discoveryStatus: neither endpoint complete -> partial', () => {
   const run = makeRun()
 
-  expect(discoveryStatus(run, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
+  expect(discoveryStatus(run.ctx, run.state, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
 })
 
 // THE MUTATION-KILLING CASE (M15): exactly ONE of the two endpoints' adjacency is complete. The
@@ -93,11 +98,11 @@ test('discoveryStatus: neither endpoint complete -> partial', () => {
 test('discoveryStatus: only ONE endpoint complete -> partial, never complete (M15)', () => {
   const inOnly = makeRun()
   inOnly.state.discovery.v2.complete.add(TOKEN_A.toLowerCase())
-  expect(discoveryStatus(inOnly, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
+  expect(discoveryStatus(inOnly.ctx, inOnly.state, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
 
   const outOnly = makeRun()
   outOnly.state.discovery.v2.complete.add(TOKEN_B.toLowerCase())
-  expect(discoveryStatus(outOnly, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
+  expect(discoveryStatus(outOnly.ctx, outOnly.state, 'v2', [TOKEN_A, TOKEN_B])).toBe('partial')
 })
 
 test('discoveryStatus: a failed scan reports failed regardless of endpoint completeness', () => {
@@ -106,14 +111,14 @@ test('discoveryStatus: a failed scan reports failed regardless of endpoint compl
   run.state.discovery.v2.complete.add(TOKEN_B.toLowerCase())
   run.state.discovery.v2.failed = true
 
-  expect(discoveryStatus(run, 'v2', [TOKEN_A, TOKEN_B])).toBe('failed')
+  expect(discoveryStatus(run.ctx, run.state, 'v2', [TOKEN_A, TOKEN_B])).toBe('failed')
 })
 
 test('discoveryStatus: a disabled protocol reports disabled before looking at discovery state at all', () => {
   const run = makeRun()
   run.ctx.modules.v3 = { ...enabledModule('v3'), enabled: () => false }
 
-  expect(discoveryStatus(run, 'v3', [TOKEN_A, TOKEN_B])).toBe('disabled')
+  expect(discoveryStatus(run.ctx, run.state, 'v3', [TOKEN_A, TOKEN_B])).toBe('disabled')
 })
 
 // ---------------------------------------------------------------------------
@@ -133,7 +138,7 @@ test('discoveryStatus: a disabled protocol reports disabled before looking at di
 
 /** `makeRun()`, but with the index swapped for one with no reorg-tail reopening, so a seeded
  * `[0, head]` coverage reads back as exactly `[0, head]`. */
-function makeRunWithIndex(): Run {
+function makeRunWithIndex(): Fold {
   const run = makeRun()
   run.ctx.index = new PoolIndex(WETH, { reorgOverlapBlocks: 0n })
   return run
@@ -156,7 +161,7 @@ test('buildReport: a warm-cache search that scans nothing new still reports the 
   run.state.discovery.v2.complete.add(TOKEN_A)
   run.state.discovery.v2.complete.add(TOKEN_B)
 
-  const report = buildReport(run)
+  const report = buildReport(run.state, run.ctx, run.req)
 
   expect(report.discovery.v2.status).toBe('complete')
   expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 0n, toBlock: head }])
@@ -179,7 +184,7 @@ test('buildReport: coverage is AND across endpoints, matching discoveryStatus â€
   run.state.discovery.v2.complete.add(TOKEN_A)
   // TOKEN_B: no coverage, never marked complete.
 
-  const report = buildReport(run)
+  const report = buildReport(run.state, run.ctx, run.req)
 
   expect(report.discovery.v2.status).toBe('partial')
   expect(report.discovery.v2.coveredRanges).toEqual([])
@@ -194,7 +199,7 @@ test('buildReport: partially overlapping endpoint coverage reports exactly the o
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: 700n })
   run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 400n, toBlock: head })
 
-  const report = buildReport(run)
+  const report = buildReport(run.state, run.ctx, run.req)
 
   expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 400n, toBlock: 700n }])
 })
@@ -211,7 +216,7 @@ test('buildReport: two trade endpoints that collapse onto one graph node still r
 
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: head })
 
-  const report = buildReport(run)
+  const report = buildReport(run.state, run.ctx, run.req)
 
   expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 0n, toBlock: head }])
 })
@@ -223,13 +228,13 @@ test('buildReport: covered fraction is monotone across two searches sharing the 
   // First search: only the recent tail is known.
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 800n, toBlock: head })
   run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 800n, toBlock: head })
-  const first = buildReport(run)
+  const first = buildReport(run.state, run.ctx, run.req)
 
   // Second search over the SAME index, now with the rest of the history scanned in â€” nothing this
   // run needs to have done itself for the report to reflect it.
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: 799n })
   run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 0n, toBlock: 799n })
-  const second = buildReport(run)
+  const second = buildReport(run.state, run.ctx, run.req)
 
   // Floor stability: the same protocol's demanded floor never moves between these two searches,
   // regardless of which sub-ranges either one happened to scan.
@@ -246,7 +251,7 @@ test('buildReport: the demand floor is the deployment floor, not min(coveredRang
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 500n, toBlock: head })
   run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 500n, toBlock: head })
 
-  const report = buildReport(run)
+  const report = buildReport(run.state, run.ctx, run.req)
 
   expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 500n, toBlock: head }])
   // The floor used for any percentage/denominator is the manifest's deployment block (0n), never the

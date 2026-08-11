@@ -271,7 +271,7 @@ async function quoteRow(
           discovery: Object.fromEntries(
             Object.entries(last.search.discovery).map(([k, v]) => [k, v.status]),
           ),
-          candidatesGenerated: last.search.enumeration.candidatesGenerated,
+          legsMeasured: last.search.enumeration.legsMeasured,
           quoting: last.search.quoting,
           aborted: last.search.aborted,
           headRegressed: last.search.headRegressed,

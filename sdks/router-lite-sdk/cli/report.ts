@@ -509,12 +509,10 @@ export function renderConfidencePanel(report: SearchReport, opts: ConfidencePane
   lines.push(
     `  breadth          explored ${groupThousands(e.intermediatesSelected)} of ${groupThousands(e.intermediatesDiscovered)} intermediate tokens — ${exhaustive}`,
   )
-  if (opts.verbose && e.poolsPruned + e.candidatesPruned + e.intermediatesPruned > 0) {
-    lines.push(
-      dim(
-        `                   ${groupThousands(e.candidatesGenerated)} candidates generated · pruned: ${e.poolsPruned} pools, ${e.intermediatesPruned} intermediates, ${e.candidatesPruned} candidates`,
-      ),
-    )
+  if (opts.verbose) {
+    const notReached = e.intermediatesPruned > 0 ? ` · ${e.intermediatesPruned} intermediates not reached yet` : ''
+    const ceiling = e.pairCeilingHit ? ' · pair ceiling hit' : ''
+    lines.push(dim(`                   ${groupThousands(e.legsMeasured)} legs measured${notReached}${ceiling}`))
   }
 
   const v = report.verification

@@ -105,10 +105,9 @@ const REPORT: SearchReport = {
     exhaustiveWithinMaxHops: true,
     intermediatesDiscovered: 5_992,
     intermediatesSelected: 8,
-    candidatesGenerated: 14,
-    poolsPruned: 2,
-    candidatesPruned: 0,
     intermediatesPruned: 4,
+    legsMeasured: 127,
+    pairCeilingHit: false,
   },
   quoting: { attempted: 127, succeeded: 90, failed: 37, transportFailed: 0, unattempted: 0 },
   verification: { preflightAttempted: 2, preflightBudgetExhausted: false },
@@ -186,11 +185,18 @@ describe('renderConfidencePanel', () => {
     expect(lines.some((l) => l.includes('nothing covered yet'))).toBe(false)
   })
 
-  it('shows pruning counters only under --verbose', () => {
+  it('shows the measurement counters only under --verbose', () => {
     const quiet = renderConfidencePanel(REPORT, { mode: 'swap' })
-    expect(quiet.some((l) => l.includes('pruned'))).toBe(false)
+    expect(quiet.some((l) => l.includes('legs measured'))).toBe(false)
     const loud = renderConfidencePanel(REPORT, { mode: 'swap', verbose: true })
-    expect(loud.some((l) => l.includes('pruned: 2 pools, 4 intermediates, 0 candidates'))).toBe(true)
+    expect(loud.some((l) => l.includes('127 legs measured · 4 intermediates not reached yet'))).toBe(true)
+    // The abuse backstop is named only when it actually fired.
+    expect(loud.some((l) => l.includes('pair ceiling hit'))).toBe(false)
+    const capped = renderConfidencePanel(
+      { ...REPORT, enumeration: { ...REPORT.enumeration, pairCeilingHit: true } },
+      { mode: 'swap', verbose: true },
+    )
+    expect(capped.some((l) => l.includes('pair ceiling hit'))).toBe(true)
   })
 
   it('approximates a partial protocol\'s demand floor age from the pinned block\'s own timestamp', () => {
