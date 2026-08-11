@@ -86,8 +86,8 @@ export type ChainContext = {
    * one `eth_call` per call.
    *
    * A PROMISE, NOT AN ADDRESS, so setup never blocks on it. Awaiting it in `buildChainContext` would
-   * put a round trip in front of every command — including `chains` and `discover`, which never
-   * want the answer — and, against an endpoint that accepts the connection and then stalls, up to a
+   * put a round trip in front of every command — including `discover`, which never wants the
+   * answer — and, against an endpoint that accepts the connection and then stalls, up to a
    * full client timeout (30s; 120s on 4663) before the first token was even resolved. Nobody needs
    * it until a result is being annotated, and by then it resolved long ago. It never rejects (see
    * {@link probeMulticall3}), so leaving it unawaited is not an unhandled rejection.

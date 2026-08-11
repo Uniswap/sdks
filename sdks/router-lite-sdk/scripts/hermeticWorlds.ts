@@ -577,9 +577,12 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
       world.set(pool.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
       index.upsert({ pool, source: 'event', createdAtBlock: 1n })
       // DETERMINISTIC BY POSITION IN THE CONVERSATION, not by a timer. The abort fires as this one
-      // pool's quote is served, so the outcome of the call that triggered it is applied before the
-      // loop ever observes the signal (it is read at the top of the NEXT cycle) — the search always
-      // has exactly this one price when it stops, on every machine, at any speed.
+      // pool's quote is served, so the recorded log is abort-then-measurement: the abort poke wakes
+      // the loop before this quote's own measurement continuation lands, so the `abort` entry is
+      // written first and the `measurement` entry second. The loop still drains that in-flight quote
+      // and keeps it as best-so-far — stopping early costs the remaining coverage, never the answer
+      // already paid for — so the search always has exactly this one price when it stops, on every
+      // machine, at any speed.
       const caller = new AbortController()
       const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN, signal: caller.signal }
       return {

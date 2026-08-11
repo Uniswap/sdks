@@ -70,6 +70,12 @@ describe('defaultTheBudgetFlag', () => {
     defaultTheBudgetFlag(strings)
     expect(strings.get('budget')).toBe('45s')
   })
+
+  it('returns the effective spec — `main` reads the return value, not the map, for its own budget clock', () => {
+    // Both arms: the default just written, and a caller-supplied value passed straight through.
+    expect(defaultTheBudgetFlag(new Map())).toBe('10000ms')
+    expect(defaultTheBudgetFlag(new Map([['budget', '45s']]))).toBe('45s')
+  })
 })
 
 describe('buildTradingApiBody', () => {
@@ -400,6 +406,20 @@ describe('summarize', () => {
     expect(summary.hardStopped).toBe(1)
     expect(summary.ties).toBe(2)
     expect(summary.missesTotal).toBe(1) // the thrown row only
+  })
+
+  it('counts a thrown lite side as hard-stopped too, when the error itself carries the flag', () => {
+    // `kind: 'error'` has no `flags` object to hang `hardStopped` off — it carries its own optional
+    // field instead (see `LiteSideResult`'s error arm) — so this exercises the OTHER branch of
+    // `summarize`'s hard-stopped check, the one the `flags.hardStopped` case above never reaches.
+    const rows: ComparisonRow[] = [
+      { pair: pair('threw-hard-stopped'), lite: { kind: 'error', message: 'stream ended past budget', finalMs: 12_000, hardStopped: true }, api: okApi(100n) },
+      { pair: pair('threw-plain'), lite: { kind: 'error', message: 'boom', finalMs: 1 }, api: okApi(100n) },
+    ]
+    const summary = summarize(rows)
+    expect(summary.hardStopped).toBe(1)
+    // Hard-stopped is a separate reading from the miss count: both thrown rows are still `error` misses.
+    expect(summary.missCounts.error).toBe(2)
   })
 
   it('handles an empty row set', () => {
