@@ -21,7 +21,16 @@ import { parseArgs } from '../args'
 import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
 import { consumeSearch } from '../stream'
 
-import { buildChainContext, hydrateLegSymbols, interruptSignal, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS } from './context'
+import {
+  annotateAnsweringImpact,
+  buildChainContext,
+  hydrateLegSymbols,
+  interruptSignal,
+  makeLeadClassifier,
+  resolveTrade,
+  startBudget,
+  TRADE_FLAGS,
+} from './context'
 
 
 export async function cmdQuote(argv: string[]): Promise<number> {
@@ -86,17 +95,24 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       return 2
     }
     const cause = budget.cause() // settled by now — the search is over
+    // The answering route's price impact — the same annotation `getQuote` stamps on its own answer,
+    // mirrored here because this command answers off the stream (see `context.ts`). One extra
+    // envelope, leader-only; failure (or an expired budget) degrades to an absent figure.
+    const answered = await annotateAnsweringImpact(ctx, final, signal)
 
     if (json) {
-      if (!stream) console.log(jsonify(final))
+      if (!stream) console.log(jsonify(answered))
       // `--watch`/`--verbose` already streamed every event as NDJSON; nothing more to print.
-      return exitCodeFor(final.status)
+      return exitCodeFor(answered.status)
     }
 
-    await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
+    await hydrateLegSymbols(ctx, trade.renderCtx, [
+      ...('best' in answered && answered.best ? [answered.best] : []),
+      ...answered.alternatives,
+    ])
     if (stream) console.log('')
     console.log(
-      renderQuoteResult(final, tradeCtx, trade.renderCtx, {
+      renderQuoteResult(answered, tradeCtx, trade.renderCtx, {
         elapsedMs: Date.now() - started,
         addresses,
         ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
@@ -106,7 +122,7 @@ export async function cmdQuote(argv: string[]): Promise<number> {
         timeline,
       }).join('\n'),
     )
-    return exitCodeFor(final.status)
+    return exitCodeFor(answered.status)
   } finally {
     budget.cancel()
   }

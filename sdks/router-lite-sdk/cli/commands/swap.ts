@@ -23,7 +23,17 @@ import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } 
 import { isSkipped, probeSimulateV1Support, simulateSwap } from '../simulate'
 import { consumeSearch } from '../stream'
 
-import { buildChainContext, hydrateLegSymbols, interruptSignal, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
+import {
+  annotateAnsweringImpact,
+  buildChainContext,
+  hydrateLegSymbols,
+  interruptSignal,
+  makeLeadClassifier,
+  resolveTrade,
+  startBudget,
+  TRADE_FLAGS,
+  type ChainContext,
+} from './context'
 
 
 const SWAP_FLAGS = {
@@ -133,14 +143,20 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       return 2
     }
     const cause = budget.cause() // settled by now — the search is over
+    // The answering route's price impact — the same annotation `getSwap` stamps on its own answer,
+    // mirrored here because this command answers off the stream (see `context.ts`).
+    const answered = await annotateAnsweringImpact(ctx, final, signal)
 
     if (json) {
-      if (!stream) console.log(jsonify(final))
+      if (!stream) console.log(jsonify(answered))
     } else {
-      await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
+      await hydrateLegSymbols(ctx, trade.renderCtx, [
+        ...('best' in answered && answered.best ? [answered.best] : []),
+        ...answered.alternatives,
+      ])
       if (stream) console.log('')
       console.log(
-        renderSwapResult(final, tradeCtx, trade.renderCtx, {
+        renderSwapResult(answered, tradeCtx, trade.renderCtx, {
           elapsedMs: Date.now() - started,
           addresses,
           ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
@@ -156,14 +172,14 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     // fresh round of simulation RPC after the panel is exactly the post-^C dawdling this path
     // exists to end. The rendered result already says `interrupted`.
     if (parsed.booleans.has('simulate') && !interrupted) {
-      const verdict = await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
+      const verdict = await runSimulation(ctx, answered, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
       // A simulation that DISPROVED the tx must not exit 0 — a script gating on "swap --simulate"
       // would otherwise treat a proven-broken transaction as a success. Dedicated code 5 (documented
       // in rl.ts/README) keeps it distinguishable from `inconclusive` (2): the chain gave a verdict.
       if (verdict === 'disproved') return 5
     }
 
-    return exitCodeFor(final.status)
+    return exitCodeFor(answered.status)
   } finally {
     budget.cancel()
   }

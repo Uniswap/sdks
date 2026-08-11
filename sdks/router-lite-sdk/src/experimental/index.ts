@@ -84,6 +84,16 @@ export { buildHookData } from '../search/hookData'
 // header and `build.surface.test.ts`).
 export { assertResultCoherent, emptyReport } from '../internal/resultCoherence'
 
+// `measureRouteImpact` is the answering-route price-impact measurement `getQuote`/`getSwap` stamp
+// onto their results (`RouteQuote.priceImpactBps`, see `src/types.ts`): one `measureLegs` envelope
+// re-quoting a route's legs at dust reference amounts, composed against the quote's own numbers.
+// Exported for the caller who answers off the STREAMS instead of the promises — `quotes()`/`swaps()`
+// leads are deliberately unannotated, so a consumer that picks its own stopping lead (the CLI is
+// exactly this caller) mirrors the facade by annotating the route it chose, with the same function
+// the facade uses. Total over failure: `undefined`, never a throw.
+export { measureRouteImpact } from '../quote/impact'
+export type { MeasureRouteImpactArgs } from '../quote/impact'
+
 // `DEFAULT_SLIPPAGE_BPS` is the slippage this package applies when a `SwapRequest` omits
 // `slippageBps` (see `search/verifier.ts`). Exported for the caller who needs to PREDICT what an
 // un-overridden `getSwap` will encode — sizing a balance, showing a user the worst case, or asserting

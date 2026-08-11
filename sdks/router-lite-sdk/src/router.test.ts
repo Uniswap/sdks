@@ -1015,6 +1015,102 @@ test('getQuote answers only after the first round settles: a fast bad first enve
   assertResultCoherent(res)
 })
 
+describe('price impact — reported on the answering route, never a refusal', () => {
+  test('getQuote stamps priceImpactBps on the answering route only; alternatives never carry it', async () => {
+    const manifest = baseManifest()
+    // Two direct pools: the winning v2 CREATE2 pool (whose dust reference is the SAME getReserves
+    // read the execution quote made, so the stub answers both), and a v4 runner-up.
+    const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
+    const v4Leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
+    const [v2Probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+
+    const { client } = stubClient({
+      calls: {
+        // Unequal reserves so a 1-unit dust quote still rounds to a nonzero answer.
+        ...entryFor(v2Probe!.quote.call, v2Return(10n ** 18n, 10n ** 24n, zeroForOne)),
+        ...entryFor(v4Module.encodeQuote([v4Leg], AMOUNT_IN, manifest).call, v4Return(500n)),
+      },
+    })
+    const router = createRouter({ client, manifest })
+    await router.ingestPool({ protocol: 'v4', poolKey })
+
+    const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+    expect(res.status).toBe('quote')
+    if (res.status === 'quote') {
+      // AMOUNT_IN (1000) against a 10^18 reserve barely moves the pool: the figure is present and
+      // ordinary-small — what matters here is presence, sign-agnostic near zero.
+      expect(res.best.quote.priceImpactBps).toBeDefined()
+      expect(Math.abs(res.best.quote.priceImpactBps!)).toBeLessThan(50)
+      for (const alt of res.alternatives) expect(alt.quote.priceImpactBps).toBeUndefined()
+    }
+    assertResultCoherent(res)
+  })
+
+  test('a thin pool reports a large negative impact — and still answers', async () => {
+    const manifest = baseManifest({ v4: false })
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+
+    // amountIn (1000) is TWICE the in-side reserve: the trade eats most of the pool.
+    const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(500n, 10n ** 9n, zeroForOne)) })
+    const router = createRouter({ client, manifest })
+
+    const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+    expect(res.status).toBe('quote') // reported, never refused
+    if (res.status === 'quote') {
+      // Exact integer arithmetic of the constant-product quote at 1000 in vs the 1-unit dust
+      // reference: the trade realizes ~33% of the marginal price, i.e. it moves the pool by ~67%.
+      expect(res.best.quote.priceImpactBps).toBe(-6654)
+    }
+    assertResultCoherent(res)
+  })
+
+  test('a failed reference envelope degrades to an absent figure — the answer is never blocked', async () => {
+    const manifest = baseManifest()
+    // v4's dust-amount quote encodes DIFFERENT calldata than the execution quote, and only the
+    // execution call is scripted — the reference envelope reverts, the answer still returns.
+    const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
+    const v4Leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
+    const { client } = stubClient({
+      calls: entryFor(v4Module.encodeQuote([v4Leg], AMOUNT_IN, manifest).call, v4Return(500n)),
+    })
+    const router = createRouter({ client, manifest })
+    await router.ingestPool({ protocol: 'v4', poolKey })
+
+    const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+    expect(res.status).toBe('quote')
+    if (res.status === 'quote') {
+      expect(res.best.quote.amountOut).toBe(500n)
+      expect(res.best.quote.priceImpactBps).toBeUndefined() // absent = not computed, never a guess
+    }
+    assertResultCoherent(res)
+  })
+
+  test('getSwap stamps the answering (verified) route too', async () => {
+    const manifest = baseManifest({ v4: false })
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 18n, 10n ** 24n, zeroForOne)) })
+    const router = createRouter({ client, manifest })
+
+    const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
+
+    expect(res.status).toBe('ready')
+    if (res.status === 'ready') {
+      expect(res.best.quote.priceImpactBps).toBeDefined()
+      for (const alt of res.alternatives) expect(alt.quote.priceImpactBps).toBeUndefined()
+    }
+    assertResultCoherent(res)
+  })
+})
+
 test('ingestLogs survives malformed entries: every valid log is still indexed, nothing throws (C4-H4)', async () => {
   // v2 AND v4 enabled, so all three parsers get handed the garbage, not just the one that matches.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n })

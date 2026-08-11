@@ -28,6 +28,7 @@ import {
 import { PoolIndex } from './pools/poolIndex'
 import type { PoolIndexStats } from './pools/poolIndex'
 import { PROTOCOL_MODULES, routeId } from './protocols'
+import { measureRouteImpact } from './quote/impact'
 import { assertHintAddresses, buildHookData } from './search/hookData'
 import type { EngineEvent, HeadWatermark, SearchContext } from './search/loop'
 import { fetchBlock, search } from './search/loop'
@@ -1144,6 +1145,39 @@ export function createRouter(opts: CreateRouterOptions): Router {
     return classify(foldEvent(e.ranked, e.state, e.report))
   }
 
+  /**
+   * The ANSWERING route's price impact (`quote/impact.ts`) — measured by the facade, for the one
+   * route a promise caller is about to be handed, as one extra `measureLegs` envelope at the
+   * search's own pinned block. Quote mode, which otherwise issues no verification calls at all,
+   * pays exactly this envelope; swap mode folds it alongside the answer preflight already verified.
+   * `undefined` on any failure (revert, transport, an expired caller signal): the annotation can
+   * never block the answer. Streaming consumers never reach this — `quotes()`/`swaps()` leads are
+   * envelope-cadence and unannotated by design.
+   */
+  async function answeringImpact(best: QuotedRoute, search: SearchReport, req: QuoteRequest): Promise<number | undefined> {
+    // Whatever the probe has ALREADY resolved, never a fresh probe: the annotation dispatches the
+    // same way the search it annotates did (a transiently-failed probe means both run per-call),
+    // and the answer path never grows an extra `eth_getCode` round trip.
+    const multicall3 = multicallResolved?.address ?? null
+    return measureRouteImpact({
+      client,
+      modules,
+      manifest,
+      blockNumber: search.block.number,
+      semaphore,
+      ...(multicall3 !== null && { multicall3 }),
+      ...(req.signal !== undefined && { signal: req.signal }),
+      route: best.route,
+      quote: best.quote,
+    })
+  }
+
+  /** `best` with `quote.priceImpactBps` stamped — a rebuild, never a mutation: the engine's route
+   * objects are shared across events and alternatives, and only the answering copy may carry it. */
+  function stampImpact<B extends QuotedRoute>(best: B, priceImpactBps: number): B {
+    return { ...best, quote: { ...best.quote, priceImpactBps } }
+  }
+
   async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
     for await (const item of startSearch(req, validateQuoteRequest, 'quote')) {
       if ('outage' in item) return rpcUnavailable(manifest)
@@ -1154,7 +1188,12 @@ export function createRouter(opts: CreateRouterOptions): Router {
       // promise caller's answer off a partial first round (a dozen fast legs leading a saturated
       // pool while the rest of the round was still on the wire — the parity sweep's biggest deltas);
       // the engine emits a `lead` the moment the axis flips, so this never waits past that moment.
-      if ((result.status === 'quote' && result.search.firstRoundComplete) || item.event.type === 'final') return result
+      if ((result.status === 'quote' && result.search.firstRoundComplete) || item.event.type === 'final') {
+        if (result.status !== 'quote') return result
+        // The answering route — and only it — carries its price impact; see {@link answeringImpact}.
+        const impact = await answeringImpact(result.best, result.search, req)
+        return impact === undefined ? result : { ...result, best: stampImpact(result.best, impact) }
+      }
     }
     /* istanbul ignore next -- the engine always yields a final event before returning */
     throw new Error('unreachable: the search completed without a final event')
@@ -1170,7 +1209,10 @@ export function createRouter(opts: CreateRouterOptions): Router {
         ((result.status === 'ready' || result.status === 'needs-action') && result.search.firstRoundComplete) ||
         item.event.type === 'final'
       ) {
-        return result
+        if (result.status !== 'ready' && result.status !== 'needs-action') return result
+        // The answering route — and only it — carries its price impact; see {@link answeringImpact}.
+        const impact = await answeringImpact(result.best, result.search, req)
+        return impact === undefined ? result : { ...result, best: stampImpact(result.best, impact) }
       }
     }
     /* istanbul ignore next -- the engine always yields a final event before returning */

@@ -19,8 +19,8 @@ import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 // real, externally-meaningful deployment), so they stay a deep import rather than joining
 // `experimental/index.ts`'s bless list.
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from '../../src/constants'
-import { PoolIndex } from '../../src/experimental/index'
-import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../../src/index'
+import { measureRouteImpact, PoolIndex, PROTOCOL_MODULES } from '../../src/experimental/index'
+import { createRouter, type PoolHint, type QuotedRoute, type QuoteResult, type Router, type SwapResult } from '../../src/index'
 import { parseAmount, parseBudget } from '../amounts'
 import { dim } from '../ansi'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
@@ -589,6 +589,35 @@ export function makeLeadClassifier(
   const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
   const hasHints = trade.hints.length > 0
   return (route) => classifyLeadOrigin(route, preExistingDirect, hasHints)
+}
+
+/**
+ * Mirrors the facade's answering-route price-impact annotation for a result this CLI chose off the
+ * STREAM: `getQuote`/`getSwap` stamp `priceImpactBps` on the route they answer with, but streamed
+ * leads are deliberately unannotated — and the default/`--verbose`/`--watch` paths all answer off
+ * `quotes()`/`swaps()`. Same measurement (`measureRouteImpact`, one extra envelope, leader-only),
+ * same degrade-to-absent posture: a failed reference never blocks or fails the render, and an
+ * already-annotated result (should the stream ever start carrying it) is passed through untouched.
+ */
+export async function annotateAnsweringImpact<R extends QuoteResult | SwapResult>(
+  ctx: ChainContext,
+  result: R,
+  signal?: AbortSignal,
+): Promise<R> {
+  if (result.status !== 'quote' && result.status !== 'ready' && result.status !== 'needs-action') return result
+  const best = result.best
+  if (best.quote.priceImpactBps !== undefined) return result
+  const impact = await measureRouteImpact({
+    client: ctx.client,
+    modules: PROTOCOL_MODULES,
+    manifest: ctx.chain.manifest,
+    blockNumber: result.search.block.number,
+    route: best.route,
+    quote: best.quote,
+    ...(signal !== undefined && { signal }),
+  })
+  if (impact === undefined) return result
+  return { ...result, best: { ...best, quote: { ...best.quote, priceImpactBps: impact } } }
 }
 
 /**

@@ -94,6 +94,7 @@ const EXPERIMENTAL_VALUE_EXPORTS = [
   'isDiscredited',
   'isHooked',
   'mapConcurrent',
+  'measureRouteImpact',
   'parseSnapshot',
   'sameFamily',
   'scanLogs',

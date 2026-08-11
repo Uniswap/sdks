@@ -172,6 +172,30 @@ export type RouteQuote = {
    * meaningful, both of which are the caller's to know.
    */
   gasEstimate?: bigint
+  /**
+   * The route's price impact in basis points — REPORTED, NEVER A REFUSAL, and carried ONLY by the
+   * route `getQuote`/`getSwap` answer with. Absent everywhere else: alternatives never carry it,
+   * streamed leads never carry it, and absence means "not computed", never "no impact".
+   *
+   * WHAT IT MEASURES. When the facade is about to answer (the answering lead, or a `final` whose
+   * status is `quote`/`ready`/`needs-action`), it re-quotes the answering route's own legs at a
+   * dust reference amount — each leg's execution input / 10,000, floor 1 — in ONE extra
+   * `measureLegs` envelope at the same pinned block, and composes per-leg ratios:
+   * `(execution unit price / reference unit price − 1) × 10,000` (`quote/impact.ts`). Negative is
+   * the ordinary direction — `-9_100` means this trade realizes 91% less per unit than the pools'
+   * marginal price, i.e. it moves the pools by ~91%. Small positive values are possible at dust
+   * sizes and are reported as measured.
+   *
+   * THE COST IS ONE ENVELOPE, LEADER-ONLY, AT ANSWER TIME: quote mode — which otherwise issues no
+   * verification calls at all — now may issue this one extra envelope per `getQuote`; swap mode
+   * folds it alongside the answer it already verified. A reference measurement that fails (revert,
+   * transport loss, the caller's already-expired signal, a zero answer) degrades to absence and
+   * never blocks or delays the answer beyond its own single round trip.
+   *
+   * NOTHING RANKS OR CLASSIFIES ON IT — a catastrophic-impact route still quotes and still answers;
+   * rendering thresholds (the CLI warns below -500 bps) are display policy, not SDK policy.
+   */
+  priceImpactBps?: number
 }
 
 export type QuotedRoute = {

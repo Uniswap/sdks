@@ -703,9 +703,35 @@ function renderHeadline(
   const amountOut = amountFor(ctx, trade.tokenOut, best.quote.amountOut)
   const left = `${STATUS_HEADER[status](STATUS_GLYPH[status])} ${amountFor(ctx, trade.tokenIn, trade.amountIn)} → ${bold(amountOut)}`
   const implied = impliedPriceNote(trade, best, ctx)
-  if (elapsedMs === undefined) return `${left}${implied}`
+  const impact = impactNote(best)
+  if (elapsedMs === undefined) return `${left}${implied}${impact}`
   const summary = `best of ${groupThousands(totalRoutes)} route${totalRoutes === 1 ? '' : 's'} · ${humanizeDuration(elapsedMs)}`
-  return `${left}${implied}  ${dim(summary)}`
+  return `${left}${implied}${impact}  ${dim(summary)}`
+}
+
+/**
+ * The CLI's high-impact rendering threshold — a DISPLAY choice, deliberately not SDK policy: the
+ * SDK reports `priceImpactBps` on the answering route and refuses nothing (`src/types.ts`).
+ */
+const HIGH_IMPACT_WARN_BPS = -500
+
+/** `impact -12.3 bps` on the result line, when the answering route carries the measurement — dimmed
+ * in the ordinary range, red at/below the warning threshold so the number itself flags the trade. */
+function impactNote(route: QuotedRoute | RankedRoute): string {
+  const bps = route.quote.priceImpactBps
+  if (bps === undefined) return ''
+  const label = `impact ${bps > 0 ? '+' : ''}${groupThousands(bps)} bps`
+  return `  ${bps < HIGH_IMPACT_WARN_BPS ? red(label) : dim(label)}`
+}
+
+/** The warning line under the leading route when impact is worse than {@link HIGH_IMPACT_WARN_BPS}:
+ * the one line a caller about to paste calldata into a wallet should not be able to miss. */
+function highImpactWarning(route: QuotedRoute | RankedRoute): string[] {
+  const bps = route.quote.priceImpactBps
+  if (bps === undefined || bps >= HIGH_IMPACT_WARN_BPS) return []
+  const pct = Math.abs(bps) / 100
+  const moved = pct >= 10 ? pct.toFixed(0) : pct.toFixed(1)
+  return [yellow(`  ⚠ high price impact — this route moves the pool ~${moved}%`)]
 }
 
 /** `1 ETH = 1,877.84 USDC` — skipped when `amountIn` is exactly `1` of the in-token's own units (the
@@ -786,6 +812,7 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
     const totalRoutes = result.alternatives.length + 1
     lines.push(renderHeadline('quote', trade, result.best, totalRoutes, ctx, opts.elapsedMs))
     lines.push(`  ${renderRoute(result.best.route, ctx, opts)}${gasNote(result.best)}`)
+    lines.push(...highImpactWarning(result.best))
     lines.push(...renderPoolDetailLines(result.best.route, opts))
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
   } else {
@@ -813,6 +840,7 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
     const totalRoutes = result.alternatives.length + 1
     lines.push(renderHeadline(result.status, trade, result.best, totalRoutes, ctx, opts.elapsedMs))
     lines.push(`  ${renderRoute(result.best.route, ctx, opts)}${gasNote(result.best)}  ${executionBadge(result.best)}`)
+    lines.push(...highImpactWarning(result.best))
     lines.push(...renderPoolDetailLines(result.best.route, opts))
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
     if (result.status === 'needs-action') {

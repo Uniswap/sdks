@@ -409,6 +409,63 @@ describe('result rendering', () => {
     expect(lines[2]).toBe('        pool 0xE055…939F')
   })
 
+  it('renders priceImpactBps on the result line when the answering route carries it', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [], priceImpactBps: -12 },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    const lines = renderQuoteResult(result, trade, CTX, { elapsedMs: 412 })
+    expect(lines[0]).toContain('impact -12 bps')
+    // Ordinary impact: no warning line anywhere on the page.
+    expect(lines.join('\n')).not.toContain('high price impact')
+  })
+
+  it('renders nothing impact-shaped when the figure was not computed', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [] },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    expect(renderQuoteResult(result, trade, CTX).join('\n')).not.toContain('impact')
+  })
+
+  it('warns when impact is worse than -500 bps — the display threshold, not SDK policy', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [], priceImpactBps: -9_100 },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    const lines = renderQuoteResult(result, trade, CTX, { elapsedMs: 412 })
+    expect(lines[0]).toContain('impact -9,100 bps')
+    expect(lines[2]).toBe('  ⚠ high price impact — this route moves the pool ~91%')
+  })
+
+  it('does NOT warn at exactly -500 bps: the threshold is "worse than", not "at"', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [], priceImpactBps: -500 },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    expect(renderQuoteResult(result, trade, CTX).join('\n')).not.toContain('high price impact')
+  })
+
   it('appends an implied unit price when amountIn is not exactly 1 of the in-token', () => {
     const result: QuoteResult = {
       status: 'quote',

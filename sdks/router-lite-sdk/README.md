@@ -334,6 +334,33 @@ makes.
 The CLI prints it dimmed on route lines (`~90k gas`), rounded to three significant figures because
 that is as much precision as the figure actually has.
 
+### `quote.priceImpactBps`: reported, never a refusal
+
+The route `getQuote`/`getSwap` answer with — and only that route — may carry
+`quote.priceImpactBps?: number`: how far its execution price sits from the same pools' **marginal**
+price, in basis points, negative in the ordinary direction (`-9_100` = this trade realizes 91% less
+per unit than the marginal price, i.e. it moves the pools by ~91%). It exists because a
+catastrophic-impact route used to quote with no flag at all: the search still answers — impact is
+**reporting, never refusal**, and nothing ranks or classifies on it — but the caller can now see
+that the answer eats the pool.
+
+- **Measured, not modeled.** When the facade is about to answer, it re-quotes the answering route's
+  own legs at a dust reference amount (each leg's execution input / 10,000, floor 1) in **one**
+  extra `measureLegs` envelope at the same pinned block, and composes the per-leg ratios
+  (`src/quote/impact.ts`). v2 legs ride in the same envelope (their quote is the same
+  `getReserves()` read, priced locally at the dust amount).
+- **Leader-only, at answer time, ≤ 1 envelope per search.** Quote mode — which issues no
+  verification calls — now may issue exactly this one extra envelope per `getQuote`; swap mode
+  folds it alongside the answer preflight already verified. `alternatives` never carry it, and
+  neither do `quotes()`/`swaps()` streamed leads (envelope-cadence leads stay unannotated).
+- **Absent means "not computed", never "no impact".** A reference leg that reverts, is lost to the
+  transport, is cut off by the caller's already-expired `AbortSignal`, or answers zero degrades the
+  figure to absence — the annotation can never block or fail the answer it annotates.
+
+The CLI prints it on the result line (`impact -12 bps`) and adds a warning line when impact is
+worse than −500 bps (`⚠ high price impact — this route moves the pool ~91%`). That threshold is a
+**display** choice in the CLI, not SDK policy.
+
 ### `reason`
 
 `no-route` and `inconclusive` both carry `reason: { code: ReasonCode; detail: string }` instead of a
