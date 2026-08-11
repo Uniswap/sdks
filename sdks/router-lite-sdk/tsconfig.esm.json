@@ -6,5 +6,13 @@
     "target": "es2020"
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/**/testing.ts", "src/internal/replay.ts", "src/internal/moduleGraph.ts"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/testing.ts",
+    "src/internal/replay.ts",
+    "src/internal/moduleGraph.ts",
+    // in-flight event-core modules — unwired until the loop lands (see docs/superpowers/plans/2026-08-10-event-driven-search-core.md Task 9)
+    "src/search/notify.ts"
+  ]
 }
