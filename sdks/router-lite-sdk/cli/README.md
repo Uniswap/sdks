@@ -69,7 +69,7 @@ A quote reads top to bottom as a story — the answer, the route it came from, h
 there, what almost won instead, and how much to trust it:
 
 ```
-✔ 1 ETH → 1,877.84 USDC  best of 40 routes · 62.6s
+✔ 1 ETH → 1,877.84 USDC  impact -14 bps  best of 40 routes · 62.6s
   ETH ─ v3 0.01% → USDC
         pool 0xE055…939F
 
@@ -79,9 +79,9 @@ how it went
   62.6s   search complete — 90 of 127 legs priced (budget reached — 60.0s)
 
 runners-up                Δ vs best
-    -0.30 USDC   -1.6 bps   ETH ─ v4 0%+hooks → USDT ─ v4 0%+hooks → USDC ~424k gas
+    -0.30 USDC   -1.6 bps   ETH ─ v4 0%+hooks → USDT ─ v4 0%+hooks → USDC ~424k gas  hook-reported
     -0.42 USDC   -2.2 bps   ETH ─ v3 0.05% → USDC                         ~89k gas
-    … and 37 more
+    … and 37 more (4 hook-reported, demoted)
 
 confidence
   priced at block #25,727,084 · 2026-08-10 20:47 UTC
@@ -107,8 +107,30 @@ confidence
   carries every event. It is always printed, not only under `--watch`;
   `--watch`/`--verbose` stream the same lines live as the search runs instead of waiting for the
   end.
+- **The `impact` figure on the headline** is the answering route's price impact in bps
+  (`priceImpactBps`): its execution price against the same pools' *marginal* price, measured by
+  re-quoting each leg at a dust reference amount. Negative is the ordinary direction — `-14 bps`
+  means the trade realizes 0.14% less per unit than the pool's marginal price, i.e. it moves the
+  pool by that much. It is **reporting, never refusal**: a catastrophic-impact route still quotes,
+  still ranks by `amountOut`, and still answers. Below **-500 bps** the number turns red and a
+  second line appears under the route — `⚠ high price impact — this route moves the pool ~7.3%` —
+  which is a CLI display threshold, not SDK policy. The figure is **absent, not zero,** when it
+  could not be measured (a reference leg reverted, was lost, or the budget had already expired);
+  absent means "not computed". Costs one extra `aggregate3` per answer where Multicall3 is deployed
+  (one `eth_call` per leg where it is not), on the leading route only.
+- **`hook-reported`** marks a route whose quoted amount is a **returns-delta hook's own claim**
+  rather than pool math: the v4 quoter delegates to the hook, and a `RETURNS_DELTA` permission means
+  the number is whatever the hook answered — honoured or not when real tokens settle. The leading
+  route says it in full (`hook-reported quote — unverifiable without simulation`); runners-up and
+  swap badges carry the compact mark. In **quote mode these routes are partitioned below every
+  verifiable one**, however well they priced, so an echo hook claiming billions sits in the
+  runners-up instead of leading. They lead only when nothing else priced at all (a price beats
+  nothing), still marked. Swap mode never partitions — preflight simulates the real trade, so an
+  echo hook fails there on its own.
 - **"runners-up"** is the alternatives as a delta table: signed Δ in the out-token's units and in
-  bps, both against the best, columns aligned and capped at 5 rows (`… and N more`).
+  bps, both against the best, columns aligned and capped at 5 rows. The overflow line names how many
+  of the hidden rows were `hook-reported` (`… and 37 more (4 hook-reported, demoted)`), so demoted
+  hook claims are never mistaken for ordinary routes nobody bothered to print.
 - **"confidence"** is the SDK's `SearchReport` reworded as plain sentences: pool knowledge (per-
   protocol discovery coverage, with an approximate calendar age for a partial protocol's scan
   floor), legs measured (the measurement funnel — legs are deduped by pool/direction/amount, so this
@@ -161,11 +183,16 @@ never treat as "carry on".
   request can still overrun a very tight budget by up to that capped timeout. Without a budget the
   search is bounded in *work*, not in seconds — a throttled endpoint can take a long time.
 - **`--verbose` vs `--watch`**: both stream the "how it went" timeline live, one line per search
-  event as it lands, instead of only printing it once at the end; `--verbose` stops at the first
-  actionable `lead` (what `getQuote`/`getSwap` would return — the same result the default,
-  non-streamed path gives), `--watch` drains the search to its `final` event (what the `quotes()`/`swaps()`
-  iterators expose — the search widens for as long as something keeps pulling). The timeline is identical either way — `--watch`/`--verbose` just show it
-  happening instead of waiting for the recap at the end.
+  event as it lands, instead of only printing it once at the end. `--verbose` and the default
+  (non-streamed) path share **one** stop rule: the first result that carries a quote **and whose
+  first measurement round has settled** (`search.firstRoundComplete`) — which is exactly what
+  `getQuote`/`getSwap` return, and the `firstRoundComplete` half is not a detail. A lead that
+  arrives mid-round is a partial reading of a round still landing legs, so stopping on "has a quote"
+  alone would answer with a strictly earlier — and systematically worse — snapshot than the facade
+  gives. `--watch` drains the search to its `final` event instead (what the `quotes()`/`swaps()`
+  iterators expose — the search widens for as long as something keeps pulling). The timeline is
+  identical either way; `--watch`/`--verbose` just show it happening instead of waiting for the
+  recap at the end.
 - **`--json` output**: without `--watch`/`--verbose` it is exactly one object, the final result
   (`jsonify(final)`). WITH either of them it is **NDJSON: one line per search event**, each
   discriminated on `event` alone and mirroring the SDK's own `SearchEvent` union:
@@ -262,11 +289,11 @@ A list that fails any of its checks exits `4` and does not run; see the exit-cod
 
 ## `scripts/compare.ts` — router-lite vs the Trading API
 
-A comparison tester, not part of `rl`: it quotes a matrix of pairs through BOTH this package's
-router (straight from `src/`, same convention as `rl`) and the [Uniswap Trading
-API](https://trade-api.gateway.uniswap.org), and reports amount-out deltas (bps, signed —
-positive means router-lite found *more* output), latency, and route shapes side by side. Run it
-from the package root:
+A **coverage** tester, not part of `rl`, and not a benchmark: it quotes a matrix of pairs through
+BOTH this package's router (straight from `src/`, same convention as `rl`) and the [Uniswap Trading
+API](https://trade-api.gateway.uniswap.org), and asks *can the router see this trade at all* —
+reporting amount-out deltas (bps, signed — positive means router-lite found *more* output), latency,
+route shapes, and above all a **MISSES** section. Run it from the package root:
 
 ```bash
 cd sdks/router-lite-sdk
@@ -277,37 +304,86 @@ chainz exec 1 -- bun scripts/compare.ts --rpc @rpc
 # Both sides
 UNISWAP_API_KEY=… chainz exec 1 -- bun scripts/compare.ts --rpc @rpc
 
+# Base's own matrix — the chain is detected from the endpoint, and it picks the matrix
+chainz exec 8453 -- bun scripts/compare.ts
+
 # See the exact Trading API request bodies without spending a key or quoting anything
 bun scripts/compare.ts --rpc https://… --dry-run
 
-# Override the built-in mainnet matrix
+# Override the matrix entirely with your own pairs
 bun scripts/compare.ts --rpc https://… --pair "USDC/WETH:5000" --pair "eth/pepe:2"
+
+# Re-run a handful of pairs to CONVERGENCE instead of the getQuote reading (minutes per row)
+bun scripts/compare.ts --rpc https://… --pair "eth/usdc:100" --converge --budget 60s
 
 # Machine-readable, one JSON document with every row + the summary
 bun scripts/compare.ts --rpc https://… --json | jq .summary
 ```
 
+- **The matrix is PER-CHAIN and PER-SIZE.** The connected endpoint identifies its own chain
+  (`buildChainContext`, exactly as `rl` does) and that chain selects its pair list: matrices ship for
+  **mainnet (1), Unichain (130), Base (8453) and Arbitrum One (42161)**. A chain with a built-in
+  manifest but no curated pair list (Robinhood Chain, which the Trading API does not serve either) is
+  declined with a one-liner naming the chains that do work, rather than run as an empty matrix.
+  Every pair carries **three sizes** — small (retail), typical (what a desk actually quotes), and
+  whale (~100× the typical) — and **each size is its own row**, labelled `PAIR @ AMOUNT`. Sizes are
+  part of the matrix rather than a flag because depth is where coverage actually breaks: the same
+  pair that ties at 1 ETH can miss entirely at 100.
+- **Default reading vs `--converge`.** By default each row stops at the **same result `getQuote`
+  would return** — the first quote whose first measurement round has settled — because that is the
+  honest thing to hold up against a Trading API response. `--converge` opts back into draining the
+  stream to the budget, for a focused re-run of a handful of pairs where the question is convergence
+  rather than coverage. It is not the default for a measured reason: the engine's post-settle phase
+  is CPU-bound and does not yield, so a drained row can sit for over a minute per pair (a Base sweep
+  left 27 rows unfinished after 45 minutes against a documented 10s budget).
+- **MISSES is the finding this sweep exists for**, and a miss is deliberately not a loss. A loss is a
+  price difference; a **miss is a coverage difference**, in four classes, each a different root-cause
+  neighbourhood:
+  - `no-route` — the API quoted and router-lite reported `no-route`/`inconclusive`: a trade the
+    router cannot see at all.
+  - `delta` — both quoted, but router-lite is off by more than **100 bps**. Catastrophic rather than
+    merely worse: at that distance the route would never be the one taken.
+  - `error` — the router-lite side *threw* (transport, config) instead of returning a verdict. Kept
+    apart from `no-route` because nothing about the chain's liquidity is implicated.
+  - `reverse` — router-lite quoted and the API did not. Reported rather than quietly celebrated: as
+    often an API-side gap (unsupported chain, unlisted token) as a router-lite win, and only the
+    row's own API error text can say which.
+
+  Each miss prints the **search's own evidence** beside it — per-protocol discovery status, the
+  quoting funnel, intermediates selected/discovered, whether the pair ceiling was hit, whether the
+  search aborted — so it is diagnosable from the output alone instead of by re-running the pair by
+  hand. The section prints last, and repeats each miss's numbers rather than referencing them, so it
+  stands alone when pasted out of a terminal into an issue.
+- **Hard stop.** `--budget` is *cooperative* (the SDK observes it between search cycles), so a pair
+  with thousands of eligible intermediates can keep an already-aborted stream producing for minutes.
+  Each row is therefore also raced against a wall-clock guard at **3× its budget** (floor 5s); a row
+  cut there is reported, never silent — `hard-stopped (stream still producing past the budget)` on
+  the row, and a `budget` line in the summary counting them. It is a reading about the search, not a
+  detail of the harness: a hard-stopped row answered from a truncated search.
+- **Ctrl-C stops the sweep; it does not discard it.** The row loop breaks between rows, the summary
+  and MISSES print over every row already swept, the cache is banked, and the process exits
+  `128+signo` — the same contract `rl` has. A second signal exits immediately.
 - **Endpoint**: `--rpc <url>` / `$ETH_RPC_URL` / `--rpc-header` / `$ETH_RPC_HEADERS`, identically to
-  `rl` (same resolver, same redaction — keyed URLs and header values never print). **Mainnet only**
-  for now: the built-in pair matrix is mainnet-specific addresses, so a non-mainnet endpoint is
-  rejected up front *unless* you supply your own pairs with `--pair`.
+  `rl` (same resolver, same redaction — keyed URLs and header values never print).
 - **`$UNISWAP_API_KEY`**: sent as the `x-api-key` header on every Trading API call, never logged —
   scrubbed out of any error text (including a redacted request/response dump) the same way an RPC
   header value is. Unset it to run router-lite only.
-- **`--pair "TOKENA/TOKENB[:amount]"`** (repeatable): overrides the built-in matrix. Each side is a
-  symbol, `eth`/`native`, or a `0x…` address — resolved the same way `rl quote`'s positionals are,
-  which means a bad one is a loud error, not a dropped pair (see below). `amount` is human units
-  (`5000`, `0.5`); defaults to `1`.
-- **The built-in matrix** (12 mainnet pairs — bluechip, stable/stable, memecoin, long-tail,
-  memecoin→memecoin via a forced intermediate, and a v2-only long-tail) is **batch-verified on-chain**
-  at startup: every address's `symbol()`/`decimals()` is read and cross-checked against what the
-  matrix expects. A mismatch — a stale hardcoded address, a redeploy — **drops that one pair with a
-  warning** rather than aborting the run; the same failure on a **user-supplied `--pair`** aborts
-  immediately, because a mistyped argument needs to be fixed, not silently skipped.
+- **`--pair "TOKENA/TOKENB[:amount]"`** (repeatable): overrides the built-in matrix entirely, on any
+  chain. Each side is a symbol, `eth`/`native`, or a `0x…` address — resolved the same way `rl
+  quote`'s positionals are, which means a bad one is a loud error, not a dropped pair (see below).
+  `amount` is human units (`5000`, `0.5`); defaults to `1`.
+- **The built-in matrix is batch-verified on-chain** at startup: every address's
+  `symbol()`/`decimals()` is read and cross-checked against what the matrix expects. A mismatch — a
+  stale hardcoded address, a redeploy — **drops that one pair with a warning** rather than aborting
+  the run; the same failure on a **user-supplied `--pair`** aborts immediately, because a mistyped
+  argument needs to be fixed, not silently skipped.
 - **`--budget <dur>`** (unit required, same parser as `rl`; default `10s`) bounds each pair's *own*
-  search clock — a slow long-tail pair cannot eat into the next pair's allowance. Records both the
-  moment the search has ANY price (`first-actionable`, same signal as `rl quote --verbose`'s `first`
-  line) and the final best once the budget expires (like `rl quote --watch`).
+  search clock — a slow long-tail pair cannot eat into the next pair's allowance. It also shapes the
+  **transport** (per-request timeout and no retries), which is why the script writes its own default
+  into the flag rather than keeping a private fallback: an unbudgeted transport left rows reporting
+  `final 150543ms` against a documented 10s budget. Each row records both the moment the search has
+  ANY price (`first-actionable`, the same signal as `rl quote --verbose`'s `first` line) and the
+  final best.
 - **`--no-cache`** / **`--cache`**: the same on-disk pool-index cache `rl` uses (see above), on by
   default.
 - **`--dry-run`**: prints the Trading API request bodies this run WOULD send and exits — no
@@ -325,15 +401,17 @@ bun scripts/compare.ts --rpc https://… --json | jq .summary
 - **Exit codes**: `0` whenever the run completes — a delta, a `no-route`, a dropped built-in pair are
   all *data*, not failure. Nonzero only for an infra/usage failure: the RPC unreachable, a malformed
   `--pair`, an unresolvable user-supplied token, or every attempted Trading API call coming back
-  `401` (that means `$UNISWAP_API_KEY` is wrong, not that router-lite lost every comparison).
+  `401` (that means `$UNISWAP_API_KEY` is wrong, not that router-lite lost every comparison). An
+  interrupted run exits `128+signo` on top of whatever it concluded.
 
-`scripts/compare.test.ts` unit-tests every pure piece — delta-bps math, `--pair` parsing, and Trading
-API response parsing against hand-written fixtures (success with a split route, the API's confirmed
-`{errorCode, detail}` 400 shape, and an unknown shape) — with no network anywhere in that file.
+`scripts/compare.test.ts` unit-tests every pure piece — delta-bps math, `--pair` parsing, miss
+classification and the summary fold, and Trading API response parsing against hand-written fixtures
+(success with a split route, the API's confirmed `{errorCode, detail}` 400 shape, and an unknown
+shape) — with no network anywhere in that file.
 
 ## Tests
 
-`bun test` in this directory runs 15 files and touches no network — the CLI itself is the live
+`bun test` in this directory runs 16 files and touches no network — the CLI itself is the live
 tool:
 
 | file | what it owns |
@@ -348,6 +426,7 @@ tool:
 | `report.test.ts` | every rendered line — route/address demotion, the runners-up delta table, the timeline, the confidence panel (incl. budget-vs-external abort phrasing) — snapshotted against canned data |
 | `stream.test.ts` | the `--watch`/`--verbose` stream as a stream: which `SearchEvent` becomes which line, that `progress` is live-only, `stopAt`, NDJSON event shapes, and that the event history is always collected |
 | `simulate.test.ts` | `eth_simulateV1` payload construction and verdict evaluation |
+| `interrupt.test.ts` | the two-signal Ctrl-C contract: the first signal aborts the shared controller and returns (no exit — the render is still owed), the second exits `128+signo` with no second notice |
 | `tokens.test.ts` | symbol/address resolution, and which failures are retryable |
 | `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping, the pre-search cache-summary coverage math |
 | `poolList.test.ts` | curation, the envelope, trust tiers, verify-before-publish |
