@@ -389,21 +389,58 @@ function parseLogChunk(raw: string | undefined): bigint | undefined {
 // how a HOST should build the signal, so it belongs in the host.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The process-wide interrupt (^C).
+//
+// One module-level controller, aborted exactly once by the FIRST SIGINT/SIGTERM
+// (`cli/interrupt.ts`, wired in `rl.ts`). `startBudget` composes it into every
+// signal it hands out, so every command's search — budgeted or not — actually
+// STOPS when the user interrupts, instead of streaming on while the handler's
+// cache flush serializes a multi-hundred-megabyte snapshot behind it. Before
+// this existed, ^C on a long `discover` looked like an infinite hang: the
+// search kept issuing requests, the flush waited its turn, and a second ^C
+// just re-entered the same handler.
+//
+// An unbudgeted run now gets THIS signal rather than `undefined`. The SDK
+// reads signal absence as "unbounded search", but it never branches on
+// presence for anything except abort observation (`req.signal?.…` throughout),
+// so an inert signal that fires only on ^C means exactly the same thing —
+// unbounded until the user says stop — and it is what makes the unbudgeted
+// case interruptible at all.
+// ---------------------------------------------------------------------------
+
+let interrupt = new AbortController()
+
+/** Aborts the process-wide interrupt signal — the first-^C half of `cli/interrupt.ts`'s contract.
+ * Idempotent: aborting an aborted controller is a no-op. */
+export function triggerInterrupt(): void {
+  interrupt.abort()
+}
+
+/** Test seam: swaps in a fresh controller so one test's interrupt cannot leak into the next.
+ * Budgets started BEFORE the reset keep the old (composed) signal, exactly like a real process
+ * would if it could un-interrupt itself — which it cannot, hence the seam. */
+export function resetInterruptForTests(): void {
+  interrupt = new AbortController()
+}
+
 /**
  * `--budget`'s live clock: the `AbortSignal` the search carries, and the handle that stops the timer
  * holding the process open once the command is done with it.
  */
 export type Budget = {
-  /** The search's signal, or `undefined` for an unbudgeted run (see {@link startBudget}). */
-  signal: AbortSignal | undefined
+  /** The search's signal: budget timer + interrupt for a budgeted run, the bare interrupt signal
+   * (inert until ^C) for an unbudgeted one — see {@link startBudget}. */
+  signal: AbortSignal
   /** Clears the timer. Idempotent, never throws, and a no-op for an unbudgeted run. */
   cancel: () => void
 }
 
 /**
- * Starts `--budget`'s clock. `signal` is `undefined` for an unbudgeted run — absence is how the SDK
- * tells a bounded search from an unbounded one, so an unbudgeted run must get no signal at all
- * rather than one that never fires.
+ * Starts `--budget`'s clock. The returned signal always exists and always composes the process-wide
+ * interrupt: for a budgeted run it aborts on whichever fires first (the budget's ref'd timer, or
+ * ^C); for an unbudgeted run it IS the interrupt signal — inert until the user interrupts, which
+ * to the SDK is indistinguishable from an unbounded search until that moment.
  *
  * CALL IT IMMEDIATELY BEFORE THE SEARCH, on the same line as the command's own `started` stamp: the
  * budget is a bound on searching, and everything between this call and the first `eth_call` is what
@@ -414,10 +451,10 @@ export type Budget = {
  * open for the remainder of it.
  */
 export function startBudget(budgetMs: number | undefined): Budget {
-  if (budgetMs === undefined) return { signal: undefined, cancel: () => {} }
+  if (budgetMs === undefined) return { signal: interrupt.signal, cancel: () => {} }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), budgetMs)
-  return { signal: controller.signal, cancel: () => clearTimeout(timer) }
+  return { signal: AbortSignal.any([controller.signal, interrupt.signal]), cancel: () => clearTimeout(timer) }
 }
 
 export type TradeContextResolved = {

@@ -13,7 +13,7 @@ import { buildEnvelope, parsePoolList, PoolListError, serializeEnvelope } from '
 import { redactHeaderValues, resetRpcHeaders } from '../redact'
 import { MAINNET, publishedListText, USDC, WETH } from '../testing'
 
-import { buildChainContext, startBudget } from './context'
+import { buildChainContext, resetInterruptForTests, startBudget, triggerInterrupt } from './context'
 
 // ---------------------------------------------------------------------------
 // `buildChainContext` — the things it decides that nothing else can.
@@ -118,6 +118,7 @@ function budgetFor(budgetMs: number | undefined): ReturnType<typeof startBudget>
 }
 afterEach(() => {
   for (const cancel of started.splice(0)) cancel()
+  resetInterruptForTests() // a test that pressed ^C must not leave the next one interrupted
 })
 
 // ---------------------------------------------------------------------------
@@ -131,7 +132,7 @@ describe('the budget signal', () => {
     stubFetch(chainIdThen(undefined, { hang: true }))
     const ctx = await buildChainContext(args({ budget: '40ms' }))
     const started = Date.now()
-    const signal = budgetFor(ctx.budgetMs).signal!
+    const signal = budgetFor(ctx.budgetMs).signal
 
     expect(signal).toBeDefined()
     expect(signal.aborted).toBe(false) // not pre-aborted: the budget is a deadline, not a veto
@@ -143,14 +144,38 @@ describe('the budget signal', () => {
     expect(Date.now() - started).toBeLessThan(5_000) // ...and did not wait for the request
   })
 
-  test('an unbudgeted run gets no signal at all', async () => {
-    // Absence is meaningful here: an optional signal is how the SDK tells an unbounded run from a
-    // bounded one, and manufacturing an already-live signal for every run would hand every command a
-    // clock it never asked for.
+  test('an unbudgeted run gets the interrupt signal — inert until ^C, never a clock', async () => {
+    // The signal exists so an unbudgeted search is still interruptible (`cli/interrupt.ts`), but it
+    // must carry NO timer: to the SDK it has to be indistinguishable from an unbounded search until
+    // the user actually interrupts.
     stubFetch(chainIdThen('0x1'))
     const ctx = await buildChainContext(args())
     expect(ctx.budgetMs).toBeUndefined()
-    expect(budgetFor(ctx.budgetMs).signal).toBeUndefined()
+    const signal = budgetFor(ctx.budgetMs).signal
+    expect(signal.aborted).toBe(false)
+    await new Promise((r) => setTimeout(r, 60)) // no budget was asked for, so nothing may fire
+    expect(signal.aborted).toBe(false)
+  })
+
+  test('the interrupt aborts every signal startBudget handed out — budgeted and unbudgeted alike', () => {
+    // The first ^C's whole mechanism: `triggerInterrupt` fires once, and every running command's
+    // search signal — whatever kind — aborts with it, so the searches stop and the flush can run.
+    const unbudgeted = budgetFor(undefined)
+    const budgeted = budgetFor(60_000) // a budget nowhere near firing on its own
+    expect(unbudgeted.signal.aborted).toBe(false)
+    expect(budgeted.signal.aborted).toBe(false)
+
+    triggerInterrupt()
+
+    expect(unbudgeted.signal.aborted).toBe(true)
+    expect(budgeted.signal.aborted).toBe(true)
+  })
+
+  test('a budgeted signal still fires on its own timer — composing the interrupt did not replace the clock', async () => {
+    const budget = budgetFor(30)
+    expect(budget.signal.aborted).toBe(false)
+    await new Promise<void>((resolve) => budget.signal.addEventListener('abort', () => resolve(), { once: true }))
+    expect(budget.signal.aborted).toBe(true) // the timer, not the interrupt: nothing here pressed ^C
   })
 
   test('THE CLOCK DOES NOT START DURING SETUP — only when the command starts its search', async () => {
@@ -166,7 +191,7 @@ describe('the budget signal', () => {
     // longer than the whole budget. A clock started in `buildChainContext` has already fired by now.
     await new Promise((r) => setTimeout(r, 80))
 
-    const signal = budgetFor(ctx.budgetMs).signal!
+    const signal = budgetFor(ctx.budgetMs).signal
     expect(signal.aborted).toBe(false) // the search gets its full budget, not the remainder of one
     await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
     expect(signal.aborted).toBe(true)
@@ -181,7 +206,7 @@ describe('the budget signal', () => {
     await new Promise((r) => setTimeout(r, 90)) // well past the budget
 
     // Still not aborted, which is the observable half of "the process would have exited by now".
-    expect(budget.signal!.aborted).toBe(false)
+    expect(budget.signal.aborted).toBe(false)
   })
 
   test('cancel is idempotent, and present even on an unbudgeted run', async () => {
@@ -190,7 +215,7 @@ describe('the budget signal', () => {
     // and a second `clearTimeout` on a cleared handle must not throw.
     stubFetch(chainIdThen('0x1'))
     const unbudgeted = startBudget(undefined)
-    expect(unbudgeted.signal).toBeUndefined()
+    expect(unbudgeted.signal.aborted).toBe(false)
     expect(() => {
       unbudgeted.cancel()
       unbudgeted.cancel()
@@ -211,10 +236,10 @@ describe('the budget signal', () => {
     const a = budgetFor(30)
     const b = budgetFor(30)
     a.cancel()
-    expect(b.signal!.aborted).toBe(false)
+    expect(b.signal.aborted).toBe(false)
     return new Promise<void>((resolve) => {
-      b.signal!.addEventListener('abort', () => {
-        expect(a.signal!.aborted).toBe(false) // the cancelled one never fires
+      b.signal.addEventListener('abort', () => {
+        expect(a.signal.aborted).toBe(false) // the cancelled one never fires
         resolve()
       })
     })

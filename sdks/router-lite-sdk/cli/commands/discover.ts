@@ -50,7 +50,7 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
       tokenIn: token.ref,
       tokenOut: via.ref,
       amountIn: 10n ** BigInt(token.decimals),
-      ...(signal ? { signal } : {}),
+      signal,
     }
 
     let final: QuoteResult | undefined

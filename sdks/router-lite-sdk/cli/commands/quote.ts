@@ -47,7 +47,7 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       tokenOut: trade.tokenOut.ref,
       amountIn: trade.amountIn,
       ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
-      ...(signal ? { signal } : {}),
+      signal,
     }
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 

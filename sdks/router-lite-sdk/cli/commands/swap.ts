@@ -91,7 +91,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       ...(slippageBps !== undefined ? { slippageBps } : {}),
       ...(deadlineSeconds !== undefined ? { deadlineSeconds } : {}),
       ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
-      ...(signal ? { signal } : {}),
+      signal,
     }
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 

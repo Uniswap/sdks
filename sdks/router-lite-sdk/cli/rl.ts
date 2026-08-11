@@ -59,6 +59,7 @@ import { cmdChains } from './commands/chains'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
+import { onTerminationSignal } from './interrupt'
 import { PoolListError } from './poolList'
 import { redact } from './redact'
 import { RpcError } from './tokens'
@@ -211,32 +212,16 @@ async function main(): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Ctrl-C banks the cache too.
-//
-// A default-terminating SIGINT never unwinds the stack, so `main`'s `finally`
-// never runs and everything the interrupted run learned is discarded. That is
-// not an edge case here: interrupting is the single most common way a long
-// `discover` ends (the output has scrolled, the answer is visible, the search
-// is still draining), and it was precisely the run with the most coverage to
-// bank. The handler makes the exit deliberate instead: flush, then exit with
-// 128+signo, which is what a shell expects from a signalled process.
-//
-// SIGTERM gets the same treatment for the same reason — a `timeout 30s rl …`
-// or a killed CI step should not be uniquely punished by losing its progress.
+// Ctrl-C stops the search, banks the cache, and exits — twice means "now".
+// The whole contract (and why the first version of this handler read as an
+// infinite hang) lives in `interrupt.ts`; this is just the wiring.
 // ---------------------------------------------------------------------------
 for (const [signal, signo] of [
   ['SIGINT', 2],
   ['SIGTERM', 15],
 ] as const) {
   process.on(signal, () => {
-    void (async (): Promise<void> => {
-      // `flushCacheSave` clears its own registration, so the `finally` in `main` — if it ever gets to
-      // run — is a no-op rather than a second write, and the save itself never throws. A pending
-      // budget timer needs no attention on this path: `process.exit` does not wait for the loop to
-      // drain, so nothing it holds open can delay the exit.
-      await flushCacheSave()
-      process.exit(128 + signo)
-    })()
+    void onTerminationSignal(signo)
   })
 }
 
