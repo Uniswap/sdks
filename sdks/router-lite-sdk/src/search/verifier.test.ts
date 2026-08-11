@@ -56,6 +56,14 @@ function quotedAt(tagByte: string): QuotedRoute {
   return { route: routeAt(tagByte), quote: { amountIn: 1000n, amountOut: 900n, intermediateAmounts: [] } }
 }
 
+/** `n` distinct quoted routes, in ranked order. Sized from `PREFLIGHT_TOP_K` at the call sites rather
+ * than spelled out, so the budget tests describe "one more than the budget" for whatever the budget
+ * is — a suite that hard-codes four candidates against a `PREFLIGHT_TOP_K` of 3 silently stops
+ * testing exhaustion the day the constant moves. */
+function rankedSet(n: number): QuotedRoute[] {
+  return Array.from({ length: n }, (_, i) => quotedAt((0x44 + i * 0x11).toString(16).padStart(2, '0')))
+}
+
 function manifest(): ChainManifest {
   return {
     chainId: 1,
@@ -94,6 +102,18 @@ test('pickLeader: every candidate failed -> falls back to evaluated[0]', () => {
   const second = rankedAt('22', 'failed')
 
   expect(pickLeader([first, second], undefined)).toBe(first)
+})
+
+test('pickLeader: a STALE leaderId absent from the set falls through cleanly to the next-best unfailed candidate', () => {
+  // A stale leader is ordinary rather than exotic: `leaderId` survives across cycles while the ranked
+  // set is rebuilt every one of them, so the route it names can simply be gone — a pool evicted from
+  // a bounded index, or a leg re-planned at a new amount under a different routeId. The lookup has to
+  // MISS cleanly: not throw on the `undefined`, and not fall all the way through to `evaluated[0]`
+  // when that one is a candidate the chain already rejected.
+  const failed = rankedAt('11', 'failed')
+  const unverified = rankedAt('22', 'unverified')
+
+  expect(pickLeader([failed, unverified], routeId(routeAt('99')))).toBe(unverified)
 })
 
 // ---------------------------------------------------------------------------
@@ -475,6 +495,36 @@ test('idle() is false while a queued leader is pending, so the loop cannot termi
   expect(verifier.idle()).toBe(true)
 })
 
+test('re-considering the UNCHANGED in-flight leader queues nothing: one simulation, and idle once it settles', async () => {
+  // The loop calls `consider` on EVERY cycle, and most cycles change nothing about the leader — a
+  // price landing elsewhere in the ranked tail, a scan chunk arriving. The queue means "a leader that
+  // is not the one already in flight", so the current leader must never fill it: a verifier that
+  // queued it anyway would spend a second, byte-identical simulation the instant the first came back,
+  // and re-arm the queue on every settle — which is a verifier that is never `idle()` and a loop that
+  // can therefore never terminate.
+  const { client, inFlight } = deferredClient()
+  const { state, wake, verifier } = harness(client)
+  const quoted = quotedAt('44')
+
+  verifier.consider([quoted])
+  await tick()
+  expect(inFlight.length).toBe(1) // `inFlight.length` IS the call count here: nothing settles by itself
+
+  verifier.consider([quoted])
+  verifier.consider([quoted])
+  await tick()
+  expect(inFlight.length).toBe(1) // three considers, one call
+
+  inFlight[0]!.resolve()
+  await wake.next()
+  await tick()
+
+  expect(inFlight.length).toBe(1) // and nothing was waiting behind it
+  expect(state.verification.preflightAttempted).toBe(1)
+  expect(statusOf(state, quoted)).toBe('verified')
+  expect(verifier.idle()).toBe(true)
+})
+
 // ---------------------------------------------------------------------------
 // The per-SEARCH preflight budget (spec §7.3): PREFLIGHT_TOP_K simulations for
 // the whole search, spanning as many `consider()` rounds as the loop makes.
@@ -485,8 +535,7 @@ test('the preflight budget is per SEARCH: a 4th distinct reverting leader is nev
     throw revertError()
   })
   const { state, wake, verifier } = harness(client)
-  const ranked = ['44', '55', '66', '77'].map(quotedAt)
-  expect(PREFLIGHT_TOP_K).toBe(3)
+  const ranked = rankedSet(PREFLIGHT_TOP_K + 1) // one more candidate than the budget can pay for
 
   // Each round is one loop cycle: consider, then the settlement's wake.
   for (let round = 0; round < PREFLIGHT_TOP_K; round++) {
@@ -503,7 +552,7 @@ test('the preflight budget is per SEARCH: a 4th distinct reverting leader is nev
 
   expect(calls()).toBe(PREFLIGHT_TOP_K)
   expect(state.verification.preflightBudgetExhausted).toBe(true)
-  expect(statusOf(state, ranked[3]!)).toBe('unverified')
+  expect(statusOf(state, ranked[PREFLIGHT_TOP_K]!)).toBe('unverified')
   expect(verifier.idle()).toBe(true)
 })
 
@@ -512,7 +561,7 @@ test('budget exhaustion is not claimed when every remaining candidate already fa
     throw revertError()
   })
   const { state, wake, verifier } = harness(client)
-  const ranked = ['44', '55', '66'].map(quotedAt)
+  const ranked = rankedSet(PREFLIGHT_TOP_K)
 
   for (let round = 0; round < PREFLIGHT_TOP_K; round++) {
     verifier.consider(ranked)
@@ -530,19 +579,20 @@ test('budget exhaustion is not claimed over an already-verified candidate', asyn
     if (call < PREFLIGHT_TOP_K - 1) throw revertError()
   })
   const { state, wake, verifier } = harness(client)
-  const ranked = ['44', '55', '66', '77'].map(quotedAt)
+  const ranked = rankedSet(PREFLIGHT_TOP_K + 1)
 
   for (let round = 0; round < PREFLIGHT_TOP_K; round++) {
     verifier.consider(ranked)
     await wake.next()
   }
 
-  // The third round verified ranked[2]; the walk now stops on it before the cap is ever consulted,
-  // so a report claiming an exhausted budget would contradict a result that is already `ready`.
+  // The last paid-for round verified `ranked[PREFLIGHT_TOP_K - 1]`; the walk now stops on it before
+  // the cap is ever consulted, so a report claiming an exhausted budget would contradict a result
+  // that is already `ready`.
   verifier.consider(ranked)
-  expect(statusOf(state, ranked[2]!)).toBe('verified')
+  expect(statusOf(state, ranked[PREFLIGHT_TOP_K - 1]!)).toBe('verified')
   expect(state.verification.preflightBudgetExhausted).toBe(false)
-  expect(verifier.leaderId()).toBe(routeId(ranked[2]!.route))
+  expect(verifier.leaderId()).toBe(routeId(ranked[PREFLIGHT_TOP_K - 1]!.route))
 })
 
 test('an aborted search never reports its preflight budget as exhausted', async () => {
@@ -550,7 +600,7 @@ test('an aborted search never reports its preflight budget as exhausted', async 
     throw revertError()
   })
   const { state, wake, verifier } = harness(client)
-  const ranked = ['44', '55', '66', '77'].map(quotedAt)
+  const ranked = rankedSet(PREFLIGHT_TOP_K + 1)
 
   for (let round = 0; round < PREFLIGHT_TOP_K; round++) {
     verifier.consider(ranked)
@@ -567,7 +617,7 @@ test('an aborted search never reports its preflight budget as exhausted', async 
 
   expect(state.verification.preflightBudgetExhausted).toBe(false)
   expect(calls()).toBe(PREFLIGHT_TOP_K) // no simulation was dispatched after the abort either
-  expect(verifier.leaderId()).toBe(routeId(ranked[3]!.route)) // the leader is still handed back
+  expect(verifier.leaderId()).toBe(routeId(ranked[PREFLIGHT_TOP_K]!.route)) // the leader is still handed back
 })
 
 test('an abort before any simulation hands back the leader with its tx, unverified and unblamed', () => {

@@ -69,9 +69,16 @@ test('the closure is the real one: it reaches deep internals and stops at the te
   for (const reached of ['src/index.ts', 'src/router.ts', 'src/internal/logScan.ts', 'src/internal/rpcErrors.ts']) {
     expect([...closure]).toContain(reached)
   }
-  // The three modules that exist only for the suites and the recorder. None is imported by anything
-  // the package exports, which is precisely why none may be compiled into `dist/`.
-  for (const testOnly of ['src/internal/testing.ts', 'src/internal/outcomeLog.ts', 'src/internal/moduleGraph.ts']) {
+  // The modules that exist only for the suites and the recorder. None is imported by anything the
+  // package exports, which is precisely why none may be compiled into `dist/`.
+  const testOnlyModules = [
+    'src/internal/testing.ts',
+    'src/internal/outcomeLog.ts',
+    'src/internal/moduleGraph.ts',
+    'src/internal/routerFixture.ts',
+    'src/search/testWorld.ts',
+  ]
+  for (const testOnly of testOnlyModules) {
     expect(existsSync(join(PKG, testOnly))).toBe(true) // still there, so the check below means something
     expect([...closure]).not.toContain(testOnly)
   }

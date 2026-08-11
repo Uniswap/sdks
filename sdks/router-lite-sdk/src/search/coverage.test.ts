@@ -8,13 +8,16 @@ import { v2Ref, v3Ref } from '../internal/testing'
 import { eagerPairScanBlocks } from '../manifest'
 import { PoolIndex } from '../pools/poolIndex'
 import type { ProtocolModule } from '../protocols/types'
-import type { BlockRange, ChainManifest, CurrencyRef, PoolRecord, Protocol, QuoteRequest } from '../types'
+import type { BlockRange, ChainManifest, CurrencyRef, PoolRecord, QuoteRequest } from '../types'
 
 import { CoverageWorker } from './coverage'
 import type { CoverageCtx } from './coverage'
 import { createNotifier } from './notify'
 import { createState } from './state'
 import type { SearchState } from './state'
+// `unused` is the ProtocolModule members nothing in this file quotes, compiles or hints with — they
+// exist only to satisfy the interface. Shared with the other two search suites.
+import { disabledModule as disabled, unused } from './testWorld'
 
 // ---------------------------------------------------------------------------
 // The coverage worker's tests (spec §3.3).
@@ -81,18 +84,6 @@ function manifestWith(opts: { deploymentBlock: bigint; v4?: boolean; v2Block?: b
   return manifest
 }
 
-/** Nothing in this file quotes, compiles or hints — those members exist only to satisfy the interface. */
-const unused = {
-  hypotheses: () => [],
-  validateHint: async () => null,
-  encodeQuote: () => {
-    throw new Error('not used')
-  },
-  compileOperation: () => {
-    throw new Error('not used')
-  },
-} as unknown as Pick<ProtocolModule, 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
-
 /**
  * A v3-shaped module. Its SHAPE (topics 1/2, identity endpoint mapping) is what `adjacencyQueries`
  * turns into the TWO topic-slot queries every real module has, and what makes the worker's
@@ -141,9 +132,6 @@ const v4Module: ProtocolModule = {
   parsePoolLog: (log) => (log as Log & { record?: PoolRecord }).record ?? null,
   ...unused,
 } as ProtocolModule
-
-const disabled = (id: Protocol): ProtocolModule =>
-  ({ id, enabled: () => false, adjacencyShape: () => undefined, parsePoolLog: () => null, ...unused }) as ProtocolModule
 
 /** The same module minus its fee-factory scope — for the tests that isolate adjacency. */
 function withoutFees(m: ProtocolModule): ProtocolModule {

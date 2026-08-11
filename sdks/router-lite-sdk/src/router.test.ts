@@ -6,7 +6,6 @@ import {
   MAX_DEADLINE_SECONDS,
   MAX_HINTS_PER_REQUEST,
   MAX_HOOK_DATA_BYTES,
-  DEFAULT_REORG_OVERLAP_BLOCKS,
   HINT_DISCREDIT_FAILURE_BLOCKS,
   UR_ADDRESS_THIS,
   UR_MSG_SENDER,
@@ -16,11 +15,30 @@ import { MULTICALL3_ABI, V2_FACTORY_ABI } from './internal/abis'
 import { sortAddresses } from './internal/currency'
 import { MULTICALL3_ADDRESS } from './internal/multicall'
 import {
+  AMOUNT_IN,
+  BLOCK_HASH,
+  BLOCK_NUMBER,
+  BLOCK_TIMESTAMP,
+  baseManifest,
+  CHAIN_ID,
+  directProbes,
+  entryFor,
+  MID,
+  PERMIT2,
+  stubClient,
+  TOKEN_A,
+  TOKEN_B,
+  TRADER,
+  UNIVERSAL_ROUTER,
+  V2_FACTORY,
+  V4_POOL_MANAGER,
+  v2Return,
+  v4Return,
+  WRAPPED,
+} from './internal/routerFixture'
+import {
   assertResultCoherent,
-  emptyReport,
-  headerNotFoundError,
   rateLimitHttpError,
-  rateLimitRpcError,
   recordStubViolation,
   serveAggregate3,
   takeStubViolations,
@@ -29,24 +47,17 @@ import {
 } from './internal/testing'
 import { manifestFor } from './manifest'
 import { isDiscredited, PoolIndex } from './pools/poolIndex'
-import type { ProtocolModule } from './protocols/types'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
 import { v4Module } from './protocols/v4'
-import { classifyQuote, classifySwap, createRouter } from './router'
+import { createRouter } from './router'
 import type { Router } from './router'
 import type {
   ChainManifest,
-  CurrencyRef,
-  EncodedTx,
-  ExecutionRequirement,
   Permit2PermitSingle,
   PoolHint,
   PoolKey,
   QuoteRequest,
   QuoteResult,
-  RankedRoute,
-  RouteLeg,
-  SearchReport,
   SwapRequest,
   SwapResult,
 } from './types'
@@ -57,193 +68,23 @@ import type {
 // ones, so a test double for them would never catch a wiring bug between the
 // facade and the actual encode/decode paths). Only the `PublicClient` is
 // stubbed, scripted per test, with the "unregistered call reverts" convention:
-// a measurement the script does not answer is a pool that is not there.
+// a measurement the script does not answer is a pool that is not there. The
+// chain, the manifest and that scripted client are `internal/routerFixture.ts`,
+// shared with the facade's two sibling suites.
+//
+// THIS FILE IS THE BODY: validation, the end-to-end swap/quote paths, hints and
+// hookData, the index lifecycle, transport options, RPC sequencing, Multicall3
+// adoption, and the two-searches-on-one-router properties. Two subjects that had
+// grown into self-contained narratives live next door instead, because they are
+// read as units and answer one question each:
+//
+//   * `router.classify.test.ts` — `classifyQuote`/`classifySwap` as PURE
+//     functions over hand-built inputs, plus `assertResultCoherent`'s verdict on
+//     each result. No client, no RPC.
+//   * `router.degraded.test.ts` — what a degraded provider is allowed to make the
+//     facade say: a 429 on `eth_call` alone, a lagging replica, a head that goes
+//     backwards, a lost preflight or readiness read. Never a confident no-route.
 // ---------------------------------------------------------------------------
-
-const TOKEN_A = `0x${'aa'.repeat(20)}` as Address
-const TOKEN_B = `0x${'bb'.repeat(20)}` as Address
-const MID = `0x${'cc'.repeat(20)}` as Address
-const WRAPPED = `0x${'ee'.repeat(20)}` as Address
-const TRADER = `0x${'11'.repeat(20)}` as Address
-const UNIVERSAL_ROUTER = `0x${'22'.repeat(20)}` as Address
-const PERMIT2 = `0x${'33'.repeat(20)}` as Address
-const V2_FACTORY = `0x${'44'.repeat(20)}` as Address
-const V4_POOL_MANAGER = `0x${'55'.repeat(20)}` as Address
-const V4_QUOTER = `0x${'66'.repeat(20)}` as Address
-
-const CHAIN_ID = 1
-const BLOCK_NUMBER = 1_000_000n
-const BLOCK_TIMESTAMP = 1_700_000_000n
-const BLOCK_HASH = `0x${'ab'.repeat(32)}` as Hex
-const AMOUNT_IN = 1000n
-
-function baseManifest(opts: { v2Block?: bigint; v4?: boolean } = {}): ChainManifest {
-  const m: ChainManifest = {
-    chainId: CHAIN_ID,
-    wrappedNative: WRAPPED,
-    v2: { factory: V2_FACTORY, deploymentBlock: opts.v2Block ?? 100n },
-    execution: { address: UNIVERSAL_ROUTER, commandSet: 'ur-2.0', permit2: PERMIT2, wrappedNative: WRAPPED },
-    coreIntermediates: [],
-  }
-  if (opts.v4 ?? true) m.v4 = { poolManager: V4_POOL_MANAGER, deploymentBlock: 100n, quoter: V4_QUOTER }
-  return m
-}
-
-/** Fixture-only stand-in for the deleted direct-probe helper: every hypothesis for (a, b), each
- * paired with its own direct-pair `encodeQuote` — the exact `{ quote }` shape the old probe API
- * returned, rebuilt from the two primitives (`hypotheses`, `encodeQuote`) that survive it. */
-function directProbes(module: ProtocolModule, a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest) {
-  return module.hypotheses(a, b, m).map((pool) => {
-    const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-    return { quote: module.encodeQuote([leg], amountIn, m) }
-  })
-}
-
-// ---------------------------------------------------------------------------
-// Stub client
-// ---------------------------------------------------------------------------
-
-type ClientScript = {
-  calls?: Record<string, Hex>
-  /** Logs for the given (lowercased) adjacency endpoint, pre-filtered by the caller is not
-   * required — the stub itself clips to the requested [fromBlock, toBlock]. */
-  logs?: (endpoint: string) => (Log & { blockNumber: bigint })[]
-  /** Scripted preflight outcomes, in dispatch order; `hang` never settles — the deterministic way
-   * to hold verification in flight while something else (an abort) decides the search. */
-  preflight?: ('ok' | 'revert' | 'rate-limit' | 'hang')[]
-  /** 429 every quote call (the quoter/pair `eth_call`s) while answering every other method — the
-   * partial-outage shape a real provider produces when only `eth_call` is rate limited. */
-  rateLimitQuotes?: boolean
-  /** `header not found` on every quote call while `eth_getBlockByNumber` answers normally — the
-   * load-balancer shape: the head came from one node, the pinned `eth_call`s go to another that is
-   * behind it. Nothing here is a revert, and nothing is a 429 (C4-H1). */
-  nodeStateQuotes?: boolean
-  readiness?: { erc20Allowance?: bigint; permit2Allowance?: bigint; balance?: bigint }
-  /** 429 the trader's `balanceOf` read while every other read lands — a throttled readiness check,
-   * which must never be coerced into a stated `insufficient-balance available: 0n`. */
-  rateLimitBalanceRead?: boolean
-  /** Aborts this controller from *inside* the first quote call, after its answer is decided: the
-   * route prices, and the loop's next cycle sees a fired signal. A deadline landing mid-search,
-   * rather than between events. */
-  abortOnQuote?: AbortController
-  /** Fires from inside every quote call, after the answer is decided but before it is returned — the
-   * same timing `abortOnQuote` uses, generalized to an arbitrary callback (C4-H5: a test's hook for
-   * mutating router-level state, e.g. `clearIndex()`, at a precise point mid-search — standing in for
-   * a host doing so from another task while this generator is paused on the event loop). */
-  midSearch?: () => void
-  chainId?: number
-  /** A function rather than a value where a test needs the head to MOVE between (or within)
-   * searches — the head-regression guard refetches once, so the fixture has to answer per call. */
-  blockNumber?: bigint | (() => bigint)
-  throwOnBlockFetch?: boolean
-}
-
-type Counters = { scans: number; preflights: number; scannedEndpoints: Set<string>; blockFetches: number }
-
-/** tokenIn is always {@link TOKEN_A} across these tests, so the ERC20 branch only needs to answer for it. */
-function stubClient(script: ClientScript): { client: PublicClient; counters: Counters } {
-  const counters: Counters = { scans: 0, preflights: 0, scannedEndpoints: new Set(), blockFetches: 0 }
-  const calls = script.calls ?? {}
-  const balance = script.readiness?.balance ?? 10n ** 24n
-  const erc20Allowance = script.readiness?.erc20Allowance ?? 10n ** 24n
-  const permit2Allowance = script.readiness?.permit2Allowance ?? 10n ** 24n
-  const headOf = (): bigint => (typeof script.blockNumber === 'function' ? script.blockNumber() : script.blockNumber ?? BLOCK_NUMBER)
-  let preflightIndex = 0
-
-  const client = {
-    async getChainId() {
-      return script.chainId ?? CHAIN_ID
-    },
-    async request(args: any) {
-      if (args.method === 'eth_getBlockByNumber') {
-        counters.blockFetches++
-        if (script.throwOnBlockFetch) throw new Error('rpc unavailable')
-        return { number: toHex(headOf()), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) }
-      }
-      if (args.method === 'eth_getBalance') return toHex(balance)
-      if (args.method === 'eth_getCode') {
-        // `validateManifest`'s immutable cross-check (manifest.ts) fetches the execution address's
-        // code unconditionally whenever `execution` is present, codeHash or not. This stub's fake
-        // "bytecode" is just this manifest's own immutables concatenated — enough to satisfy that
-        // substring check without asserting anything about real Universal Router bytecode.
-        const [addr] = args.params as [string]
-        if (addr.toLowerCase() !== UNIVERSAL_ROUTER.toLowerCase()) return '0x'
-        const embed = [WRAPPED, PERMIT2, V2_FACTORY, V4_POOL_MANAGER].map((a) => a.slice(2).toLowerCase()).join('')
-        return `0x${embed}` as Hex
-      }
-      if (args.method === 'eth_getLogs') {
-        const filter = args.params[0]
-        counters.scans++
-        // An unfiltered query would make a real provider return every log the factory ever emitted;
-        // the scanner is supposed to always send its topic filter (see `internal/logScan.ts`).
-        if (!Array.isArray(filter.topics) || filter.topics.length === 0)
-          throw new Error('stubClient: eth_getLogs arrived with no topic filter')
-        // A topic position holds `null` (anything), one value, or — since C5-C — an ARRAY of accepted
-        // values, which is how one adjacency request carries BOTH of the trade's endpoints. Indexed
-        // address topics are 32-byte left-padded; unpad back to plain lowercase addresses so callers
-        // can key `logs`/`scannedEndpoints` by the address itself, not its topic encoding.
-        const slot = (topic: unknown): string[] =>
-          (topic === null || topic === undefined ? [] : Array.isArray(topic) ? topic : [topic]).filter((t): t is string => typeof t === 'string')
-        const bound = [filter.topics[1], filter.topics[2]].map(slot).find((values) => values.length > 0) ?? []
-        const endpoints = bound.map((t) => `0x${t.slice(-40)}`.toLowerCase() as Address)
-        for (const endpoint of endpoints) counters.scannedEndpoints.add(endpoint)
-        if (!script.logs || endpoints.length === 0) return []
-        const from = BigInt(filter.fromBlock)
-        const to = BigInt(filter.toBlock)
-        // A node answers a merged filter with the union over its accepted values, so this stub does
-        // too; ingestion is idempotent, so a log matching both endpoints arriving twice is harmless.
-        return endpoints.flatMap((endpoint) => script.logs!(endpoint)).filter((log) => log.blockNumber >= from && log.blockNumber <= to)
-      }
-      if (args.method !== 'eth_call') throw new Error(`stubClient: unexpected method ${args.method}`)
-
-      const [{ to, data }] = args.params
-      const target = (to as string).toLowerCase()
-
-      if (target === UNIVERSAL_ROUTER.toLowerCase()) {
-        counters.preflights++
-        const outcome = script.preflight?.[preflightIndex++] ?? 'ok'
-        if (outcome === 'revert') throw Object.assign(new Error('execution reverted'), { data: '0xdeadbeef' })
-        if (outcome === 'rate-limit') throw rateLimitHttpError()
-        if (outcome === 'hang') return new Promise(() => {}) // never settles
-        return '0x'
-      }
-      if (target === PERMIT2.toLowerCase()) {
-        return encodeAbiParameters([{ type: 'uint160' }, { type: 'uint48' }, { type: 'uint48' }], [permit2Allowance, 2_000_000_000, 0])
-      }
-      if (target === TOKEN_A.toLowerCase()) {
-        // balanceOf(address) has one argument; allowance(address,address) has two.
-        const isBalanceOf = (data as string).length <= 10 + 64
-        if (isBalanceOf && script.rateLimitBalanceRead) throw rateLimitHttpError()
-        const value = isBalanceOf ? balance : erc20Allowance
-        return encodeAbiParameters([{ type: 'uint256' }], [value])
-      }
-
-      // Quote calls (quoters, v2 pairs) — the only branch the partial outage touches.
-      if (script.rateLimitQuotes) throw rateLimitRpcError()
-      if (script.nodeStateQuotes) throw headerNotFoundError()
-      const entry = calls[`${target}:${data}`]
-      script.abortOnQuote?.abort() // the answer is already decided; the deadline lands on the way out
-      script.midSearch?.()
-      if (entry === undefined) throw new Error('execution reverted') // no pool there
-      return entry
-    },
-  } as unknown as PublicClient
-
-  return { client, counters }
-}
-
-function v2Return(reserveIn: bigint, reserveOut: bigint, zeroForOne: boolean): Hex {
-  const [reserve0, reserve1] = zeroForOne ? [reserveIn, reserveOut] : [reserveOut, reserveIn]
-  return encodeAbiParameters([{ type: 'uint112' }, { type: 'uint112' }, { type: 'uint32' }], [reserve0, reserve1, 0])
-}
-
-function v4Return(amountOut: bigint): Hex {
-  return encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [amountOut, 0n])
-}
-
-function entryFor(call: { to: Address; data: Hex }, value: Hex): Record<string, Hex> {
-  return { [`${call.to.toLowerCase()}:${call.data}`]: value }
-}
 
 /** A client that throws on every method — used to prove a validation failure happens before any
  * RPC: if validation ordering ever regressed, these tests would fail with *this* error instead of
@@ -801,259 +642,6 @@ describe('quote-only manifests (C4-P3)', () => {
   })
 })
 
-test('classifySwap: requirements present but no candidate ever compiled falls through to terminal classification, never asserting a missing tx (C1 regression)', () => {
-  // The exact repro shape: a `best` exists (something was quoted and ranked), top-level
-  // `requirements` is non-empty (readiness found something missing), but nothing ever compiled
-  // into an executable plan, so `tx` is `undefined`. Before the fix, the `needs-action` branch
-  // asserted `e.tx!` unconditionally and produced a result with `tx: undefined`, which
-  // `assertResultCoherent` rejects.
-  const fakeBest: RankedRoute = {
-    route: { legs: [] },
-    quote: { amountIn: 1n, amountOut: 1n, intermediateAmounts: [] },
-    execution: 'failed',
-  }
-  const requirement: ExecutionRequirement = { kind: 'erc20-approval', token: TOKEN_A, spender: PERMIT2, minimumAmount: 1n }
-
-  const completeReport = emptyReport() // aborted:false, all `disabled`, unattempted:0 -> isSearchComplete = true
-  const complete = classifySwap({ best: fakeBest, alternatives: [], requirements: [requirement], report: completeReport })
-  expect(complete.status).toBe('no-route')
-  if (complete.status === 'no-route') expect(complete.alternatives).toContainEqual(fakeBest)
-  assertResultCoherent(complete)
-
-  const incompleteReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial' as const, coveredRanges: [], demandFloor: 0n } } }
-  const incomplete = classifySwap({ best: fakeBest, alternatives: [], requirements: [requirement], report: incompleteReport })
-  expect(incomplete.status).toBe('inconclusive')
-  // This candidate is `execution: 'failed'` — the chain rejected it — so it is demoted into
-  // `alternatives` on the incomplete path too, exactly as on the completed `no-route` path above. An
-  // authoritative revert does not become provisional because some other part of the search was cut
-  // short, so `inconclusive` never *leads* with it.
-  if (incomplete.status === 'inconclusive') {
-    expect(incomplete.best).toBeUndefined()
-    expect(incomplete.tx).toBeUndefined()
-  }
-  expect(incomplete.alternatives).toContainEqual(fakeBest)
-  assertResultCoherent(incomplete)
-})
-
-function rankedRoute(out: bigint, execution: RankedRoute['execution'], revertData?: Hex): RankedRoute {
-  return {
-    route: { legs: [] },
-    quote: { amountIn: AMOUNT_IN, amountOut: out, intermediateAmounts: [] },
-    execution,
-    ...(revertData !== undefined && { revertData }),
-  }
-}
-
-test('classifyQuote: a leader outpriced by its own alternative keeps the marker that explains it (live Base regression)', () => {
-  // The defect, exactly as it shipped. On Base, `rl quote eth usdc 1` ranked a hooked v4 pool top at
-  // 1,906.567949 USDC and `rankRoutes`' 5-bps simplicity margin (1.6 bps here) promoted a plain v3
-  // pool at 1,906.256081 ahead of it — correct, spec'd behaviour, and marked `promotedOverComplex`
-  // precisely so a caller can tell it apart from a broken sort. `toQuoted` then rebuilt every quote
-  // route from `{ route, quote }`, and the marker was the collateral: what reached `QuoteResult`
-  // (and the CLI panel, and any SDK consumer) was a `best` beaten by its own `alternatives[0]` with
-  // nothing anywhere to explain it. The marker is a fact about RANKING, which quoting performs; only
-  // `execution`/`revertData` are facts about verification, and only those two may be stripped.
-  const promoted: RankedRoute = { ...rankedRoute(1_906_256_081n, 'unverified'), promotedOverComplex: true }
-  const outpricing: RankedRoute = rankedRoute(1_906_567_949n, 'unverified')
-
-  const r = classifyQuote({ best: promoted, alternatives: [outpricing], report: emptyReport() })
-  expect(r.status).toBe('quote')
-  if (r.status !== 'quote') return
-  expect(r.best.promotedOverComplex).toBe(true)
-  // Still stripped: the verification fields say nothing a quote is entitled to claim.
-  expect(Object.keys(r.best).sort()).toEqual(['promotedOverComplex', 'quote', 'route'])
-  expect(Object.keys(r.alternatives[0]!).sort()).toEqual(['quote', 'route'])
-  assertResultCoherent(r)
-})
-
-test('assertResultCoherent: an UNMARKED quote inversion is the bug, and it is rejected', () => {
-  // The systemic half of the fix. An alternative pricing above `best` is legal — but only while the
-  // route says why. Drop the marker (which is precisely what `toQuoted` used to do) and the same
-  // result is indistinguishable from a sort bug, so it must not pass.
-  const best = rankedRoute(1_906_256_081n, 'unverified')
-  const outpricing = rankedRoute(1_906_567_949n, 'unverified')
-  const unmarked = classifyQuote({ best, alternatives: [outpricing], report: emptyReport() })
-  expect(() => assertResultCoherent(unmarked)).toThrow(/outpriced by an alternative/)
-
-  // And an ordinary, correctly-ordered quote is untouched by the check.
-  const ordered = classifyQuote({ best: outpricing, alternatives: [best], report: emptyReport() })
-  expect(() => assertResultCoherent(ordered)).not.toThrow()
-})
-
-test('assertResultCoherent: a marker that OUTLIVED its promotion is the bug too, in the other direction', () => {
-  // The stale half. The engine re-ranks the accumulated composed set every cycle, so a marker set
-  // in one cycle is an input to the next — and if it survives a re-rank that promoted nothing, it is a
-  // false explanation attached to a leader that simply won outright. (`rankRoutes` strips input
-  // markers precisely so this cannot happen; this is the assertion that would catch it if that ever
-  // regressed.)
-  const stale: RankedRoute = { ...rankedRoute(1_906_567_949n, 'unverified'), promotedOverComplex: true }
-  const lower = rankedRoute(1_000_000_000n, 'unverified')
-  const r = classifyQuote({ best: stale, alternatives: [lower], report: emptyReport() })
-  expect(() => assertResultCoherent(r)).toThrow(/marker outlived the promotion/)
-
-  // The bound is `>=`, not `>`: a promotion over a route pricing EXACTLY equal is legal (the margin
-  // is inclusive, and `compareRoutes`' tie-breaks decide who led), so an equal-priced alternative
-  // must satisfy the check.
-  const tied = classifyQuote({
-    best: { ...rankedRoute(1_906_567_949n, 'unverified'), promotedOverComplex: true },
-    alternatives: [rankedRoute(1_906_567_949n, 'unverified')],
-    report: emptyReport(),
-  })
-  expect(() => assertResultCoherent(tied)).not.toThrow()
-})
-
-test('classifySwap: promotedOverComplex survives onto the public SwapResult.best untouched (C4-P7)', () => {
-  // `rankRoutes` (quote/rank.ts) is what actually sets this marker; this test pins the OTHER half of
-  // the contract — that `classifySwap` is a pure passthrough for it, just as `classifyQuote`'s
-  // `toQuoted` now is (it strips only the two verification fields). A `RankedRoute`
-  // already carrying the marker (as if `rankRoutes` had promoted it) must reach `SwapResult.best`
-  // exactly as-is for both statuses that lead with `best`.
-  const promoted: RankedRoute = { ...rankedRoute(100n, 'verified'), promotedOverComplex: true }
-  const tx: EncodedTx = { to: UNIVERSAL_ROUTER, data: '0xfeedface', value: 0n }
-  const limits = { minAmountOut: 99n, deadline: 9_999_999_999n }
-
-  const ready = classifySwap({ best: promoted, alternatives: [], tx, limits, report: emptyReport() })
-  expect(ready.status).toBe('ready')
-  if (ready.status === 'ready') expect(ready.best.promotedOverComplex).toBe(true)
-  assertResultCoherent(ready)
-
-  const needsActionBest: RankedRoute = { ...rankedRoute(100n, 'needs-action'), promotedOverComplex: true }
-  const requirement: ExecutionRequirement = { kind: 'erc20-approval', token: TOKEN_A, spender: PERMIT2, minimumAmount: 1n }
-  const needsAction = classifySwap({
-    best: needsActionBest,
-    alternatives: [],
-    tx,
-    limits,
-    requirements: [requirement],
-    report: emptyReport(),
-  })
-  expect(needsAction.status).toBe('needs-action')
-  if (needsAction.status === 'needs-action') expect(needsAction.best.promotedOverComplex).toBe(true)
-  assertResultCoherent(needsAction)
-})
-
-test('classifySwap: `needs-action` is gated on the ROUTE\'s discriminant, not on the requirement count', () => {
-  // The two used to be read as interchangeable, and they are only interchangeable because of the
-  // order of `verifyLeader`'s body (`search/verifier.ts`, "DO NOT REORDER"). This is the shape that
-  // tells them apart: a full requirement list, a compiled tx, a clean report — and a leader the
-  // engine did NOT gate on those requirements. `needs-action` would be a promise about a route
-  // nothing gated, and `assertResultCoherent` rejects exactly that result ("needs-action whose best
-  // route is unverified"), so the classifier must not produce it in the first place.
-  const requirement: ExecutionRequirement = { kind: 'erc20-approval', token: TOKEN_A, spender: PERMIT2, minimumAmount: 1n }
-  const tx: EncodedTx = { to: UNIVERSAL_ROUTER, data: '0xfeedface', value: 0n }
-  const limits = { minAmountOut: 99n, deadline: 9_999_999_999n }
-  const abortedReport: SearchReport = { ...emptyReport(), aborted: true }
-
-  const r = classifySwap({
-    best: rankedRoute(100n, 'unverified'),
-    alternatives: [],
-    tx,
-    limits,
-    requirements: [requirement],
-    report: abortedReport,
-  })
-
-  expect(r.status).toBe('inconclusive')
-  assertResultCoherent(r)
-
-  // And the positive control: same everything, leader marked `needs-action` by the engine.
-  const gated = classifySwap({
-    best: rankedRoute(100n, 'needs-action'),
-    alternatives: [],
-    tx,
-    limits,
-    requirements: [requirement],
-    report: emptyReport(),
-  })
-  expect(gated.status).toBe('needs-action')
-  assertResultCoherent(gated)
-})
-
-test('classifySwap: an aborted search hands back everything it computed — best, tx, and alternatives (FW5/P1 regression)', () => {
-  // The `AbortSignal.timeout(900)` shape the README recommends: the search priced routes and even
-  // compiled the leader's calldata, then the deadline fired. Nobody simulated the leader, so it
-  // cannot be promised `ready` — but nothing ruled it out either, and discarding the priced routes
-  // and the encoded tx (as this branch used to) leaves the caller a bare reason string.
-  const best = rankedRoute(900n, 'unverified')
-  const alternatives = [rankedRoute(800n, 'unverified'), rankedRoute(700n, 'failed', '0xdeadbeef')]
-  const tx: EncodedTx = { to: UNIVERSAL_ROUTER, data: '0xfeedface', value: 0n }
-  const abortedReport: SearchReport = { ...emptyReport(), aborted: true }
-
-  const r = classifySwap({ best, alternatives, tx, report: abortedReport })
-
-  expect(r.status).toBe('inconclusive')
-  if (r.status === 'inconclusive') {
-    expect(r.reason.code).toBe('aborted')
-    expect(r.best).toBe(best)
-    expect(r.tx).toBe(tx)
-  }
-  // `alternatives` and `search` are status-agnostic: reachable with no narrowing at all. A candidate
-  // that reverted keeps its verbatim `revertData`, which `RankedRoute` declares.
-  expect(r.alternatives).toEqual(alternatives)
-  expect(r.alternatives[1]!.revertData).toBe('0xdeadbeef')
-  expect(r.search.aborted).toBe(true)
-  assertResultCoherent(r)
-})
-
-test('classifySwap: an aborted search whose leader REVERTED demotes it to an alternative — no best, no tx (FINDING 1)', () => {
-  // The sibling of the test above, and the one line between "we could not verify this" and "we are
-  // handing you calldata the chain already rejected". `execution: 'failed'` is the node answering
-  // authoritatively about this block; an abort elsewhere in the search does not soften it.
-  const failed = rankedRoute(900n, 'failed', '0xdeadbeef')
-  const alternatives = [rankedRoute(800n, 'failed', '0xfeed')]
-  const tx: EncodedTx = { to: UNIVERSAL_ROUTER, data: '0xfeedface', value: 0n }
-  const abortedReport: SearchReport = { ...emptyReport(), aborted: true }
-
-  const r = classifySwap({ best: failed, alternatives, tx, report: abortedReport })
-
-  expect(r.status).toBe('inconclusive')
-  if (r.status === 'inconclusive') {
-    expect(r.best).toBeUndefined() // never a lead the chain rejected...
-    expect(r.tx).toBeUndefined() // ...and never its calldata
-  }
-  // The ranking survives the demotion: the nominal leader is still the head of the list.
-  expect(r.alternatives).toEqual([failed, ...alternatives])
-  assertResultCoherent(r)
-})
-
-test('classifySwap: partial discovery (no best) classifies inconclusive/discovery-incomplete (C4-P5)', () => {
-  // Every other axis is clean (not aborted, nothing unattempted, no transport/verification/head
-  // trouble) — the ONLY thing standing between this search and a completed verdict is one protocol's
-  // discovery never finishing. `inconclusiveReason` must name that axis specifically, not fall back
-  // to a generic code.
-  const report: SearchReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial', coveredRanges: [], demandFloor: 0n } } }
-
-  const r = classifySwap({ alternatives: [], report })
-
-  expect(r.status).toBe('inconclusive')
-  if (r.status === 'inconclusive') {
-    expect(r.reason.code).toBe('discovery-incomplete')
-    expect(r.reason.detail).toContain('v2:partial')
-  }
-  assertResultCoherent(r)
-})
-
-test('classifySwap: unattempted quote candidates (no best) classify inconclusive/quotes-unattempted (C4-P5)', () => {
-  // Discovery is complete (every protocol `disabled` in `emptyReport`), nothing aborted, nothing
-  // degraded — the search was simply cut off with candidates still unquoted, which is its own
-  // incompleteness axis and must not be folded into a generic "did not complete" message.
-  // `unattempted` sits outside the `attempted` sum and outside `legsMeasured`: these are legs that
-  // were planned and never dispatched, so nothing settled for them.
-  const report: SearchReport = {
-    ...emptyReport(),
-    quoting: { ...emptyReport().quoting, unattempted: 3 },
-  }
-
-  const r = classifySwap({ alternatives: [], report })
-
-  expect(r.status).toBe('inconclusive')
-  if (r.status === 'inconclusive') {
-    expect(r.reason.code).toBe('quotes-unattempted')
-    expect(r.reason.detail).toContain('3')
-  }
-  assertResultCoherent(r)
-})
-
 test('getSwap end-to-end: a pre-ingested v4 hint (on a fee tier no module speculates on) resolves to ready', async () => {
   const manifest = baseManifest()
   // fee/tickSpacing outside STANDARD_V4_CONFIGS: unreachable by the module's own `hypotheses`, only
@@ -1284,433 +872,6 @@ test('a completed search whose only candidate fails preflight resolves to no-rou
   assertResultCoherent(res)
 })
 
-// ---------------------------------------------------------------------------
-// A PARTIAL RPC OUTAGE IS NEVER A NO-ROUTE (FW2).
-//
-// Both tests below are a reviewer's probes, kept permanently. Each one used to
-// produce a *confident* `no-route` — the first with "search complete: no viable
-// route found" over stats reading 99 attempted / 0 succeeded / 99 failed, the
-// second with "no candidate route verified successfully" — because a 429 was
-// folded into the same bucket as an on-chain revert. Every other axis looked
-// perfect (all protocols' discovery `complete`, nothing aborted, nothing
-// unattempted), which is exactly what made the lie so convincing.
-// ---------------------------------------------------------------------------
-
-test('a no-route caused by nothing being COMPILABLE names the cause, not just the verdict (C4-H4)', async () => {
-  // Same shape as the preflight-revert test above (deployment block above the head, so discovery
-  // completes with no scans), but the candidate never reaches preflight at all: the recipient is
-  // the very v2 pair the route trades through, which `assertPlanInvariants` rejects. Without the
-  // cause attached, the caller is told "no candidate route verified successfully" for a request it
-  // could have fixed itself — and the pool address is not knowable at request-validation time, so
-  // this is the only layer that can say it.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
-  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
-  const pairAddress = computeV2PairAddress(manifest.v2!.factory, TOKEN_A, TOKEN_B)
-
-  const { client, counters } = stubClient({
-    calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-  })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({
-    tokenIn: TOKEN_A,
-    tokenOut: TOKEN_B,
-    amountIn: AMOUNT_IN,
-    trader: TRADER,
-    recipient: pairAddress,
-  })
-
-  expect(res.status).toBe('no-route')
-  if (res.status === 'no-route') {
-    expect(res.reason.code).toBe('no-route-verified') // same code as a preflight-revert no-route; `detail` carries the cause
-    expect(res.reason.detail).toContain('recipient')
-    expect(res.reason.detail.toLowerCase()).toContain(pairAddress.toLowerCase())
-  }
-  // It failed at compile time, so no simulation was ever spent on it.
-  expect(counters.preflights).toBe(0)
-  assertResultCoherent(res)
-})
-
-test('a provider that 429s only eth_call is inconclusive/rpc-degraded, never a confident no-route', async () => {
-  // Same "discovery completes without a single scan" setup as the test above, so the *only* thing
-  // standing between this search and an authoritative `no-route` is the transport axis.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const { client, counters } = stubClient({ rateLimitQuotes: true })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('inconclusive')
-  expect(res.status).not.toBe('no-route')
-  if (res.status === 'inconclusive') {
-    expect(res.reason.code).toBe('rpc-degraded') // distinct from the total-outage 'rpc-unavailable'
-    expect(res.search.quoting.transportFailed).toBeGreaterThan(0)
-    expect(res.search.quoting.succeeded).toBe(0)
-    // Nothing reverted: not one of those dropped calls was evidence about the chain.
-    expect(res.search.quoting.failed).toBe(0)
-    // The giveaway from the original bug report — discovery genuinely IS complete here, and the
-    // classification must still refuse to conclude.
-    expect(res.search.discovery.v2.status).toBe('complete')
-    expect(res.search.aborted).toBe(false)
-    expect(res.search.enumeration.exhaustiveWithinMaxHops).toBe(false)
-  }
-  expect(counters.preflights).toBe(0) // nothing ever quoted, so nothing to verify
-  assertResultCoherent(res)
-
-  // The quote-shaped surface tells the same story.
-  const quoteRes = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
-  expect(quoteRes.status).toBe('inconclusive')
-  if (quoteRes.status === 'inconclusive') expect(quoteRes.reason.code).toBe('rpc-degraded')
-  assertResultCoherent(quoteRes)
-})
-
-test('a node two blocks behind ("header not found" on every quote) is inconclusive/rpc-degraded, never a confident no-route (C4-H1)', async () => {
-  // THE C4-H1 REPRO. `eth_getBlockByNumber` is answered by a healthy node; the pinned `eth_call`s
-  // are load-balanced onto one that does not have that block's state yet. Not one of those errors
-  // mentions a revert, is a 429, or carries a status — so every one of them used to land on the
-  // classifier's `execution` default and be tallied as `quoting.failed`: on-chain evidence the
-  // search never had, and (with discovery genuinely complete here) a CONFIDENT `no-route` from a
-  // search that never touched chain state.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const { client } = stubClient({ nodeStateQuotes: true })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('inconclusive')
-  expect(res.status).not.toBe('no-route')
-  if (res.status === 'inconclusive') {
-    expect(res.reason.code).toBe('rpc-degraded')
-    // Counted on the transport axis, not the on-chain one: `NodeStateError extends TransportError`.
-    expect(res.search.quoting.transportFailed).toBeGreaterThan(0)
-    expect(res.search.quoting.failed).toBe(0) // nothing reverted — nothing executed at all
-    expect(res.search.quoting.succeeded).toBe(0)
-    expect(res.search.discovery.v2.status).toBe('complete') // the axis that made the old lie convincing
-    expect(res.search.aborted).toBe(false)
-    expect(res.search.enumeration.exhaustiveWithinMaxHops).toBe(false)
-  }
-  assertResultCoherent(res)
-
-  const quoteRes = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
-  expect(quoteRes.status).toBe('inconclusive')
-  if (quoteRes.status === 'inconclusive') expect(quoteRes.reason.code).toBe('rpc-degraded')
-  assertResultCoherent(quoteRes)
-})
-
-test('a head that goes BACKWARDS between searches is inconclusive/rpc-degraded with headRegressed, and recovers on the next advance (C4-H1)', async () => {
-  // The quiet half of the same failure: the lagging node does not error, it just answers about an
-  // older chain. Nothing is 429'd, nothing reverts in the transport sense — so without its own axis
-  // this search would report a perfectly confident `no-route` computed against state the router had
-  // already been past.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  let head = BLOCK_NUMBER
-  const { client } = stubClient({ blockNumber: () => head })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  // 1. A normal search at N: discovery completes without a scan, nothing prices, verdict is honest.
-  const first = await router.getSwap(req)
-  expect(first.status).toBe('no-route')
-  if (first.status === 'no-route') expect(first.reason.code).toBe('no-viable-route') // C4-P5: nothing was ever priced
-  expect(first.search.headRegressed).toBe(false)
-  expect(first.search.block.number).toBe(BLOCK_NUMBER)
-  assertResultCoherent(first)
-
-  // 2. The load balancer now answers from a replica two blocks behind — and keeps doing so, so the
-  //    guard's single refetch does not shake it off.
-  head = BLOCK_NUMBER - 2n
-  const second = await router.getSwap(req)
-  expect(second.status).toBe('inconclusive')
-  expect(second.status).not.toBe('no-route')
-  if (second.status === 'inconclusive') expect(second.reason.code).toBe('rpc-degraded')
-  expect(second.search.headRegressed).toBe(true)
-  expect(second.search.block.number).toBe(BLOCK_NUMBER - 2n) // searched where the node actually is
-  assertResultCoherent(second)
-
-  // 3. The head advances past the watermark: back to a plain authoritative verdict, with no sticky
-  //    degradation left over from the blip.
-  head = BLOCK_NUMBER + 1n
-  const third = await router.getSwap(req)
-  expect(third.status).toBe('no-route')
-  expect(third.search.headRegressed).toBe(false)
-  expect(third.search.block.number).toBe(BLOCK_NUMBER + 1n)
-  assertResultCoherent(third)
-})
-
-test('a transient head blip is absorbed by the single refetch: no degradation reported at all', async () => {
-  // The guard refetches once precisely so one unlucky request to a lagging replica costs a round
-  // trip rather than a caller-visible `inconclusive`.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  // Search 1 pins N (watermark N). Search 2's first fetch lands on the lagging replica (N-2); its
-  // one refetch lands on a healthy node (N+1), so the search proceeds normally at N+1.
-  const heads = [BLOCK_NUMBER, BLOCK_NUMBER - 2n, BLOCK_NUMBER + 1n]
-  let served = 0
-  const { client } = stubClient({ blockNumber: () => heads[Math.min(served++, heads.length - 1)]! })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  const first = await router.getSwap(req)
-  expect(first.search.block.number).toBe(BLOCK_NUMBER)
-
-  const second = await router.getSwap(req)
-  expect(second.status).toBe('no-route')
-  expect(second.search.headRegressed).toBe(false)
-  expect(second.search.block.number).toBe(BLOCK_NUMBER + 1n) // the refetch's answer, not the blip's
-  expect(served).toBe(3) // exactly one extra round trip: the guard refetches once, never in a loop
-  assertResultCoherent(second)
-})
-
-test('two searches at the SAME head are not a regression — the guard fires on strictly-below only', async () => {
-  // A quiet chain (or two calls inside one block) is the common case, not a degradation: `<` vs `<=`
-  // here is the difference between an honest verdict and permanent `rpc-degraded` on every idle
-  // chain, and it costs a second head round trip per search on top.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const { client, counters } = stubClient({ blockNumber: () => BLOCK_NUMBER })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  const first = await router.getSwap(req)
-  const second = await router.getSwap(req)
-
-  expect(first.search.headRegressed).toBe(false)
-  expect(second.status).toBe('no-route') // still entitled to an authoritative verdict
-  expect(second.search.headRegressed).toBe(false)
-  expect(counters.blockFetches).toBe(2) // one per search: the equal head never triggered the refetch
-  assertResultCoherent(second)
-})
-
-test('the watermark never moves BACKWARD on a within-bound lagging head', async () => {
-  // The monotone-max property, observed from outside: after a lagging search at N-2, a later search
-  // at N-1 is still behind the *watermark* (N) and must still report it. A watermark that tracked the
-  // most recent head instead would call N-1 an advance over N-2 and hand back a confident verdict
-  // computed two blocks behind where this router has already been.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  let head = BLOCK_NUMBER
-  const { client } = stubClient({ blockNumber: () => head })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  await router.getSwap(req) // watermark: N
-
-  head = BLOCK_NUMBER - 2n
-  const lagging = await router.getSwap(req)
-  expect(lagging.search.headRegressed).toBe(true)
-
-  head = BLOCK_NUMBER - 1n // higher than the last pinned block, still below the watermark
-  const stillLagging = await router.getSwap(req)
-  expect(stillLagging.status).toBe('inconclusive')
-  expect(stillLagging.search.headRegressed).toBe(true)
-  expect(stillLagging.search.block.number).toBe(BLOCK_NUMBER - 1n)
-  assertResultCoherent(stillLagging)
-})
-
-test('a bogus high head does not poison the router forever: the watermark self-heals on two agreeing sane answers', async () => {
-  // The failure mode a plain monotone maximum has: one glitched answer sits above every real head
-  // for the life of the router, so every later search reports `rpc-degraded` (never again an
-  // authoritative `no-route`) and pays two head round trips to do it. Two independent answers
-  // hundreds of millions of blocks below the record are evidence about the RECORD, not the chain.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  let head = 9_999_999_999n // a provider glitch, far outside any plausible reorg or replica lag
-  const { client, counters } = stubClient({ blockNumber: () => head })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  await router.getSwap(req) // watermark poisoned: 9_999_999_999
-
-  head = BLOCK_NUMBER
-  const healing = await router.getSwap(req)
-  expect(healing.status).toBe('no-route') // the fetch and its refetch agree, so nothing regressed
-  expect(healing.search.headRegressed).toBe(false)
-  expect(healing.search.block.number).toBe(BLOCK_NUMBER)
-
-  const fetchesBefore = counters.blockFetches
-  head = BLOCK_NUMBER + 1n
-  const after = await router.getSwap(req)
-  expect(after.status).toBe('no-route')
-  expect(after.search.headRegressed).toBe(false)
-  // Healed for good: back to one head round trip per search, not two forever.
-  expect(counters.blockFetches - fetchesBefore).toBe(1)
-  assertResultCoherent(after)
-})
-
-test('a within-bound regression is NOT self-healed away — the ordinary lagging replica still reports', async () => {
-  // The other side of the self-heal bound: a two-block lag is exactly what the axis exists for, and
-  // must not be explained away as a bad watermark.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  let head = BLOCK_NUMBER
-  const { client } = stubClient({ blockNumber: () => head })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  await router.getSwap(req)
-  head = BLOCK_NUMBER - DEFAULT_REORG_OVERLAP_BLOCKS // well inside the plausible-lag bound
-  const lagging = await router.getSwap(req)
-
-  expect(lagging.status).toBe('inconclusive')
-  expect(lagging.search.headRegressed).toBe(true)
-  // And the watermark stayed put, so the next lagging search reports too.
-  const again = await router.getSwap(req)
-  expect(again.search.headRegressed).toBe(true)
-  assertResultCoherent(lagging)
-})
-
-test('a failed head REFETCH degrades the search rather than escalating it to a total outage', async () => {
-  // The refetch is a diagnostic. Letting it throw would take a search that already has a perfectly
-  // usable pinned block and report `rpc-unavailable` — a strictly worse answer than the degraded one
-  // the guard exists to produce.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  let fetches = 0
-  const { client } = stubClient({
-    blockNumber: () => {
-      fetches++
-      if (fetches === 1) return BLOCK_NUMBER // search 1: establishes the watermark
-      if (fetches === 2) return BLOCK_NUMBER - 2n // search 2: behind, so the guard refetches...
-      throw new Error('connection reset by peer') // ...and the refetch dies
-    },
-  })
-  const router = createRouter({ client, manifest })
-  const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
-
-  await router.getSwap(req)
-  const res = await router.getSwap(req)
-
-  expect(res.status).toBe('inconclusive')
-  if (res.status === 'inconclusive') expect(res.reason.code).toBe('rpc-degraded') // NOT 'rpc-unavailable'
-  expect(res.search.headRegressed).toBe(true)
-  expect(res.search.block.number).toBe(BLOCK_NUMBER - 2n) // the first answer, kept and searched at
-  assertResultCoherent(res)
-})
-
-test('a 429 on the preflight call alone is inconclusive/rpc-degraded — the route stays unverified, never failed and never ready', async () => {
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
-  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
-
-  const { client, counters } = stubClient({
-    calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-    // Every verification attempt is rate limited, so the degradation never resolves.
-    preflight: Array<'rate-limit'>(8).fill('rate-limit'),
-  })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('inconclusive')
-  expect(res.status).not.toBe('no-route')
-  expect(res.status).not.toBe('ready')
-  if (res.status === 'inconclusive') {
-    expect(res.reason.code).toBe('rpc-degraded')
-    expect(res.search.verificationDegraded).toBe(true)
-    // The quote itself succeeded — this is purely a verification-channel failure.
-    expect(res.search.quoting.succeeded).toBeGreaterThan(0)
-    expect(res.search.quoting.transportFailed).toBe(0)
-    expect(res.search.discovery.v2.status).toBe('complete')
-    // FW5/P1: the route priced and encoded fine, so it comes back — as `unverified`, which is
-    // exactly what a lost simulation leaves behind. The caller can retry it against a healthier
-    // endpoint instead of re-running the whole search.
-    expect(res.best?.execution).toBe('unverified')
-    expect(res.tx?.to).toBe(manifest.execution!.address)
-  }
-  expect(counters.preflights).toBeGreaterThan(0)
-  assertResultCoherent(res)
-})
-
-test('a throttled readiness read never becomes a stated requirement: inconclusive/rpc-degraded, never a confident needs-action', async () => {
-  // The sibling of the two probes above, one layer over: readiness reads flow through the same
-  // `ethCall`, and coercing a throttled `balanceOf` to `0n` used to state `insufficient-balance
-  // available: 0n` as fact — then short-circuit preflight, so nothing downstream could notice.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
-  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
-
-  const { client, counters } = stubClient({
-    calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-    rateLimitBalanceRead: true,
-    // The trader is genuinely unapproved, so a real requirement is observed alongside the lost read:
-    // the list is non-empty but INCOMPLETE, which is exactly what must not be promised.
-    readiness: { erc20Allowance: 0n },
-  })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('inconclusive')
-  expect(res.status).not.toBe('needs-action')
-  if (res.status === 'inconclusive') {
-    expect(res.reason.code).toBe('rpc-degraded')
-    expect(res.search.verificationDegraded).toBe(true)
-    expect(res.search.quoting.succeeded).toBeGreaterThan(0) // the route itself priced fine
-    // FW5/P1: no `needs-action` errand is promised off a half-read funding state — but the route and
-    // its calldata are still handed over, which is strictly more than this path used to return.
-    expect(res.best?.quote.amountOut).toBeGreaterThan(0n)
-    expect(res.tx?.to).toBe(manifest.execution!.address)
-  }
-  expect(counters.preflights).toBe(0) // funding state unknown ⇒ no simulation to misread
-  assertResultCoherent(res)
-})
-
-test('a genuinely unmet requirement (reads all landed) is still needs-action — the fix does not blunt real requirements', async () => {
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
-  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
-
-  const { client } = stubClient({
-    calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-    readiness: { balance: 0n }, // a read that LANDED and said zero
-  })
-  const router = createRouter({ client, manifest })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('needs-action')
-  if (res.status === 'needs-action') {
-    expect(res.requirements).toContainEqual({ kind: 'insufficient-balance', token: TOKEN_A, required: AMOUNT_IN, available: 0n })
-    expect(res.search.verificationDegraded).toBe(false)
-  }
-  assertResultCoherent(res)
-})
-
-test('a preflight lost to the transport does not write the SEARCH off: the verifier falls through to the next candidate', async () => {
-  // The 'unverified' vs 'failed' distinction, observable from outside: a transport loss says nothing
-  // about the route, so the candidate is passed over (never demoted to `failed`) and the walk goes
-  // on — a runner-up whose simulation gets through still returns `ready`.
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n })
-  const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
-  const v4Leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
-  const [v2Probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
-  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
-
-  const { client, counters } = stubClient({
-    // The v4 pool outprices the v2 one, so its preflight goes first — and is rate limited.
-    calls: {
-      ...entryFor(v4Module.encodeQuote([v4Leg], AMOUNT_IN, manifest).call, v4Return(10n ** 21n)),
-      ...entryFor(v2Probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-    },
-    preflight: ['rate-limit', 'ok'],
-  })
-  const router = createRouter({ client, manifest })
-  await router.ingestPool({ protocol: 'v4', poolKey })
-
-  const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER })
-
-  expect(res.status).toBe('ready')
-  if (res.status === 'ready') {
-    expect(res.execution.verifiedAtBlock.number).toBe(res.search.block.number)
-    // The transport-lost leader was never blamed: it sits in `alternatives` as `unverified`.
-    const lost = res.alternatives.find((a) => a.execution === 'unverified')
-    expect(lost).toBeDefined()
-    expect(res.search.verificationDegraded).toBe(true) // a lost call still degrades the report
-  }
-  expect(counters.preflights).toBe(2)
-  assertResultCoherent(res)
-})
-
 test('a second identical getQuote call reuses the persisted PoolIndex and issues no further log scans', async () => {
   // No direct pool exists — the only route is the two-hop through MID, and MID becomes an
   // intermediate only when it is a neighbor of BOTH endpoints, which only the adjacency scans can
@@ -1842,23 +1003,81 @@ test('a quote whose amountOut overflows uint128 degrades that candidate instead 
   assertResultCoherent(res)
 })
 
-test('quotes() streams SearchEvents: a lead per improvement, coalesced progress, one final always last', async () => {
-  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+test('quotes() streams SearchEvents: a lead per IMPROVEMENT, one final always last', async () => {
+  // THREE routes of strictly increasing quality, and the two better ones reachable only through the
+  // adjacency scans — the second of them from an OLDER chunk of the same scan than the first. That
+  // staging is what makes "a lead per improvement" observable at all: a one-pool world produces
+  // exactly one lead, which a stream that only ever announced its FINAL answer would satisfy just as
+  // well, and a world whose last improvement lands on the terminating cycle produces one too (the
+  // terminal cycle emits its `final` INSTEAD of a lead). Here the stream has to carry the direct
+  // pair, then the route that outprices it, while the search is still running.
+  const V2_BLOCK = BLOCK_NUMBER - 30_000n // wide enough that the adjacency walk takes several chunks
+  const manifest = baseManifest({ v2Block: V2_BLOCK, v4: false })
+  const MID2 = `0x${'dd'.repeat(20)}` as Address
   const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
-  const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
-  const { client } = stubClient({
-    calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
-    logs: () => [],
+  /** `getReserves` for one hop, oriented for a trade that enters through `from`. */
+  const hop = (from: Address, to: Address, reserveIn: bigint, reserveOut: bigint): Record<string, Hex> =>
+    entryFor(
+      directProbes(v2Module, from, to, AMOUNT_IN, manifest)[0]!.quote.call,
+      v2Return(reserveIn, reserveOut, sortAddresses(from, to)[0]!.toLowerCase() === from.toLowerCase()),
+    )
+
+  const { client: scripted } = stubClient({
+    calls: {
+      // The direct pair is priced 2:1 AGAINST the trade (~498 out). The MID two-hop is 1:1 on both
+      // hops (~993 after two lots of v2 fee), and the MID2 two-hop's first hop pays 2:1 IN FAVOUR
+      // (~1988). So the leader improves twice, in that order.
+      ...entryFor(probe!.quote.call, v2Return(2n * 10n ** 24n, 10n ** 24n, token0.toLowerCase() === TOKEN_A.toLowerCase())),
+      ...hop(TOKEN_A, MID, 10n ** 24n, 10n ** 24n),
+      ...hop(MID, TOKEN_B, 10n ** 24n, 10n ** 24n),
+      ...hop(TOKEN_A, MID2, 10n ** 24n, 2n * 10n ** 24n),
+      ...hop(MID2, TOKEN_B, 10n ** 24n, 10n ** 24n),
+    },
+    // MID/MID2 become intermediates only once each is a neighbor of BOTH endpoints, which only these
+    // scans establish (coreIntermediates is empty). MID's pairs sit next to the head, MID2's at the
+    // v2 deployment block — and the walk goes newest-first, so MID2 arrives chunks later than MID.
+    logs: (endpoint) =>
+      endpoint === TOKEN_A.toLowerCase()
+        ? [pairCreatedLog(manifest, TOKEN_A, MID, BLOCK_NUMBER - 100n), pairCreatedLog(manifest, TOKEN_A, MID2, V2_BLOCK + 1n)]
+        : endpoint === TOKEN_B.toLowerCase()
+          ? [pairCreatedLog(manifest, MID, TOKEN_B, BLOCK_NUMBER - 100n), pairCreatedLog(manifest, MID2, TOKEN_B, V2_BLOCK + 1n)]
+          : [],
   })
+  // The oldest chunk — the one carrying MID2's pairs — is held for a few macrotasks, which is what
+  // keeps the search from CONVERGING on the cycle that first prices the MID two-hop. A terminating
+  // cycle emits its `final` instead of a lead, so without something still in flight the whole
+  // improvement story arrives as one closing event and this test could not tell a streaming engine
+  // from a batch one.
+  const client = {
+    ...scripted,
+    async request(args: { method: string; params: [{ fromBlock: Hex; toBlock: Hex }] }) {
+      const range = args.method === 'eth_getLogs' ? args.params[0] : undefined
+      if (range && BigInt(range.fromBlock) <= V2_BLOCK + 1n && V2_BLOCK + 1n <= BigInt(range.toBlock)) {
+        for (let i = 0; i < 4; i++) await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      return scripted.request(args as never)
+    },
+  } as unknown as PublicClient
   const router = createRouter({ client, manifest })
 
   const events = []
   for await (const e of router.quotes({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })) events.push(e)
 
-  // A lead arrived (the pool priced), and exactly one final closed the stream, last.
-  expect(events.some((e) => e.type === 'lead')).toBe(true)
+  // Two leads at least, each a STRICT improvement on the one before it: the direct pair leads while
+  // it is all there is, and a two-hop takes over when the scans deliver one that outprices it.
+  const leads = events.flatMap((e) => (e.type === 'lead' && e.result.status === 'quote' ? [e.result.best] : []))
+  // A price is a price: `classifyQuote` reports a leader as `quote` however incomplete the search that
+  // found it, so every lead in a quote stream narrows — a lead that did not would be its own bug.
+  expect(events.filter((e) => e.type === 'lead')).toHaveLength(leads.length)
+  expect(leads.length).toBeGreaterThanOrEqual(2)
+  for (let i = 1; i < leads.length; i++) {
+    expect(leads[i]!.quote.amountOut > leads[i - 1]!.quote.amountOut).toBe(true)
+  }
+  expect(leads[0]!.route.legs).toHaveLength(1) // the direct pair led first
+  expect(leads.at(-1)!.route.legs).toHaveLength(2) // and a two-hop had taken over before the final
+  // Exactly one final closed the stream, last, and it leads with the best of the three.
   expect(events.filter((e) => e.type === 'final')).toHaveLength(1)
   expect(events.at(-1)!.type).toBe('final')
   for (const e of events) {
@@ -1871,6 +1090,9 @@ test('quotes() streams SearchEvents: a lead per improvement, coalesced progress,
   if (last.type === 'final') {
     expect(last.result.status).toBe('quote')
     expect(last.result.search.aborted).toBe(false)
+    if (last.result.status === 'quote') {
+      expect(last.result.best.quote.amountOut).toBeGreaterThanOrEqual(leads.at(-1)!.quote.amountOut)
+    }
   }
 })
 
@@ -2387,8 +1609,12 @@ describe('transport options (C4-P6)', () => {
     const res = await router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER, hints })
 
     expect(res.status).not.toBe('ready') // nothing here was ever a real, quotable pool
-    expect(peak).toBeGreaterThan(0) // the stub was actually exercised
-    expect(peak).toBeLessThanOrEqual(CONCURRENCY) // the whole point: a real cross-batch bound
+    // EXACTLY the bound, not merely under it. The first round fires more calls than `CONCURRENCY`
+    // (ten hinted tiers plus the standard-tier hypotheses plus three readiness reads) and every one
+    // of them parks on a real timer, so a correctly-shared semaphore has all five permits out at
+    // once — while `<= CONCURRENCY` would also pass for a bound of one, i.e. for a router that
+    // accidentally serialized the whole round.
+    expect(peak).toBe(CONCURRENCY)
   })
 
   test('createRouter({ logChunkBlocks }) overrides the eth_getLogs window (starting AND regrowth ceiling) for every scan this router issues', async () => {
@@ -3014,7 +2240,10 @@ test('two concurrent searches under maxPools pressure: one search\'s scans evict
         router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }),
         router.getQuote({ tokenIn: OTHER_IN, tokenOut: OTHER_OUT, amountIn: AMOUNT_IN }),
       ]),
-      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 5_000)),
+      // 2s, not 5s: bun's default per-test timeout is 5s, so a 5s sentinel raced the runner and a
+      // genuinely parked search reported as an anonymous test timeout rather than as this test's own
+      // 'hung' — the crafted diagnostic has to win that race.
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 2_000)),
     ])
 
   // THE CONTROL, and the reason this test can claim anything about eviction at all. Same world, same

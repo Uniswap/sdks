@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import type { Address, Hex, PublicClient } from 'viem'
-import { decodeFunctionData, toHex } from 'viem'
+import { decodeFunctionData, encodeFunctionResult, toHex } from 'viem'
 
 import { AbortedCallError, NodeStateError, TransportError } from '../errors'
 import type { EthCall } from '../types'
@@ -32,8 +32,12 @@ type InnerScript = Record<
 >
 
 type StubOptions = {
-  /** Consulted per OUTER call, in order; past the end every outer call is served. */
-  outerOutcomes?: ('serve' | Error | { garbage: Hex })[]
+  /**
+   * Consulted per OUTER call, in order; past the end every outer call is served. `{ raw }` returns
+   * those bytes verbatim in place of the envelope's real result — undecodable garbage, or (the
+   * subtler shape) a perfectly well-formed `Result[]` of the wrong LENGTH.
+   */
+  outerOutcomes?: ('serve' | Error | { raw: Hex })[]
   /** Serve direct (non-aggregate3) eth_calls from this table; absent → loud stub error. */
   direct?: Record<string, Hex | Error>
   onOuterCall?: (to: string, innerCount: number, blockTag: string) => void
@@ -91,7 +95,7 @@ function stubMulticallClient(script: InnerScript, opts: StubOptions = {}): {
         if (outcome instanceof Error) throw outcome
         const contentFailure = opts.outerFailsWhen?.(carried)
         if (contentFailure !== undefined) throw contentFailure
-        if (outcome !== 'serve') return outcome.garbage
+        if (outcome !== 'serve') return outcome.raw
         return served
       }
       const entry = opts.direct?.[innerKey(to as string, data as string)]
@@ -332,11 +336,45 @@ test('an ABORTED chunk is never bisected either: the caller already gave up', as
 test('outer return data that does not decode as Result[] is the same coarsening, never a crash', async () => {
   const calls = [call(0)]
   const script: InnerScript = { [innerKey(calls[0]!.to, calls[0]!.data)]: ok(0) }
-  const { client } = stubMulticallClient(script, { outerOutcomes: [{ garbage: '0x1234' }] })
+  const { client } = stubMulticallClient(script, { outerOutcomes: [{ raw: '0x1234' }] })
 
   const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
 
   expect(results[0]).toBeInstanceOf(TransportError)
+})
+
+test('a result COUNT that disagrees with the chunk is written off as an anomaly, and never re-asked', async () => {
+  // The outer failure that is not an error at all: the call SUCCEEDED and its bytes decode cleanly as
+  // `Result[]` — there are simply fewer of them than there were calls in the envelope. Believing that
+  // response means pairing answers with the wrong calls from the mismatch onward, which is the one
+  // outcome worse than losing the chunk, so the chunk is coarsened to `TransportError` — never to
+  // InnerCallFailures, which would negative-cache routes nothing was learned about.
+  //
+  // AND IT IS NOT BISECTED. `shouldBisect` never sees this one: the mismatch is detected after the
+  // call returned, on the decode path, so the write-off is immediate — which is also the right answer
+  // on its own terms, since a node that miscounts its results will miscount two halves just as well.
+  // The request count is what says so; the result shape is identical either way.
+  const calls = [call(0), call(1), call(2)]
+  const script: InnerScript = {}
+  calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
+  // Well-formed, correctly typed, and exactly one result short of the chunk.
+  const oneShort = encodeFunctionResult({
+    abi: MULTICALL3_ABI,
+    functionName: 'aggregate3',
+    result: calls.slice(1).map((_, i) => ({ success: true, returnData: toHex(`result-${i}`) })),
+  })
+  const { client, outerCalls } = stubMulticallClient(script, { outerOutcomes: [{ raw: oneShort }] })
+
+  const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
+
+  for (const r of results) {
+    expect(r).toBeInstanceOf(TransportError)
+    expect(r).not.toBeInstanceOf(InnerCallFailure)
+  }
+  // The diagnostic names the arithmetic, so the anomaly is debuggable from a report rather than
+  // indistinguishable from a 429.
+  expect(((results[0] as TransportError).cause as Error).message).toContain('2 results for 3 calls')
+  expect(outerCalls).toHaveLength(1) // one envelope on the wire: written off, not halved
 })
 
 test('an abort with the permit in hand skips the chunk: AbortedCallError in every slot, nothing sent', async () => {

@@ -3,7 +3,7 @@ import fc from 'fast-check'
 import type { Address, Hex, Log, PublicClient } from 'viem'
 import { encodeAbiParameters } from 'viem'
 
-import { DEFAULT_CONCURRENCY, INTERMEDIATES_BATCH, PUMP_VANGUARD_LEGS } from '../constants'
+import { DEFAULT_CONCURRENCY, INTERMEDIATES_BATCH, PUMP_VANGUARD_LEGS, SCAN_CHUNK_CONCURRENCY } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
@@ -17,13 +17,14 @@ import type {
   CurrencyRef,
   PoolRecord,
   PoolRef,
-  Protocol,
   QuoteRequest,
   SwapRequest,
 } from '../types'
 
 import type { EngineEvent, SearchContext } from './loop'
 import { search } from './loop'
+import type { Fate, World } from './testWorld'
+import { addr, disabledModule, fatePrice, fromIdData, idData, newPool } from './testWorld'
 
 // ---------------------------------------------------------------------------
 // The solver loop's behavioral suite — the two tests the whole design was sold
@@ -71,35 +72,13 @@ const TS = 1_700_000_000n
  * range up on the FIRST error — which is what makes a starved scope affordable to test. */
 const UNREACHABLE = providerErrors['eth-mainnet.public.blastapi.io'].message
 
-function addr(n: number): Address {
-  return `0x${n.toString(16).padStart(40, '0')}` as Address
-}
-
 // ---------------------------------------------------------------------------
-// A self-contained constant-product world (the same shape as pump.test.ts):
-// measurement outcomes are decided by each pool's scripted fate, never by real
-// protocol encoding. Compile/encode for swaps IS real (spread off the real v2
-// module), so preflight simulates genuine Universal Router calldata.
+// The scripted constant-product world is `./testWorld.ts`, shared with
+// pump.test.ts and coverage.test.ts: measurement outcomes are decided by each
+// pool's scripted fate, never by real protocol encoding. The fake MODULES below
+// are this file's own — compile/encode for swaps IS real here (spread off the
+// real v2 module), so preflight simulates genuine Universal Router calldata.
 // ---------------------------------------------------------------------------
-
-type Fate = { kind: 'price'; r0: bigint; r1: bigint } | { kind: 'revert' }
-type World = Map<string, Fate>
-
-function cpOut(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
-  const withFee = amountIn * 997n
-  return (withFee * reserveOut) / (reserveIn * 1000n + withFee)
-}
-
-function fatePrice(fate: Fate, pool: PoolRef, currencyIn: CurrencyRef, amountIn: bigint): bigint | undefined {
-  if (fate.kind !== 'price') return undefined
-  const zeroForOne = String(currencyIn).toLowerCase() === String(pool.currencies[0]).toLowerCase()
-  const [reserveIn, reserveOut] = zeroForOne ? [fate.r0, fate.r1] : [fate.r1, fate.r0]
-  return cpOut(amountIn, reserveIn, reserveOut)
-}
-
-function idData(pool: PoolRef, currencyIn: CurrencyRef, amountIn: bigint): Hex {
-  return `0x${Buffer.from(`${pool.id}|${String(currencyIn).toLowerCase()}|${amountIn}`).toString('hex')}` as Hex
-}
 
 function worldQuote(world: World, target?: Address): ProtocolModule['encodeQuote'] {
   return (legs, amountIn) => {
@@ -110,26 +89,15 @@ function worldQuote(world: World, target?: Address): ProtocolModule['encodeQuote
       call: { to, data: idData(pool, leg.currencyIn, amountIn) },
       decode: () => {
         const fate = world.get(pool.id)
-        if (!fate || fate.kind === 'revert') throw new Error('no pool here')
-        return { amountOut: fatePrice(fate, pool, leg.currencyIn, amountIn)! }
+        const amountOut = fate && fatePrice(fate, pool, leg.currencyIn, amountIn)
+        // Nothing here scripts a fate past `price`/`revert`, so an absent price IS the data-less
+        // revert shape — the pool-absent, amount-independent one.
+        if (amountOut === undefined) throw new Error('no pool here')
+        return { amountOut }
       },
     }
   }
 }
-
-const unused = {
-  hypotheses: () => [],
-  validateHint: async () => null,
-  encodeQuote: () => {
-    throw new Error('not used')
-  },
-  compileOperation: () => {
-    throw new Error('not used')
-  },
-} as unknown as Pick<ProtocolModule, 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
-
-const disabledModule = (id: Protocol): ProtocolModule =>
-  ({ id, enabled: () => false, adjacencyShape: () => undefined, parsePoolLog: () => null, ...unused }) as ProtocolModule
 
 /** Real v2 module (so `compileOperation` produces genuine UR calldata for preflight) with quoting,
  * discovery, and enumeration re-pointed at the scripted world. */
@@ -196,15 +164,6 @@ function manifestOf(opts: { v2?: boolean; v3?: boolean; v4?: boolean }): ChainMa
     ...(opts.v3 === true && { v3: { factory: V3_FACTORY, deploymentBlock: 0n, v3QuoterV2: V3_QUOTER } }),
     ...(opts.v4 === true && { v4: { poolManager: V4_POOL_MANAGER, deploymentBlock: 0n, quoter: V4_QUOTER } }),
   }
-}
-
-let nextPoolNumber = 0x9000
-
-function newPool(index: PoolIndex | undefined, world: World, a: Address, b: Address, fate?: Fate, createdAtBlock = 1n): PoolRef {
-  const pool = v2Ref(addr(nextPoolNumber++), a, b)
-  world.set(pool.id, fate ?? { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
-  index?.upsert({ pool, source: 'event', createdAtBlock })
-  return pool
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +251,7 @@ function makeClient(
             [10n ** 30n, 2 ** 47, 0],
           )
         }
-        const key = Buffer.from(String((params[0] as { data?: string }).data ?? '0x').slice(2), 'hex').toString()
+        const key = fromIdData(((params[0] as { data?: Hex }).data ?? '0x') as Hex)
         await opts.onQuote?.(key)
         quotes.push(key)
         timeline.push('quote')
@@ -441,8 +400,11 @@ test('abandoning the iterator after the first lead aborts in-flight scans', asyn
 
   await ticks(30) // whatever was already dispatched settles
   const afterAbort = served.length
-  const totalChunks = Number(eagerPairScanBlocks(manifest) / 64n)
-  expect(afterAbort).toBeLessThan(totalChunks / 2) // the walk stopped far short of the window
+  // The bound is derived from the WALK, not from the window: the abort lands within a couple of
+  // macrotasks of the first lead, and the walk advances at most `SCAN_CHUNK_CONCURRENCY` chunks per
+  // macrotask, so a working abort stops after a handful of rounds' worth. Half the window (787
+  // chunks here) would also pass if the abort merely halved the walk instead of ending it.
+  expect(afterAbort).toBeLessThan(8 * SCAN_CHUNK_CONCURRENCY)
   await ticks(30)
   expect(served.length).toBe(afterAbort) // and nothing new goes out after the abort settles
 })
@@ -840,8 +802,7 @@ test("the caller's own abort stops the eager scan, not only the iterator's aband
 
   await ticks(30)
   const afterAbort = served.length
-  const totalChunks = Number(eagerPairScanBlocks(manifest) / 64n)
-  expect(afterAbort).toBeLessThan(totalChunks / 2)
+  expect(afterAbort).toBeLessThan(8 * SCAN_CHUNK_CONCURRENCY) // concurrency-derived, as above
   await ticks(30)
   expect(served.length).toBe(afterAbort) // and nothing new goes out once the abort settles
 })
@@ -946,7 +907,11 @@ test('an abort mid-detached-round cancels the queued legs — the drain waits on
   const wireAtAbort = onWire
   for (const release of parked.splice(0)) release() // the in-flight requests answer; nothing else may follow
 
-  // The drain must finish in bounded ticks — not after the round's remaining 28 legs.
+  // The drain must finish in bounded ticks — not after the round's remaining 28 legs. 100 macrotasks
+  // is a HANG DETECTOR, not a latency budget: it is deliberately an order of magnitude above what
+  // this choreography needs, so it fails only on a loop that never finishes. RAISE IT (do not delete
+  // it) if the loop legitimately grows the number of event-loop turns a search takes — another hop
+  // tier, another sequenced source — because then a real pass would start reading as 'hung'.
   const outcome = await Promise.race([collectAll(gen), ticks(100).then(() => 'hung' as const)])
   expect(outcome).not.toBe('hung')
   if (outcome === 'hung') throw new Error('unreachable')
@@ -1137,7 +1102,9 @@ test('termination survives a cross-search frontier shrink while parked quiet (st
   expect(lead.value!.ranked[0]!.execution).toBe('verified')
   expect(state.intermediates.discovered).toBe(5) // the stale value the termination check just read
 
-  // THE REGRESSION: the next pull must reach final, not park forever.
+  // THE REGRESSION: the next pull must reach final, not park forever. Same hang-detector reading of
+  // `ticks(100)` as the abort-drain test above — raise it if the loop legitimately grows the turns a
+  // search takes; never delete it.
   const outcome = await Promise.race([
     gen.next(),
     ticks(100).then(() => 'hung' as const),
@@ -1190,6 +1157,16 @@ function buildSearchWorld(spec: { direct: boolean; xs: { inPrices: boolean; outP
   }
 }
 
+/** A world with more eligible intermediates than one batch holds, so at least one generated run is
+ * guaranteed to exercise frontier GROWTH rather than a single seed batch (see the vacuity guard
+ * below). Sized from `INTERMEDIATES_BATCH`, so it stays a multi-batch world if the constant moves. */
+const multiBatchWorld = {
+  direct: false,
+  xs: Array.from({ length: INTERMEDIATES_BATCH + 2 }, () => ({ inPrices: true, outPrices: true })),
+}
+
+let sawSecondBatch = false
+
 test('property: the intermediates frontier only ever grows — a node the search has selected is never un-selected', async () => {
   await fc.assert(
     fc.asyncProperty(searchWorldArb, async (spec) => {
@@ -1198,6 +1175,7 @@ test('property: the intermediates frontier only ever grows — a node the search
       for await (const e of search(ctx, req, 'quote')) {
         snapshots.push({ selected: [...e.state.intermediates.selected], notch: e.state.intermediates.notch })
       }
+      if (snapshots.some((s) => s.notch >= 2)) sawSecondBatch = true
 
       for (let i = 1; i < snapshots.length; i++) {
         const before = snapshots[i - 1]!
@@ -1210,8 +1188,15 @@ test('property: the intermediates frontier only ever grows — a node the search
         for (const node of before.selected) expect(after.selected).toContain(node)
       }
     }),
-    { numRuns: 25 },
+    { numRuns: 25, examples: [[multiBatchWorld]] },
   )
+  // The same guard as pump's `sawRetry`. Every generated world is free to be a single-batch one, and
+  // a run in which they ALL were would assert "the frontier only grows" over searches whose frontier
+  // never had a second batch to grow into — vacuously true, and exactly what a shrinking
+  // `INTERMEDIATES_BATCH` (or a `maxLength` that stopped tracking it) would quietly produce. The
+  // seeded example above makes the multi-batch world unconditional, so a failure here is the engine
+  // refusing to advance, never a thin sample.
+  expect(sawSecondBatch).toBe(true)
 })
 
 test('property: measurement dedup across a WHOLE search — the wire never repeats a (pool, direction, amount)', async () => {

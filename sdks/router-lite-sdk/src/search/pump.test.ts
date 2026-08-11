@@ -16,7 +16,6 @@ import { computeV2PairAddress } from '../protocols/v2'
 import type {
   BlockRef,
   ChainManifest,
-  CurrencyRef,
   PoolHint,
   PoolKey,
   PoolRecord,
@@ -30,9 +29,12 @@ import type { PlannedLeg, PumpCtx } from './pump'
 import { composeRoutes, inLegIntermediate, orderedIntermediates, planDueLegs, pump, pumpDry } from './pump'
 import type { SearchState } from './state'
 import { createState, legKey } from './state'
+import type { Fate, World } from './testWorld'
+import { addr, fatePrice, fromIdData, idData, newPool } from './testWorld'
 
 // ---------------------------------------------------------------------------
-// Fixtures — a self-contained constant-product world served by fake modules
+// Fixtures — the scripted constant-product world of `./testWorld.ts` (shared
+// with loop.test.ts and coverage.test.ts), served by THIS file's fake modules,
 // whose encodeQuote/decode are deterministic local math (spec Task 5: no real
 // protocol encoding needed), plus a handful of real-module planning tests
 // against per-protocol manifests.
@@ -47,41 +49,7 @@ const BLOCK: BlockRef = { number: 100n, hash: zeroHash, timestamp: 1_700_000_000
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 const DAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F' as Address
 
-function addr(n: number): Address {
-  return `0x${n.toString(16).padStart(40, '0')}` as Address
-}
-
 const FAKE_MANIFEST: ChainManifest = { chainId: 1, wrappedNative: WN }
-
-type Fate =
-  | { kind: 'price'; r0: bigint; r1: bigint; gas?: bigint }
-  | { kind: 'revert' } // data-less: the pool-absent, amount-independent shape
-  | { kind: 'revert-data' }
-  | { kind: 'transport' }
-
-type World = Map<string, Fate> // pool.id -> fate
-
-/** v2's own fee curve — any monotone function works; this one is easy to brute-force. */
-function cpOut(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
-  const withFee = amountIn * 997n
-  return (withFee * reserveOut) / (reserveIn * 1000n + withFee)
-}
-
-function fatePrice(fate: Fate, pool: PoolRef, currencyIn: CurrencyRef, amountIn: bigint): bigint | undefined {
-  if (fate.kind !== 'price') return undefined
-  const zeroForOne = String(currencyIn).toLowerCase() === String(pool.currencies[0]).toLowerCase()
-  const [reserveIn, reserveOut] = zeroForOne ? [fate.r0, fate.r1] : [fate.r1, fate.r0]
-  return cpOut(amountIn, reserveIn, reserveOut)
-}
-
-/** Leg identity as the scripted client sees it — what the dedup property counts. */
-function idData(pool: PoolRef, currencyIn: CurrencyRef, amountIn: bigint): Hex {
-  return `0x${Buffer.from(`${pool.id}|${String(currencyIn).toLowerCase()}|${amountIn}`).toString('hex')}` as Hex
-}
-
-function fromIdData(data: Hex): string {
-  return Buffer.from(data.slice(2), 'hex').toString()
-}
 
 /** A ProtocolModule whose quotes are local constant-product math over `world` — measurement
  * outcomes are decided by each pool's scripted fate, never by real protocol encoding. */
@@ -122,15 +90,6 @@ function worldClient(record?: string[]): Pick<PublicClient, 'request'> {
       return '0x'
     },
   } as unknown as Pick<PublicClient, 'request'>
-}
-
-let nextPoolNumber = 0x1000
-
-function newPool(index: PoolIndex | undefined, world: World, a: Address, b: Address, fate: Fate, createdAtBlock = 1n): PoolRef {
-  const pool = v2Ref(addr(nextPoolNumber++), a, b)
-  world.set(pool.id, fate)
-  index?.upsert({ pool, source: 'event', createdAtBlock })
-  return pool
 }
 
 type FakeSetup = { state: SearchState; ctx: PumpCtx; req: QuoteRequest; world: World; index: PoolIndex; record: string[] }

@@ -10,6 +10,8 @@
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
     "src/**/testing.ts",
+    "src/internal/routerFixture.ts",
+    "src/search/testWorld.ts",
     "src/internal/outcomeLog.ts",
     "src/internal/moduleGraph.ts"
   ]

@@ -207,6 +207,29 @@ test('abortAll() delivers an aborted signal to a running source', async () => {
   expect(set.signal.aborted).toBe(true)
 })
 
+test('launch() AFTER abortAll() hands the source an already-aborted signal', async () => {
+  // The loop's `finally` aborts the set, and a source can still be launched after it — a scan armed
+  // by a `demandFull()` that raced the consumer walking away, or any launch on an already-cancelled
+  // search. The signal a late source receives is the set's own, so it must arrive already `aborted`
+  // rather than pristine: a source that read `signal.aborted` as false would put a request on the
+  // wire for a search that is over, and would never receive the `abort` event either (it already
+  // fired). The set still counts it and still pokes, so the loop cannot park waiting on it.
+  const notifier = createNotifier()
+  const set = new SourceSet(notifier)
+  set.abortAll()
+
+  let seen: boolean | undefined
+  const woken = notifier.next()
+  set.launch('late', async (signal) => {
+    seen = signal.aborted
+  })
+  await woken
+
+  expect(seen).toBe(true)
+  expect(set.settled()).toBe(true)
+  expect(set.failures()).toEqual([])
+})
+
 test('abortAll() is idempotent', () => {
   const notifier = createNotifier()
   const set = new SourceSet(notifier)

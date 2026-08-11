@@ -447,6 +447,37 @@ test('onOutcomes delivers each MULTICALL_CHUNK-sized group of the input exactly 
   expect(starts.size).toBe(3)
 })
 
+test('multicall path: ONE failed envelope of three coarsens its own 50 legs and no others — index alignment intact', async () => {
+  // The granularity claim at round level, and the one a per-envelope test cannot make: a 120-leg
+  // round is three envelopes, and a provider that drops the MIDDLE one must cost exactly the 50 legs
+  // that rode in it. The failure modes this rules out are both silent — every leg coarsened (one
+  // chunk's outage taken for the round's), or the surviving envelopes' answers shifted into the gap
+  // (fifty `transport` slots written at the wrong indices, so every later leg is reported holding
+  // some other leg's price).
+  const { legs, world } = chunkFixture()
+  const client = multicallStubClient(world, { outerOutcomes: ['serve', rateLimitHttpError(), 'serve'] })
+
+  const outcomes = await measureLegs({
+    client,
+    modules,
+    manifest,
+    legs,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  // Envelopes are dispatched in input order, so the coarsened window is exactly the second group.
+  const coarsened = outcomes.flatMap((o, i) => (o.kind === 'transport' ? [i] : []))
+  expect(coarsened).toEqual(Array.from({ length: MULTICALL_CHUNK }, (_, i) => MULTICALL_CHUNK + i))
+  // Everything else answered, at its own index, with its own price: `k{i}` prices at 2i, so a shift
+  // by even one slot fails here rather than passing as a plausible tally.
+  expect(outcomes.map((o) => o.key)).toEqual(legs.map((l) => l.key))
+  for (const [i, outcome] of outcomes.entries()) {
+    if (coarsened.includes(i)) continue
+    expect(outcome).toEqual({ key: `k${i + 1}`, kind: 'success', amountOut: BigInt(2 * (i + 1)), gasEstimate: 0n })
+  }
+})
+
 test('multicall path: each dispatch group is exactly one aggregate3 envelope, delivered as it settles', async () => {
   const { legs, world } = chunkFixture()
   let envelopes = 0
