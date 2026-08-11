@@ -19,11 +19,8 @@
 
 import { hexToString, parseAbi, trim, type Address, type PublicClient } from 'viem'
 
+import { classifyRpcError } from '../src/experimental/index'
 import type { ChainManifest, CurrencyRef } from '../src/index'
-// `classifyRpcError` is internal (not on the public/experimental surface); imported by relative path
-// — the same escape hatch `commands/discover.ts` documents — rather than re-deriving the SDK's
-// transport-vs-execution rules here, which is exactly the drift that produced the bug below.
-import { classifyRpcError } from '../src/internal/rpcErrors'
 
 import { shortHex } from './ansi'
 import { UsageError } from './args'

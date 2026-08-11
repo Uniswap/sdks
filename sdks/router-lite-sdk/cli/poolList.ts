@@ -74,20 +74,23 @@ import {
   type PublicClient,
 } from 'viem'
 
-import { parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
+import {
+  aggregateCalls,
+  ethCall,
+  mapConcurrent,
+  MULTICALL3_ADDRESS,
+  parseSnapshot,
+  PoolIndex,
+  serializeSnapshot,
+  toGraphNode,
+  type PoolIndexSnapshot,
+} from '../src/experimental/index'
 import { PROTOCOLS, type ChainManifest, type PoolRecord, type Protocol } from '../src/index'
-// The three below are internal (not on the public/experimental surface); imported by relative path,
-// the same escape hatch `commands/discover.ts` documents. `toGraphNode` because curation has to fold
-// the native family onto the wrapped-native node EXACTLY as `PoolIndex` does, and a second
-// implementation of that rule here would drift from the one the coverage keys were written under;
-// the multicall/rpc pair because verify-before-publish dispatches its probes through the same two
-// seams a search does, on the same terms (see the verify section at the bottom of this file).
-import { toGraphNode } from '../src/internal/currency'
-import { MULTICALL3_ADDRESS, aggregateCalls } from '../src/internal/multicall'
-import { ethCall, mapConcurrent } from '../src/internal/rpc'
-// The SDK's own snapshot shape gate — the one `PoolIndex.fromSnapshot` runs, reached directly (it is
-// not re-exported from `../src/experimental/index`) so an untrusted list can be GATED without being
-// RESTORED. See `parsePoolList` for what that saved.
+// deep import: deliberately unblessed, it is `PoolIndex.fromSnapshot`'s own shape-assertion
+// internal — exported from `pools/poolIndex.ts` (see that function's own docstring) so an
+// untrusted list can be GATED without being RESTORED, but never re-exported from
+// `../src/experimental/index`. A shape-assertion internal is exactly the kind of primitive this
+// package's bless list draws the line at (see `experimental/index.ts`'s header).
 import { assertSnapshotShape } from '../src/pools/poolIndex'
 
 /**

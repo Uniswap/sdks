@@ -1,8 +1,7 @@
 import type { EncodedTx, ExecutionRequirement, NeedsActionSwap, PoolRef, QuotedRoute } from '@uniswap/router-lite-sdk'
+import { emptyReport } from '@uniswap/router-lite-sdk/experimental'
 import { describe, expect, test } from 'bun:test'
 import { encodeFunctionData, maxUint160, maxUint256, pad, parseAbi, parseEther, toHex, type Address, type Hex } from 'viem'
-
-import { emptyReport } from '../src/internal/testing'
 
 import {
   buildSimulateSwapPayload,

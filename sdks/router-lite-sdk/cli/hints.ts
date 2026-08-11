@@ -17,8 +17,8 @@
 
 import { isAddress, zeroAddress, type Address, type Hex } from 'viem'
 
+import { sortAddresses } from '../src/experimental/index'
 import type { CurrencyRef, PoolHint } from '../src/index'
-import { sortAddresses } from '../src/internal/currency'
 
 import { UsageError } from './args'
 

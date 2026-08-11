@@ -5,10 +5,15 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { decodeFunctionData, encodeFunctionResult, pad, type Address, type Hex, type PublicClient } from 'viem'
 
-import { PoolIndex, serializeSnapshot, v2PoolRef, type PoolIndexSnapshot } from '../src/experimental/index'
+import {
+  MULTICALL3_ABI,
+  MULTICALL3_ADDRESS,
+  PoolIndex,
+  serializeSnapshot,
+  v2PoolRef,
+  type PoolIndexSnapshot,
+} from '../src/experimental/index'
 import { manifestFor, type ChainManifest, type PoolRecord } from '../src/index'
-import { MULTICALL3_ABI } from '../src/internal/abis'
-import { MULTICALL3_ADDRESS } from '../src/internal/multicall'
 
 import {
   applyPoolList,

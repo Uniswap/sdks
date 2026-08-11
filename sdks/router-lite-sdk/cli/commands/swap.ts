@@ -15,8 +15,8 @@
 
 import { isAddress, type Address } from 'viem'
 
+import { blockTimeSecondsOf } from '../../src/experimental/index'
 import type { SwapRequest, SwapResult } from '../../src/index'
-import { blockTimeSecondsOf } from '../../src/manifest'
 import { bold, dim, green, red, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
 import { amountFor, exitCodeFor, jsonify, renderSwapResult, type FirstLeadInfo, type TradeContext } from '../report'

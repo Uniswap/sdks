@@ -93,6 +93,10 @@ ${bold('common options')}
   --concurrency <n>       max in-flight RPC requests, 1-1024 (SDK default: 20). Raise it for an
                           endpoint with connection headroom — 40 measurably beat 20 on a keyed
                           mainnet endpoint; lower it against a shared or rate-limited quota.
+  --log-chunk <blocks>    pin the eth_getLogs window ceiling for every log scan (positive integer;
+                          SDK floor: 128 blocks). For a provider with a KNOWN, small getLogs cap
+                          (e.g. Ankr's public endpoint, ~3k blocks) — skips the bisection the scanner
+                          would otherwise spend discovering that cap on its own.
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
   --addresses             restore inline pool addresses on every route line (best and alternatives
                           alike) instead of the default compact notation (\`v3 0.01%\`) with the

@@ -289,6 +289,30 @@ describe('the router the CLI builds', () => {
     // endpoint; the DEFAULT is still the SDK's 20, which is what an absent flag leaves in place.
     expect((await buildChainContext(withConcurrency('40'))).router).toBeDefined()
   })
+
+  test('--log-chunk is validated, and a legal value really reaches createRouter’s options', async () => {
+    stubFetch(chainIdThen('0x1'))
+    const withLogChunk = (value: string): ParsedArgs => {
+      const parsed = args()
+      parsed.strings.set('log-chunk', value)
+      return parsed
+    }
+
+    // Shape-rejected by the CLI's OWN check, before the endpoint is touched — same posture as
+    // `--concurrency` above.
+    for (const bad of ['0', '-1', '1.5', 'lots', '']) {
+      await expect(buildChainContext(withLogChunk(bad))).rejects.toThrow(/--log-chunk/)
+    }
+
+    // A positive integer BELOW the SDK's own floor (`MIN_CHUNK`, 128 blocks) passes the CLI's shape
+    // check but is what `createRouter` itself rejects — the SDK's own error, naming its own option,
+    // is the proof the parsed value really arrived at `createRouter`'s options rather than being
+    // silently dropped somewhere in between.
+    await expect(buildChainContext(withLogChunk('1'))).rejects.toThrow(/logChunkBlocks/)
+
+    // ...and a legal value (well above the floor) builds a router normally.
+    expect((await buildChainContext(withLogChunk('5000'))).router).toBeDefined()
+  })
 })
 
 // ---------------------------------------------------------------------------

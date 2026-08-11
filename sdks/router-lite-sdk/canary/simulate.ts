@@ -7,6 +7,7 @@ import {
   type NeedsActionSwap,
   type ReadySwap,
 } from '@uniswap/router-lite-sdk'
+import { assertResultCoherent, DEFAULT_SLIPPAGE_BPS } from '@uniswap/router-lite-sdk/experimental'
 import {
   decodeAbiParameters,
   encodeEventTopics,
@@ -22,13 +23,6 @@ import {
   type Hex,
   type PublicClient,
 } from 'viem'
-
-// `assertResultCoherent` and `DEFAULT_SLIPPAGE_BPS` are internal (unreachable through either public
-// export path), so they are imported by relative path — the same escape hatch the fork harness uses
-// (`integration/e2e.ts` -> `../src/internal/testing`). `canary/` sits next to `integration/` under
-// the same package root, so the relative depth is identical.
-import { DEFAULT_SLIPPAGE_BPS } from '../src/constants'
-import { assertResultCoherent } from '../src/internal/testing'
 
 // ---------------------------------------------------------------------------
 // eth_simulateV1 — the execution proof for the live-RPC canary suite.

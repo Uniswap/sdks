@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
+import { emptyReport } from '../src/experimental/index'
 import type { PoolRef, QuotedRoute, QuoteResult, SearchReport } from '../src/index'
-import { emptyReport } from '../src/internal/testing'
 
 import { setColorEnabled } from './ansi'
 import type { RenderCtx, TradeContext } from './report'

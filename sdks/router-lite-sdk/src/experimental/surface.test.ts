@@ -1,23 +1,50 @@
 import { expect, test } from 'bun:test'
 import type { Address, Hex } from 'viem'
-import { pad } from 'viem'
+import { encodeEventTopics, encodeFunctionResult, pad } from 'viem'
 
 import { MAINNET_MANIFEST } from '../index'
-import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
+import type { BlockRange, PoolRecord, PoolRef, QuotedRoute, QuoteResult, RouteLeg, UniversalRouterDeployment } from '../index'
 
-import type { AdjacencyShape, Custody, FeeDiscovery, PoolIndexOptions, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
+import type {
+  AdjacencyShape,
+  Custody,
+  FeeDiscovery,
+  MergedLogQuery,
+  PoolIndexOptions,
+  PoolIndexSnapshot,
+  ProtocolModule,
+  QuoteProbe,
+  RpcFailureKind,
+} from './index'
 import * as experimentalModule from './index'
 import {
+  DEFAULT_SLIPPAGE_BPS,
+  MULTICALL3_ABI,
+  MULTICALL3_ADDRESS,
   PROTOCOL_MODULES,
   PoolIndex,
+  V4_POOL_MANAGER_ABI,
   adjacencyQueries,
+  aggregateCalls,
+  assertResultCoherent,
+  blockTimeSecondsOf,
   buildHookData,
+  classifyRpcError,
   compileExecutionPlan,
+  emptyReport,
   encoderFor,
+  ethCall,
   generateRoutes,
+  intersectRanges,
+  isDiscredited,
   isHooked,
+  mapConcurrent,
   parseSnapshot,
+  sameFamily,
+  scanLogs,
   serializeSnapshot,
+  sortAddresses,
+  toGraphNode,
   v2PoolRef,
   v4PoolRef,
 } from './index'
@@ -48,17 +75,34 @@ import {
 
 /** Every VALUE export of the `/experimental` subpath, sorted. */
 const EXPERIMENTAL_VALUE_EXPORTS = [
+  'DEFAULT_SLIPPAGE_BPS',
+  'MULTICALL3_ABI',
+  'MULTICALL3_ADDRESS',
   'POOL_INDEX_SCHEMA_VERSION',
   'PROTOCOL_MODULES',
   'PoolIndex',
+  'V4_POOL_MANAGER_ABI',
   'adjacencyQueries',
+  'aggregateCalls',
+  'assertResultCoherent',
+  'blockTimeSecondsOf',
   'buildHookData',
+  'classifyRpcError',
   'compileExecutionPlan',
+  'emptyReport',
   'encoderFor',
+  'ethCall',
   'generateRoutes',
+  'intersectRanges',
+  'isDiscredited',
   'isHooked',
+  'mapConcurrent',
   'parseSnapshot',
+  'sameFamily',
+  'scanLogs',
   'serializeSnapshot',
+  'sortAddresses',
+  'toGraphNode',
   'v2Module',
   'v2PoolRef',
   'v3Module',
@@ -204,4 +248,83 @@ test('a PoolIndex snapshot round-trips using only `.../experimental` exports (P2
   expect(restored.uncovered('v2', WETH, 0n, 21_000_000n)).toEqual([
     { fromBlock: 20_999_969n, toBlock: 21_000_000n }, // only the standing reorg overlap
   ])
+})
+
+// ---------------------------------------------------------------------------
+// BLESSED FOR canary/ AND cli/ — reachability/callability checks for the second export block in
+// `experimental/index.ts`, the same minimal-execution guard as above but for internal helpers those
+// two tools used to reach only via a relative `../src/internal/*` import.
+// ---------------------------------------------------------------------------
+
+test('emptyReport builds a coherent all-zero SearchReport, and assertResultCoherent accepts a minimal result built from it', () => {
+  const result: QuoteResult = {
+    status: 'no-route',
+    reason: { code: 'no-viable-route', detail: 'no test route' },
+    alternatives: [],
+    search: emptyReport(),
+  }
+  expect(() => assertResultCoherent(result)).not.toThrow()
+})
+
+test('DEFAULT_SLIPPAGE_BPS names the default slippage a SwapRequest uses when unset', () => {
+  expect(DEFAULT_SLIPPAGE_BPS).toBe(100)
+})
+
+test('scanLogs is callable against a minimal client using a MergedLogQuery, and V4_POOL_MANAGER_ABI names v4 PoolManager events', async () => {
+  const topic0 = encodeEventTopics({ abi: V4_POOL_MANAGER_ABI, eventName: 'Initialize' })[0]!
+  const query: MergedLogQuery = { address: [MAINNET_MANIFEST.v4!.poolManager], topics: [topic0] }
+  const client: any = { request: async () => [] }
+  const result = await scanLogs(client, query, { fromBlock: 0n, toBlock: 10n }, {})
+  expect(result.complete).toBe(true)
+  expect(result.logs).toEqual([])
+})
+
+test('MULTICALL3_ADDRESS and MULTICALL3_ABI name the canonical Multicall3 deployment', () => {
+  expect(MULTICALL3_ADDRESS).toBe('0xcA11bde05977b3631167028862bE2a173976CA11')
+  expect(MULTICALL3_ABI.some((f) => f.type === 'function' && f.name === 'aggregate3')).toBe(true)
+})
+
+test('aggregateCalls, ethCall, and mapConcurrent are callable against a minimal client — the RPC-dispatch stage primitives', async () => {
+  const aggregate3Result = encodeFunctionResult({
+    abi: MULTICALL3_ABI,
+    functionName: 'aggregate3',
+    result: [{ success: true, returnData: '0x' as Hex }],
+  })
+  const client: any = { request: async () => aggregate3Result }
+  const calls = [{ to: MULTICALL3_ADDRESS, data: '0x1234' as Hex }]
+
+  const [viaMulticall] = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: 1n })
+  expect(viaMulticall).toBe('0x')
+
+  const viaDirectCall = await ethCall(client, calls[0]!, 1n)
+  expect(typeof viaDirectCall).toBe('string')
+
+  expect(await mapConcurrent([1, 2, 3], 2, async (n) => n * 2)).toEqual([2, 4, 6])
+})
+
+test('classifyRpcError classifies a failed call into a channel, and RpcFailureKind names the result', () => {
+  const kind: RpcFailureKind = classifyRpcError(new Error('execution reverted'))
+  expect(kind).toBe('execution')
+})
+
+test('toGraphNode, sameFamily, and sortAddresses normalize currencies the way PoolIndex itself does', () => {
+  expect(toGraphNode('native', WETH)).toBe(WETH.toLowerCase())
+  expect(sameFamily('native', WETH, WETH)).toBe(true)
+  expect(sameFamily(USDC, WETH, WETH)).toBe(false)
+  expect(sortAddresses(WETH, USDC)).toEqual(sortAddresses(USDC, WETH))
+})
+
+test("isDiscredited reads a PoolRecord's own ranking judgment", () => {
+  const record: PoolRecord = { pool: v2WethUsdc, source: 'hint' }
+  expect(isDiscredited(record)).toBe(false)
+})
+
+test("intersectRanges intersects two block-range sets — the range algebra behind PoolIndex's coverage cache", () => {
+  const a: BlockRange[] = [{ fromBlock: 0n, toBlock: 100n }]
+  const b: BlockRange[] = [{ fromBlock: 50n, toBlock: 150n }]
+  expect(intersectRanges(a, b)).toEqual([{ fromBlock: 50n, toBlock: 100n }])
+})
+
+test("blockTimeSecondsOf reads a manifest's own chain-physics number", () => {
+  expect(blockTimeSecondsOf(MAINNET_MANIFEST)).toBe(12)
 })

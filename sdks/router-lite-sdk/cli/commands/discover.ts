@@ -13,14 +13,9 @@
 
 import type { Address } from 'viem'
 
+import { blockTimeSecondsOf, isDiscredited, sameFamily } from '../../src/experimental/index'
 import { PROTOCOLS } from '../../src/index'
 import type { CurrencyRef, PoolRecord, Protocol, QuoteResult } from '../../src/index'
-// `isDiscredited` and `sameFamily` are internal (not on the public/experimental surface); imported
-// by relative path — the same escape hatch `canary/simulate.ts` documents — rather than re-deriving
-// the discredit rule or the native/wrapped-native family rule here and drifting.
-import { sameFamily } from '../../src/internal/currency'
-import { blockTimeSecondsOf } from '../../src/manifest'
-import { isDiscredited } from '../../src/pools/poolIndex'
 import { bold, cyan, dim, green, red, shortHex, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
 import { describePool, jsonify, renderConfidencePanel, viewKey, type RenderCtx, type TokenView } from '../report'

@@ -802,6 +802,12 @@ looks exactly like a pair with no liquidity.
 
 ## Development
 
+Comments throughout this package carry short task tags (`C4-P6`, `C5-B`, `R3`, `F1`, `Task 17`, and
+similar) — they index the historical implementation-plan documents this codebase was built from.
+Those plan documents themselves are gone (deleted in commit `e65a1988`, once superseded), but the
+tags are kept in code deliberately, as archaeology pointers: `git log --grep <tag>` finds the commits
+that did the work a tag refers to, which is usually enough context on its own.
+
 Three private workspaces sit beside `src/`, none of them published:
 
 - **`integration/`** — anvil-fork integration suite (opt-in via `ROUTER_LITE_FORK=1`).

@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from 'bun:test'
 
 import { redact, redactHeaderValues, redactKeyedUrl, REDACTED_URL, registerRpcHeaders, resetRpcHeaders } from './redact'
 
-// These cases mirror `canary/providers.test.ts`'s own suite — the two implementations are
-// deliberate duplicates (see `redact.ts`'s header), and this pins them to identical behaviour.
+// `canary/providers.test.ts` carries its own "redactKeyedUrl (pure)" describe block against this
+// same imported function, with the identical cases — deliberate belt-and-suspenders (see that
+// block's comment), not a second implementation to keep in sync (see `redact.ts`'s header).
 describe('redactKeyedUrl', () => {
   it('redacts a URL whose path carries a vendor key', () => {
     const message = 'HTTP request failed.\n\nURL: https://eth-mainnet.g.alchemy.com/v2/EXAMPLE-KEY-NOT-REAL-00\nStatus: 400'

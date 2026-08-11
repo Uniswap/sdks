@@ -12,9 +12,12 @@ import { stat } from 'node:fs/promises'
 
 import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 
-// `DEFAULT_CONCURRENCY`/`MAX_CONCURRENCY` are the SDK's own bounds for the option `--concurrency`
-// maps to; imported by relative path (the same escape hatch `discover.ts` documents) so `--help` and
-// the flag's validation can never disagree with `createRouter`'s.
+// deep import: deliberately unblessed — `DEFAULT_CONCURRENCY`/`MAX_CONCURRENCY` are the SDK's own
+// bounds for the option `--concurrency` maps to, imported by relative path so `--help` and the
+// flag's validation can never disagree with `createRouter`'s. Plain internal constants with no
+// consumer-facing story of their own (unlike `MULTICALL3_ADDRESS`/`MULTICALL3_ABI`, which name a
+// real, externally-meaningful deployment), so they stay a deep import rather than joining
+// `experimental/index.ts`'s bless list.
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from '../../src/constants'
 import { PoolIndex } from '../../src/experimental/index'
 import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../../src/index'
@@ -50,6 +53,7 @@ export const COMMON_FLAGS: FlagSpec = {
   json: { kind: 'boolean' },
   budget: { kind: 'string', alias: 'b' },
   concurrency: { kind: 'string' },
+  'log-chunk': { kind: 'string' },
   verbose: { kind: 'boolean', alias: 'v' },
   'pool-list': { kind: 'string' },
   'trust-coverage': { kind: 'boolean' },
@@ -103,6 +107,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const budgetArg = parsed.strings.get('budget')
   const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
   const concurrency = parseConcurrency(parsed.strings.get('concurrency'))
+  const logChunkBlocks = parseLogChunk(parsed.strings.get('log-chunk'))
   const poolListSpec = parsed.strings.get('pool-list')
   const trustCoverage = parsed.booleans.has('trust-coverage')
   // ARGUMENT MISTAKES ARE DECIDED BEFORE ANYTHING IS SPENT, next to the other two pure parses above.
@@ -272,6 +277,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     // in hand. The cross-check itself is unchanged, and so is the execution-address fingerprint.
     assumeChainId: chainId,
     ...(concurrency !== undefined ? { concurrency } : {}),
+    ...(logChunkBlocks !== undefined ? { logChunkBlocks } : {}),
   })
   const base = { chain, client, router, index }
   return budgetMs !== undefined ? { ...base, budgetMs } : base
@@ -291,6 +297,34 @@ function parseConcurrency(raw: string | undefined): number | undefined {
   const value = Number(raw)
   if (!/^\d+$/.test(raw.trim()) || !Number.isInteger(value) || value < 1 || value > MAX_CONCURRENCY) {
     throw new UsageError(`--concurrency '${raw}' must be an integer in [1, ${MAX_CONCURRENCY}] (default: ${DEFAULT_CONCURRENCY})`)
+  }
+  return value
+}
+
+/**
+ * `--log-chunk`, the CLI's knob for `createRouter`'s `logChunkBlocks`: a ceiling override for the
+ * `eth_getLogs` window `scanLogs` starts (and regrows toward) on every scan this router issues,
+ * instead of letting the scanner discover a provider's cap by bisecting down from its own wide
+ * default. Worth exposing for the same reason as `--concurrency` — the right value is a property of
+ * the ENDPOINT — but here it is a known CEILING rather than a preference: a provider that caps
+ * `eth_getLogs` to a few thousand blocks (Ankr's public endpoint, ~3k) turns every cold scan into a
+ * multi-step bisection before the first request succeeds, and pinning the known cap skips the
+ * descent entirely.
+ *
+ * Only shape-validated here (a positive integer, `--log-chunk`'s own usage error, exit 3): the
+ * SDK's own floor (`MIN_CHUNK`, currently 128 blocks) is enforced by `createRouter` itself — a
+ * value that parses fine here but is too small surfaces as `RouterConfigError`, which exits 3 all
+ * the same, and re-stating that floor here would just be a second copy of the SDK's own bound to
+ * keep in sync.
+ */
+function parseLogChunk(raw: string | undefined): bigint | undefined {
+  if (raw === undefined) return undefined
+  if (!/^\d+$/.test(raw.trim())) {
+    throw new UsageError(`--log-chunk '${raw}' must be a positive integer (number of blocks)`)
+  }
+  const value = BigInt(raw.trim())
+  if (value < 1n) {
+    throw new UsageError(`--log-chunk '${raw}' must be a positive integer (number of blocks)`)
   }
   return value
 }

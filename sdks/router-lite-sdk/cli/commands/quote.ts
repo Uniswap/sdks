@@ -14,8 +14,8 @@
 //    then recapped in the final panel.
 // ---------------------------------------------------------------------------
 
+import { blockTimeSecondsOf } from '../../src/experimental/index'
 import type { QuoteRequest } from '../../src/index'
-import { blockTimeSecondsOf } from '../../src/manifest'
 import { parseArgs } from '../args'
 import { exitCodeFor, jsonify, renderQuoteResult, type FirstLeadInfo, type TradeContext } from '../report'
 import { firstRouteReporter, iterateWaves } from '../waves'

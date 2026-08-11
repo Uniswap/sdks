@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
+import { assertResultCoherent, emptyReport } from '../src/experimental/index'
 import type { PoolRef, QuoteResult, SearchReport, SwapResult } from '../src/index'
 import { REASON_CODES } from '../src/index'
-import { assertResultCoherent, emptyReport } from '../src/internal/testing'
 
 import { setColorEnabled } from './ansi'
 import { explainReason } from './reasons'

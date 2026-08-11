@@ -1,16 +1,22 @@
 // ---------------------------------------------------------------------------
-// Keyed-URL redaction — mirrored from `canary/providers.test.ts#redactKeyedUrl`
-// (same rule, same rationale), because this CLI has the same leak path: viem
-// embeds the full request URL in every error it constructs, and the RPC URLs
-// this tool is handed (via `--rpc`/`$ETH_RPC_URL`) routinely carry vendor keys
-// in the path or query string. Every error line this CLI prints goes through
-// here first; the URL itself is never printed on any success path at all.
+// Keyed-URL redaction — this CLI's leak path is viem embedding the full
+// request URL in every error it constructs, and the RPC URLs this tool is
+// handed (via `--rpc`/`$ETH_RPC_URL`) routinely carry vendor keys in the path
+// or query string. Every error line this CLI prints goes through here first;
+// the URL itself is never printed on any success path at all.
 //
-// Deliberately duplicated rather than imported: `canary/` resolves the SDK by
-// package name (the built `dist/`), and this CLI's contract is "always the
-// current source" — importing across the two workspaces would couple this
-// tool's runtime to a possibly-stale build artifact for twenty lines of pure
-// string code. The unit tests pin the behaviour to the canary's exact cases.
+// THE SINGLE IMPLEMENTATION. `canary/providers.test.ts` has the identical leak
+// path (it captures real provider errors into a committed fixture) and used
+// to carry its own copy, on the theory that canary resolves the SDK by
+// package name (the built `dist/`) while this CLI always runs the current
+// source, so importing across the two workspaces would couple one to the
+// other's resolution world. That reasoning never actually applied to this
+// function: it has no dependency on the SDK at all, so which world resolves
+// it is irrelevant. Canary now imports it from here directly; this file is
+// the one implementation, and `cli/redact.test.ts`'s cases are mirrored (not
+// duplicated) by `canary/providers.test.ts`'s own pure describe block, kept
+// there deliberately for coverage on every `bun test canary` run — see that
+// block's own comment for why.
 // ---------------------------------------------------------------------------
 
 /** What a keyed endpoint's URL is replaced with before anything is printed. */

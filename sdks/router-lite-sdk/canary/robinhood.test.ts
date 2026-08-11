@@ -1,9 +1,7 @@
 import { createRouter, manifestFor, RouterConfigError, type QuoteResult, type Router } from '@uniswap/router-lite-sdk'
+import { scanLogs, V4_POOL_MANAGER_ABI } from '@uniswap/router-lite-sdk/experimental'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { decodeEventLog, encodeEventTopics, parseAbi, parseEther, type Address, type Hex, type PublicClient } from 'viem'
-
-import { V4_POOL_MANAGER_ABI } from '../src/internal/abis'
-import { scanLogs } from '../src/internal/logScan'
 
 import { canaryLog, robinhoodChainId, robinhoodClient, robinhoodEnabled } from './env'
 import { CANARY_TRADER, probeSimulateV1Support, simulateSwapE2E } from './simulate'

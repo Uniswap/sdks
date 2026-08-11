@@ -86,9 +86,8 @@ import { join } from 'node:path'
 
 import type { Address } from 'viem'
 
-import { parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
+import { intersectRanges, parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
 import { PROTOCOLS, type BlockRange, type Protocol } from '../src/index'
-import { intersectRanges } from '../src/internal/ranges'
 
 import type { FlagSpec } from './args'
 

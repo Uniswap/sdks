@@ -160,6 +160,13 @@ never treat as "carry on".
   The right value is a property of the *endpoint*, which only you know: `40` measurably beat `20`
   on a keyed mainnet endpoint, while a shared or rate-limited quota wants less. It is validated
   against the SDK's own bounds before the endpoint is touched.
+- **`--log-chunk <blocks>`** pins the `eth_getLogs` window ceiling (`createRouter`'s
+  `logChunkBlocks`) for every log scan this run issues, instead of letting the scanner discover a
+  provider's cap by bisecting down from its own wide default. For a **provider that caps
+  `eth_getLogs` to a small, known range** — Ankr's public endpoint caps around 3,000 blocks, for
+  example — pinning that cap skips the multi-step descent a cold scan would otherwise spend
+  rediscovering it, on every scan, every run. Must be a positive integer; the SDK's own floor
+  (128 blocks) is enforced by `createRouter` itself.
 - **`--rpc-header "Name: value"`** (repeatable) / **`$ETH_RPC_HEADERS`** add extra headers to every
   RPC request — for a gateway that authenticates by header instead of (or in addition to) a keyed
   URL. The env var is foundry's own wire format (comma-separated `Name: value` pairs), which is

@@ -3,13 +3,21 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createRouter, MAINNET_MANIFEST } from '@uniswap/router-lite-sdk'
+import { scanLogs } from '@uniswap/router-lite-sdk/experimental'
 import { describe, it, expect } from 'bun:test'
 import { createPublicClient, http, parseEther, toHex, type Address } from 'viem'
 import { mainnet } from 'viem/chains'
 
 const CANARY_DIR = dirname(fileURLToPath(import.meta.url))
 
-import { scanLogs } from '../src/internal/logScan'
+// `redactKeyedUrl`/`REDACTED_URL` are a repo-local, non-SDK helper (pure string manipulation, no
+// dependency on the SDK or on which world it resolves from), so — now that this file's SDK imports
+// are unified onto the built package (see this file's `scanLogs` import above) — there is no
+// "different resolution worlds" reason left to keep a second copy of them here. `cli/redact.ts` is
+// the single implementation; this suite imports it directly rather than re-deriving the same rule.
+// The redundancy this used to justify (a copy that "must track the working tree's source") never
+// actually applied to this function in the first place — it never touches the SDK at all.
+import { redactKeyedUrl, REDACTED_URL } from '../cli/redact'
 
 import { canaryEnabled, canaryLog, canaryProviders, primaryProvider, type CanaryProvider } from './env'
 import { probeSimulateV1Support } from './simulate'
@@ -58,49 +66,6 @@ function fixtureKeyFor(provider: CanaryProvider): string {
   } catch {
     return provider.label
   }
-}
-
-/** What a keyed endpoint's URL is replaced with before anything is written down. */
-const REDACTED_URL = 'https://<redacted-keyed-endpoint>'
-
-/**
- * Minimum length of a URL path segment for it to be treated as a SECRET rather than a route.
- *
- * Vendor API keys live in the path (`.../v2/<key>`, `.../<key>/`), and every real one is a long
- * opaque token — the major vendors' documented formats are all twenty-something characters or
- * longer. Ordinary path segments (`v2`, `rpc`, `mainnet`, `eth`) are short. 16 sits comfortably
- * between the two, and erring toward over-redaction is the right side to err on here.
- */
-const SECRET_SEGMENT_MIN_LENGTH = 16
-
-/**
- * Replaces any KEY-BEARING URL in `message` with {@link REDACTED_URL}, leaving the rest of the
- * message — the status, the JSON-RPC code, the provider's own words — exactly as captured.
- *
- * This exists because `providerErrors.json` IS COMMITTED and viem embeds the full request URL in
- * every error it constructs. Run the canary against a keyed archive endpoint (which is the only way
- * several of these rows complete at all — see `canary.test.ts`'s header) and the naive capture path
- * writes that key straight into the repository. So the redaction happens here, at the boundary where
- * a live error becomes a durable artifact, rather than being left to whoever reviews the diff.
- *
- * KEYLESS PUBLIC URLS ARE DELIBERATELY LEFT INTACT. `https://eth.drpc.org` carries no secret, and
- * which vendor produced a given error message is the single most useful thing about the fixture —
- * redacting it unconditionally would trade a real diagnostic for no security at all. A URL is
- * treated as keyed when it has a path segment of at least {@link SECRET_SEGMENT_MIN_LENGTH}
- * characters, or any query string (some vendors pass the key as `?apikey=`).
- *
- * DUPLICATED (deliberately) IN `cli/redact.ts`, which must track the working tree's source rather
- * than this workspace's built-dist resolution — its unit tests mirror this suite's cases, so a
- * rule change here must be made there too (and vice versa).
- */
-export function redactKeyedUrl(message: string): string {
-  return message.replace(/https?:\/\/[^\s"'<>\\]+/g, (url) => {
-    const withoutScheme = url.slice(url.indexOf('://') + 3)
-    const [beforeQuery, ...queryParts] = withoutScheme.split('?')
-    if (queryParts.length > 0 && queryParts.join('?').length > 0) return REDACTED_URL
-    const segments = beforeQuery!.split('/').slice(1)
-    return segments.some((s) => s.length >= SECRET_SEGMENT_MIN_LENGTH) ? REDACTED_URL : url
-  })
 }
 
 function loadFixture(): ProviderErrorFixture {
@@ -181,14 +146,18 @@ async function hugeLogsProbe(provider: CanaryProvider): Promise<{
 // Pure, no RPC, and therefore NOT gated on `RUN`: this is the one thing in the canary suite whose
 // failure mode is a leaked credential rather than a missed regression, so it is verified on every
 // run of this file — including the ones where `canaryEnabled()` is false and nothing else executes.
+// `cli/redact.test.ts` carries the same cases against the same imported function (belt-and-suspenders
+// deliberately kept: this file's copy runs on every `bun test` of `canary/`, independent of whichever
+// command happens to also run `cli/`'s suite, and a leaked credential is exactly the failure mode
+// worth double coverage for).
 describe('redactKeyedUrl (pure)', () => {
   it('redacts a URL whose path carries a vendor key', () => {
     const message = 'HTTP request failed.\n\nURL: https://eth-mainnet.g.alchemy.com/v2/EXAMPLE-KEY-NOT-A-REAL-ONE-000000\nStatus: 400'
-    expect(redactKeyedUrl(message)).toBe('HTTP request failed.\n\nURL: https://<redacted-keyed-endpoint>\nStatus: 400')
+    expect(redactKeyedUrl(message)).toBe(`HTTP request failed.\n\nURL: ${REDACTED_URL}\nStatus: 400`)
   })
 
   it('redacts a URL that carries the key in a query string', () => {
-    expect(redactKeyedUrl('URL: https://rpc.example.com/eth?apikey=abc')).toBe('URL: https://<redacted-keyed-endpoint>')
+    expect(redactKeyedUrl('URL: https://rpc.example.com/eth?apikey=abc')).toBe(`URL: ${REDACTED_URL}`)
   })
 
   it('leaves keyless public endpoints alone — which vendor errored is the point of the fixture', () => {
