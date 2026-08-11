@@ -8,6 +8,7 @@ import type { EthCall } from '../types'
 import { MULTICALL3_ABI } from './abis'
 import { ethCall, mapConcurrent } from './rpc'
 import type { Semaphore } from './rpc'
+import { classifyRpcError, isRequestTooLarge } from './rpcErrors'
 
 // ---------------------------------------------------------------------------
 // Multicall3 aggregation — many quotes per round trip, one round trip per
@@ -142,6 +143,16 @@ export type AggregateCallsArgs = {
  * (`rpc-degraded`) search and no negative-cache writes — rather than fanned out as N fabricated
  * on-chain reverts, which is exactly the C4-H1 failure mode with a new spelling.
  *
+ * BUT IT IS ASKED AGAIN, SMALLER, FIRST. Before writing off a chunk, an outer failure that is
+ * DETERMINISTIC and about the envelope — the node's `eth_call` gas cap, or an execution-shaped
+ * refusal — makes the chunk split in half and both halves retry (see {@link shouldBisect}). Written
+ * off instead, one such failure costs the whole chunk permanently, because the engine's retry
+ * re-sends the identical oversized batch; that is exactly how a warm index on a wide mainnet pair
+ * turned a perfectly answerable round into a `rpc-degraded` search (C4-T14, found by
+ * `integration/swap.fork.test.ts`). Transport failures and aborts are NOT re-asked — answering "you
+ * are sending too much" or "the caller gave up" with more requests is the one direction that makes
+ * things worse. The write-off above is what a bisected chunk lands on when it reaches size 1.
+ *
  * SENDER- AND VALUE-CARRYING CALLS ARE NEVER AGGREGATED. `aggregate3` cannot forward a per-call
  * `from` (inner `msg.sender` is Multicall3) or `value`; a call that sets either is dispatched as an
  * individual `ethCall` — same slot semantics, same channel classification as the per-call path —
@@ -190,6 +201,11 @@ export async function aggregateCalls(args: AggregateCallsArgs): Promise<Array<He
     try {
       raw = await ethCall(client, { to: multicall3, data }, blockNumber, semaphore, signal)
     } catch (err) {
+      if (chunk.length > 1 && shouldBisect(err)) {
+        const half = Math.ceil(chunk.length / 2)
+        await Promise.all([runChunk(chunk.slice(0, half)), runChunk(chunk.slice(half))])
+        return
+      }
       const shared = coarsenOuterFailure(err, chunk.length)
       for (const i of chunk) results[i] = shared
       return
@@ -226,6 +242,44 @@ export async function aggregateCalls(args: AggregateCallsArgs): Promise<Array<He
  * of the aggregation machinery says nothing about the chunk's calls, and the only safe direction to
  * be wrong in is the one that never fabricates on-chain evidence and never negative-caches.
  */
+/**
+ * Should a failed OUTER aggregate3 be RE-ASKED as two halves rather than written off?
+ *
+ * Yes for exactly two shapes, and the reasoning is the same one for both: the failure is
+ * DETERMINISTIC and about the ENVELOPE, so re-sending the identical batch can only fail identically,
+ * while a smaller batch has a real chance — and a batch of one cannot have the problem at all.
+ *
+ *  1. {@link isRequestTooLarge} — the node ran out of the gas an `eth_call` may burn. This is the
+ *     one that brought the fix: on a wide mainnet pair with a warm index, ~39 v3/v4 quoter
+ *     simulations in one envelope exceed anvil's cap and the WHOLE round is lost, deterministically
+ *     and forever (the retry re-sends the same oversized batch). It arrives wearing the transport
+ *     channel on anvil and the execution channel on geth, which is exactly why the predicate is a
+ *     shape read rather than a channel test.
+ *  2. An execution-channel outer failure. `aggregate3` with `allowFailure: true`, at an address this
+ *     package verified has code, does not revert for anything an inner call did — so this is either
+ *     case 1 in geth's dialect or one genuinely poisonous inner call. Halving isolates which, and at
+ *     size 1 the answer lands on the single call that caused it instead of on all 50.
+ *
+ * NO ON THE TRANSPORT CHANNEL OTHERWISE, which is the important half. A 429, a dropped socket, a
+ * gateway timeout — these say the provider is under pressure, and the answer to "you are sending too
+ * much" is emphatically not to turn one request into two. Those keep {@link coarsenOuterFailure}'s
+ * write-off, and the search reports `rpc-degraded` as it always has.
+ *
+ * NO ON AN ABORT, for the same reason `ethCall` checks the signal with the permit in hand: the
+ * search is over, and bisecting would put requests on the wire that the caller has already said it
+ * no longer wants.
+ *
+ * TERMINATION is structural rather than a depth budget: every recursion strictly halves a chunk that
+ * `chunk.length > 1` guarantees is at least 2, so the worst case is ceil(log2(MULTICALL_CHUNK)) ≈ 6
+ * levels and at most 2N-1 envelopes for an N-call chunk — and only ever on a shape that would
+ * otherwise have lost all N. No new constant, and nothing to keep in sync with `MULTICALL_CHUNK`.
+ */
+function shouldBisect(err: unknown): boolean {
+  if (err instanceof AbortedCallError) return false
+  if (isRequestTooLarge(err)) return true
+  return classifyRpcError(err) === 'execution'
+}
+
 function coarsenOuterFailure(err: unknown, chunkSize: number): Error {
   if (err instanceof AbortedCallError) return err
   if (err instanceof TransportError) return err

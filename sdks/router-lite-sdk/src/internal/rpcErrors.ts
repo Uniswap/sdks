@@ -101,6 +101,16 @@ const TRANSPORT_MESSAGE =
  * as a result-cap marker — so the defect was two regexes in one module disagreeing about the same
  * sentence.
  */
+/**
+ * Gas-exhaustion dialects, read by {@link isRequestTooLarge} alone — never by `classifyRpcError`.
+ *
+ * `out ?of ?gas` covers all three spellings in the wild: geth's "out of gas", revm/anvil's
+ * `OutOfGas` (one word — the Debug rendering of its error enum, which is why the spaced form in
+ * `REVERT_MESSAGE` misses it), and "outofgas". The `exceeds` alternatives are the pre-flight refusal:
+ * the node declined before executing because the gas asked for is above what it will serve.
+ */
+const GAS_EXHAUSTION_MESSAGE = /out ?of ?gas|gas required exceeds|exceeds .{0,24}gas (limit|cap|allowance)|intrinsic gas too low/i
+
 const NODE_STATE_MESSAGE =
   /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|\bmax(?:imum)? results?\b|response size|limited to (?:an?\s+)?[\d][\d,_]*\s+(?:block\s+)?range/i
 
@@ -502,4 +512,32 @@ export function classifyRpcError(err: unknown): RpcFailureKind {
  */
 export function revertDataOf(err: unknown): Hex | undefined {
   return collectFacts(err).revertData
+}
+
+/**
+ * The node could not execute this REQUEST because of its SIZE — it exhausted the gas an `eth_call`
+ * is allowed to burn, or refused the gas it was asked for. Read it as "ask for less", never as an
+ * answer about anything the request contained.
+ *
+ * DELIBERATELY SEPARATE FROM {@link classifyRpcError}, AND NOT A FOURTH CHANNEL. The three channels
+ * say *whose fault* a failure is (the chain's, the provider's, the block's); this says the request
+ * was the wrong SHAPE, which is orthogonal — the same condition reaches us wearing different
+ * channels depending on the node's dialect:
+ *
+ *   anvil/revm  `InternalRpcError` (-32603), `details: "EVM error OutOfGas"` — the message tier
+ *               reads viem's own "An internal error was received." wrapper as TRANSPORT text, so
+ *               this arrives classified `transport`
+ *   geth        "out of gas" / "gas required exceeds allowance" — matches `REVERT_MESSAGE`, so it
+ *               arrives classified `execution`
+ *
+ * Both are the same fact, and neither channel is wrong about what it was asked. Rather than move
+ * either dialect between channels — which would change what happens to a SINGLE failing call, and in
+ * the anvil case would turn an out-of-gas into a data-less execution revert that `search/pump.ts`
+ * negative-caches as "no pool here" — this is a separate, additive read for the one caller that can
+ * act on it: `internal/multicall.ts`, which answers by halving the batch and asking again. That is
+ * the same move `internal/logScan.ts` already makes when a provider declares an `eth_getLogs` range
+ * cap, for the same reason: a deterministic "too big" is fixed by asking smaller, never by retrying.
+ */
+export function isRequestTooLarge(err: unknown): boolean {
+  return collectFacts(err).messages.some((m) => GAS_EXHAUSTION_MESSAGE.test(m))
 }

@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import * as viem from 'viem'
 import type { Hex } from 'viem'
 
+import { TransportError } from '../errors'
+
 import providerErrors from './__fixtures__/providerErrors.json'
-import { classifyRpcError, parseDeclaredCap, revertDataOf } from './rpcErrors'
+import { classifyRpcError, isRequestTooLarge, parseDeclaredCap, revertDataOf } from './rpcErrors'
 import {
   chainDisconnectedError,
   connectionRefusedError,
@@ -317,6 +319,62 @@ describe('classifyRpcError — evidence depth', () => {
 
   test('a self-referential cause terminates instead of spinning', () => {
     expect(classifyRpcError(selfReferentialError())).toBe('execution')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// C4-T14: `isRequestTooLarge` — the "ask for less" read, deliberately NOT a
+// fourth channel.
+//
+// A node that exhausts its `eth_call` gas cap reaches us wearing a DIFFERENT
+// channel depending on its dialect, and neither channel is wrong: geth says
+// "out of gas" (execution text) and anvil/revm says `OutOfGas` inside viem's
+// "An internal error was received." wrapper, whose "internal error" is transport
+// text. The predicate reads the shape instead, so `internal/multicall.ts` can
+// answer both by halving the batch — and the classification of a SINGLE failing
+// call is left exactly where it was, which matters: moving anvil's spelling into
+// the execution channel would make it a data-less revert, and `search/pump.ts`
+// negative-caches those as "no pool here".
+// ---------------------------------------------------------------------------
+
+describe('isRequestTooLarge — "the request was too big", independent of channel', () => {
+  /** The real shape, captured off anvil 1.7.1 during the C4-T14 fork run (a warm-index ETH -> USDC
+   * search whose 39-quote envelope exceeded the cap). Reproduced verbatim, wrapper text included. */
+  const anvilOutOfGas = (): Error =>
+    Object.assign(new Error('An internal error was received.\n\nDetails: EVM error OutOfGas\nVersion: viem@2.x'), {
+      name: 'InternalRpcError',
+      code: -32603,
+      details: 'EVM error OutOfGas',
+    })
+
+  test("anvil's one-word OutOfGas is recognized — the spelling `REVERT_MESSAGE`'s spaced `out of gas` misses", () => {
+    expect(isRequestTooLarge(anvilOutOfGas())).toBe(true)
+    // ...and its CHANNEL is deliberately untouched. This assertion is the guard on the decision not
+    // to fix this in `classifyRpcError`: were it to become `execution`, a single out-of-gas quote
+    // would look like a data-less revert and be cached as a pool that does not exist.
+    expect(classifyRpcError(anvilOutOfGas())).toBe('transport')
+  })
+
+  test("geth's dialects are recognized too, and they stay in the execution channel", () => {
+    expect(isRequestTooLarge(new Error('out of gas'))).toBe(true)
+    expect(isRequestTooLarge(new Error('gas required exceeds allowance (30000000)'))).toBe(true)
+    expect(isRequestTooLarge(new Error('intrinsic gas too low'))).toBe(true)
+    expect(classifyRpcError(new Error('out of gas'))).toBe('execution')
+  })
+
+  test('it walks the cause chain, so a TransportError-wrapped node error is still recognized', () => {
+    // The shape `multicall.ts` actually sees: `ethCall` has already wrapped the node's error, since
+    // this dialect classified as transport on the way through.
+    expect(isRequestTooLarge(new TransportError('eth_call failed in the transport', { cause: anvilOutOfGas() }))).toBe(true)
+  })
+
+  test('ordinary failures are NOT "too large" — a 429 must never trigger more requests', () => {
+    expect(isRequestTooLarge(rateLimitHttpError())).toBe(false)
+    expect(isRequestTooLarge(new Error('execution reverted'))).toBe(false)
+    expect(isRequestTooLarge(new Error('header not found'))).toBe(false)
+    expect(isRequestTooLarge(new Error('NotEnoughLiquidity()'))).toBe(false)
+    // The word "gas" alone is not the signal — a revert reason may mention it freely.
+    expect(isRequestTooLarge(new Error('reverted: gas price too high'))).toBe(false)
   })
 })
 

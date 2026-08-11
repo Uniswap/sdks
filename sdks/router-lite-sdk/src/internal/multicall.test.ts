@@ -37,6 +37,12 @@ type StubOptions = {
   /** Serve direct (non-aggregate3) eth_calls from this table; absent → loud stub error. */
   direct?: Record<string, Hex | Error>
   onOuterCall?: (to: string, innerCount: number, blockTag: string) => void
+  /**
+   * Fail the OUTER call as a function of what the envelope is CARRYING, rather than by position —
+   * the only way to script a node whose behaviour depends on batch size or contents, which is
+   * exactly what bisection exists to survive. Returning `undefined` serves the envelope normally.
+   */
+  outerFailsWhen?: (inner: { target: string; callData: string }[]) => Error | undefined
 }
 
 function innerKey(target: string, callData: string): string {
@@ -61,6 +67,7 @@ function stubMulticallClient(script: InnerScript, opts: StubOptions = {}): {
       }
       if (isAggregate) {
         const outcome = opts.outerOutcomes?.[outerIndex++] ?? 'serve'
+        let carried: { target: string; callData: string }[] = []
         // The envelope is decoded (and its Call3 fields verified) even when the outcome is a
         // failure, so `outerCalls` records what a 429'd chunk was CARRYING — which is what the
         // chunk-correlation assertions are about.
@@ -69,6 +76,7 @@ function stubMulticallClient(script: InnerScript, opts: StubOptions = {}): {
           blockTag,
           expectBlockNumber: BLOCK,
           onEnvelope: (inner) => {
+            carried = inner.map((c) => ({ target: c.target, callData: c.callData }))
             outerCalls.push({ to: (to as string).toLowerCase(), targets: inner.map((c) => c.target) })
             opts.onOuterCall?.((to as string).toLowerCase(), inner.length, blockTag)
           },
@@ -81,6 +89,8 @@ function stubMulticallClient(script: InnerScript, opts: StubOptions = {}): {
           },
         })
         if (outcome instanceof Error) throw outcome
+        const contentFailure = opts.outerFailsWhen?.(carried)
+        if (contentFailure !== undefined) throw contentFailure
         if (outcome !== 'serve') return outcome.garbage
         return served
       }
@@ -192,15 +202,19 @@ test('a node-state outer failure stays a NodeStateError (TransportError subclass
   expect(results[0]).toBeInstanceOf(NodeStateError)
 })
 
-test('an execution-shaped OUTER failure is NOT believed as N on-chain reverts: coarsened to TransportError', async () => {
+test('an execution-shaped OUTER failure is NOT believed as N on-chain reverts: bisected, then coarsened to TransportError', async () => {
   // aggregate3 with allowFailure never reverts for an inner call's sake, so an outer revert is an
   // aggregator anomaly. Fanning it out as InnerCallFailures would fabricate negative-cacheable
   // evidence about every route in the chunk — C4-H1 with a new spelling.
+  //
+  // Since C4-T14 the chunk is re-asked in halves first (`shouldBisect`), so a failure that really is
+  // about the whole envelope has to persist all the way down to size 1 before anything is written
+  // off. Here every envelope fails, so it does — and the write-off is the same one it always was.
   const calls = [call(0), call(1)]
   const script: InnerScript = {}
   calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
   const outerRevert = Object.assign(new Error('execution reverted'), { data: '0xdeadbeef' })
-  const { client } = stubMulticallClient(script, { outerOutcomes: [outerRevert] })
+  const { client, outerCalls } = stubMulticallClient(script, { outerFailsWhen: () => outerRevert })
 
   const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
 
@@ -209,6 +223,110 @@ test('an execution-shaped OUTER failure is NOT believed as N on-chain reverts: c
     expect(r).not.toBeInstanceOf(InnerCallFailure)
     expect((r as TransportError).cause).toBe(outerRevert)
   }
+  // The full binary tree, and no more: the root plus one envelope per call. This is what pins
+  // TERMINATION — an off-by-one in the split (a half that never shrinks) would hang the test rather
+  // than fail it, so the count is the assertion that says the recursion bottomed out.
+  expect(outerCalls).toHaveLength(2 * calls.length - 1)
+})
+
+test('a node gas cap: the chunk is halved until the batch fits, and every call still gets its real answer', async () => {
+  // THE FIX'S REASON FOR EXISTING (C4-T14, found by `integration/swap.fork.test.ts`). A node applies
+  // a gas cap to the OUTER eth_call, so an envelope carrying too many expensive quoter simulations
+  // dies as a whole — deterministically, which is why the engine's ordinary retry cannot help: it
+  // re-sends the identical oversized batch. Modelled here as "more than two inner calls is too
+  // many"; the real one was ~39 v3/v4 quotes against anvil's cap.
+  //
+  // The anvil/revm spelling is used verbatim, including viem's wrapper text, because that shape is
+  // classified TRANSPORT (its "An internal error was received." trips the transport message tier) —
+  // so this test also pins that bisection keys on `isRequestTooLarge`'s shape read rather than on
+  // the channel, which is the whole reason the predicate is separate from `classifyRpcError`.
+  const calls = Array.from({ length: 7 }, (_, i) => call(i))
+  const script: InnerScript = {}
+  calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
+  const outOfGas = Object.assign(new Error('An internal error was received.\n\nDetails: EVM error OutOfGas'), {
+    name: 'InternalRpcError',
+    code: -32603,
+  })
+  const { client, outerCalls } = stubMulticallClient(script, {
+    outerFailsWhen: (inner) => (inner.length > 2 ? outOfGas : undefined),
+  })
+
+  const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
+
+  // Nothing is lost. Before the fix all seven came back as TransportError and the search reported
+  // `rpc-degraded` over a round the node was perfectly able to answer.
+  results.forEach((r, i) => expect(r).toBe(toHex(`result-${i}`)))
+  // It really did have to split — and every envelope that finally landed was within the cap.
+  expect(outerCalls.length).toBeGreaterThan(1)
+  for (const { targets } of outerCalls.filter((_, i) => i > 0)) expect(targets.length).toBeLessThanOrEqual(4)
+})
+
+test('bisection isolates ONE poison call: it alone is written off, the rest of the chunk keeps its answers', async () => {
+  // The other half of what halving buys. A single inner call that makes the envelope fail (a quote
+  // so expensive it alone exhausts the cap) used to cost every candidate in the chunk. Now the
+  // damage is bounded to the call that caused it, and the search stays complete over the others —
+  // the difference between one unmeasured leg and a whole `rpc-degraded` round.
+  const calls = Array.from({ length: 8 }, (_, i) => call(i))
+  const script: InnerScript = {}
+  calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
+  const poison = calls[3]!.data
+  const outerRevert = Object.assign(new Error('execution reverted'), { data: '0xdeadbeef' })
+  const { client } = stubMulticallClient(script, {
+    outerFailsWhen: (inner) => (inner.some((c) => c.callData === poison) ? outerRevert : undefined),
+  })
+
+  const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
+
+  results.forEach((r, i) => {
+    if (i === 3) {
+      expect(r).toBeInstanceOf(TransportError)
+      // Still never an InnerCallFailure: the envelope failed, so nothing on-chain was learned about
+      // this call either, and it must not become negative-cacheable evidence.
+      expect(r).not.toBeInstanceOf(InnerCallFailure)
+    } else {
+      expect(r).toBe(toHex(`result-${i}`))
+    }
+  })
+})
+
+test('a TRANSPORT outer failure is never bisected: one envelope on the wire, not two', async () => {
+  // The guard rail on the whole idea. A 429 means the provider is already under more load than it
+  // wants; answering it by turning one request into two, then four, is the opposite of the fix.
+  // Only DETERMINISTIC envelope failures are re-asked — a transport failure keeps the write-off, and
+  // the request count is what proves it rather than the result shape (which is the same either way).
+  const calls = Array.from({ length: 6 }, (_, i) => call(i))
+  const script: InnerScript = {}
+  calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
+  const throttled = rateLimitHttpError()
+  const { client, outerCalls } = stubMulticallClient(script, { outerFailsWhen: () => throttled })
+
+  const results = await aggregateCalls({ client, multicall3: MULTICALL3_ADDRESS, calls, blockNumber: BLOCK })
+
+  for (const r of results) expect(r).toBeInstanceOf(TransportError)
+  expect(outerCalls).toHaveLength(1)
+})
+
+test('an ABORTED chunk is never bisected either: the caller already gave up', async () => {
+  // Same reasoning as `ethCall` checking the signal with the permit in hand. An abort is not a
+  // statement about the envelope's size, and bisecting one would put requests on the wire that the
+  // search has already stopped waiting for.
+  const calls = Array.from({ length: 4 }, (_, i) => call(i))
+  const script: InnerScript = {}
+  calls.forEach((c, i) => (script[innerKey(c.to, c.data)] = ok(i)))
+  const controller = new AbortController()
+  controller.abort()
+  const { client, outerCalls } = stubMulticallClient(script)
+
+  const results = await aggregateCalls({
+    client,
+    multicall3: MULTICALL3_ADDRESS,
+    calls,
+    blockNumber: BLOCK,
+    signal: controller.signal,
+  })
+
+  for (const r of results) expect(r).toBeInstanceOf(AbortedCallError)
+  expect(outerCalls).toHaveLength(0)
 })
 
 test('outer return data that does not decode as Result[] is the same coarsening, never a crash', async () => {
