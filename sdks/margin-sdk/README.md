@@ -1,9 +1,9 @@
 # @uniswap/margin-sdk
 
 A framework-agnostic TypeScript SDK for the **Uniswap v4 margin trading periphery**: open, manage,
-and close leveraged spot positions built from a v4 swap composed with a borrow/supply against an
-external lending venue — **Morpho Blue, Aave v3, Aave v4, or Compound v3** — all behind one
-`MarginRouter`.
+and close leveraged spot positions built from a **Universal Router** swap (sourcing v2/v3/v4
+liquidity) composed with a borrow/supply against an external lending venue — **Morpho Blue,
+Aave v3, Aave v4, or Compound v3** — all behind one `MarginRouter`.
 
 The SDK covers:
 
@@ -14,8 +14,11 @@ The SDK covers:
   (Solady clone-with-immutable-args CREATE2) with no RPC round-trip.
 - **Leverage & health math** — decimal-aware position sizing (`sizeIncrease` / `sizeDecrease`),
   leverage↔LTV conversions, health factors, slippage helpers.
+- **Universal Router route builders** — the position swap is a caller-built UR command plan
+  supplied per call; `buildV4ExactOutRoute` covers the canonical single-pool v4 case.
 - **A plan builder** (`MarginPlanner`) for the advanced `execute` entry point: compose v4 routing
-  actions and margin account actions into one atomic flash-accounted plan.
+  actions, `ROUTE_SWAP` Universal Router legs, and margin account actions into one atomic
+  flash-accounted plan.
 - **Read descriptors** that drop into wagmi `useReadContract(s)` / viem `readContract`, identical
   across all lending venues.
 
@@ -25,8 +28,9 @@ Built on [viem](https://viem.sh); no other runtime dependencies.
 
 A margin position is leveraged spot exposure assembled in a single transaction inside one
 `PoolManager` unlock: borrow the **debt** token, swap it into the **collateral** token
-(exact-output), and supply the collateral (your equity plus the bought amount) to the lending
-market. The position is **long the collateral and short the debt** — direction is set entirely by
+(exact-output, routed through the Universal Router you supply per call — so liquidity can come
+from v2, v3, and v4), and supply the collateral (your equity plus the bought amount) to the
+lending market. The position is **long the collateral and short the debt** — direction is set entirely by
 the `(collateral, debt)` pairing, there is no separate flag:
 
 | Goal               | Market                             | Resulting position  |
@@ -50,6 +54,8 @@ npm install @uniswap/margin-sdk viem
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseUnits } from 'viem'
 import { mainnet } from 'viem/chains'
 import {
+  buildV4ExactOutRoute,
+  getMarginAccountAddress,
   getMarginAddresses,
   increasePositionCall,
   parseLeverageX18,
@@ -65,7 +71,6 @@ const walletClient = createWalletClient({ chain: mainnet, transport: custom(wind
 const WETH = addresses.weth9
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const market = { collateral: WETH, debt: USDC } // long WETH, short USDC
-const poolKey = toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 3000, tickSpacing: 60 })
 
 // 1. Size the swap from equity + target leverage. The price MUST come from a real quote
 //    (debt-wei per one whole collateral token), not spot; maxDebtIn is the binding slippage cap.
@@ -78,7 +83,23 @@ const { collateralToBuy, maxDebtIn } = sizeIncrease({
   slippageBps: 50,
 })
 
-// 2. One-time Permit2 setup for the equity token:
+// 2. Build the swap route: a Universal Router command plan that buys collateralToBuy
+//    exact-output and delivers it to YOUR MarginAccount (derived offchain). The single-pool v4
+//    case is one helper call; multi-hop or cross-version routes come from the
+//    universal-router-sdk. The Universal Router is a per-call parameter — pass a deployment with
+//    already-unlocked V4_SWAP support.
+const account = getMarginAccountAddress(mainnet.id, owner, 0n)
+const poolKey = toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 500, tickSpacing: 10 })
+const route = buildV4ExactOutRoute({
+  poolKey,
+  input: USDC, // the debt the router flash-takes and the UR spends
+  output: WETH, // the collateral the route buys
+  amountOut: collateralToBuy,
+  amountInMaximum: maxDebtIn,
+  recipient: account,
+})
+
+// 3. One-time Permit2 setup for the equity token:
 //    ERC20.approve(permit2) then Permit2.approve(token, router).
 await walletClient.writeContract({
   account,
@@ -92,18 +113,20 @@ await walletClient.writeContract({
   ...permit2ApproveCall({ permit2: addresses.permit2, token: WETH, spender: addresses.marginRouter, amount: equity }),
 })
 
-// 3. Simulate (surfaces decoded reverts), then send.
+// 4. Simulate (surfaces decoded reverts), then send.
 const { request } = await publicClient.simulateContract({
-  account,
+  account: owner,
   ...increasePositionCall({
     marginRouter: addresses.marginRouter,
     params: {
       adapter: addresses.lendingAdapters.morphoBlue!,
       market,
-      poolKey,
       equity,
       collateralToBuy,
       maxDebtIn,
+      universalRouter, // your chosen UR deployment (must carry already-unlocked V4_SWAP)
+      routeCommands: route.commands,
+      routeInputs: route.inputs,
       deadline: BigInt(Math.floor(Date.now() / 1000) + 900),
     },
   }),
@@ -145,7 +168,14 @@ Every read also has a pure `*Call` descriptor (e.g. `describePositionCall`, `pos
 ## Close or delever
 
 ```ts
-import { FULL_CLOSE, closePositionCall, decreasePositionCall, sizeDecrease } from '@uniswap/margin-sdk'
+import {
+  FULL_CLOSE,
+  buildV4ExactOutRoute,
+  closePositionCall,
+  decreasePositionCall,
+  sizeDecrease,
+  withSlippageUp,
+} from '@uniswap/margin-sdk'
 
 // Full close: repay all debt, withdraw all collateral, return the residual (realized PnL).
 // Size the collateral cap from the CURRENT debt plus headroom (debt accrues interest).
@@ -155,21 +185,43 @@ const { maxCollateralIn } = sizeDecrease({
   debtDecimals: 6,
   slippageBps: 100,
 })
+// The close route must buy AT LEAST the live debt — buffer the read for interest accrual
+// (over-bought debt is returned to the caller after the unlock).
+const debtToBuy = withSlippageUp(position.debtAmount, 10)
+const closeRoute = buildV4ExactOutRoute({
+  poolKey,
+  input: WETH, // the collateral sold
+  output: USDC, // the debt bought back
+  amountOut: debtToBuy,
+  amountInMaximum: maxCollateralIn,
+  recipient: account,
+})
 const close = closePositionCall({
   marginRouter: addresses.marginRouter,
-  params: { adapter, market, poolKey, maxCollateralIn, deadline },
+  params: {
+    adapter,
+    market,
+    maxCollateralIn,
+    universalRouter,
+    routeCommands: closeRoute.commands,
+    routeInputs: closeRoute.inputs,
+    deadline,
+  },
 })
 
-// Partial delever: repay a fixed amount and bound the resulting LTV (mandatory).
+// Partial delever: repay a fixed amount and bound the resulting LTV (mandatory). The route buys
+// exactly debtToRepay.
 const delever = decreasePositionCall({
   marginRouter: addresses.marginRouter,
   params: {
     adapter,
     market,
-    poolKey,
     debtToRepay: parseUnits('1000', 6),
     maxCollateralIn,
-    maxLtvAfter: parseUnits('0.7', 18), // keep LTV ≤ 70%
+    universalRouter,
+    routeCommands: deleverRoute.commands, // buildV4ExactOutRoute({ ..., amountOut: debtToRepay })
+    routeInputs: deleverRoute.inputs,
+    maxLtvAfter: parseUnits('0.7', 18), // keep LTV ≤ 70%, must sit strictly below 100%
     deadline,
   },
 })
@@ -249,13 +301,23 @@ adapter — nothing else changes:
 
 ```ts
 const shortMarket = { collateral: USDC, debt: WETH }
+const shortRoute = buildV4ExactOutRoute({
+  poolKey, // same USDC/WETH pool — direction comes from input/output
+  input: WETH, // the debt sold on a short open
+  output: USDC, // the collateral bought
+  amountOut: collateralToBuy,
+  amountInMaximum: maxDebtIn,
+  recipient: shortAccount, // getMarginAccountAddress(chainId, owner, 1n)
+})
 const params = {
-  adapter: addresses.lendingAdapters.aaveV3!, // or aaveV4
+  adapter: addresses.lendingAdapters.aaveV3!, // or aaveV4, compoundV3
   market: shortMarket,
-  poolKey, // same USDC/WETH pool
   equity: parseUnits('3000', 6), // ⚠️ USDC decimals now
   collateralToBuy, // 6-decimal USDC
   maxDebtIn, // 18-decimal WETH
+  universalRouter,
+  routeCommands: shortRoute.commands,
+  routeInputs: shortRoute.inputs,
   subId: 1n, // isolate from the long under subId 0
   deadline,
 }
@@ -306,15 +368,16 @@ Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
 
 | Contract                     | Address                                      |
 | ---------------------------- | -------------------------------------------- |
-| MarginRouter                 | `0x0000000004BBC92D0657580CAe35aEBF054E5CDC` |
-| MarginAccount implementation | `0x83Fc96d2B162dAF8532e5677C6Ec32A1Cb7882E4` |
-| MorphoLendingAdapter         | `0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa` |
-| AaveLendingAdapter (v3)      | `0x8EeacdB24c7650478496845A61f03fF6BC263222` |
-| AaveV4LendingAdapter         | `0x3a9Cc5eEbAC911E5a316de1F2bCD166016d7469E` |
+| MarginRouter                 | `0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0` |
+| MarginAccount implementation | `0x36e5317CEE9F70c0A41A97A4676899Dfe9a10239` |
+| MorphoLendingAdapter         | `0x08e4C6b61D99B6f2AD472c16ECE641F63F5635D5` |
+| AaveLendingAdapter (v3)      | `0x2c0bDc6786D285665337Ce7d544C8bC80a23A55C` |
+| AaveV4LendingAdapter         | `0xaC98DBcdC8c9f665372BbBE68C6A9123A8CbA6Eb` |
+| CompoundV3LendingAdapter     | `0xAaD2B75B9557748a16216f991613deFE42134c36` |
 
-`CompoundV3LendingAdapter` (the fourth venue upstream, bound to the cUSDCv3 Comet) is not in the
-live mainnet deployment yet, so `lendingAdapters.compoundV3` is absent until it is deployed and
-allowlisted; its ABI ships as `COMPOUND_V3_LENDING_ADAPTER_ABI`.
+The **Universal Router is deliberately not in this table**: it is a per-call parameter of the
+position flows, so callers pick the deployment their route targets. It must carry already-unlocked
+`V4_SWAP` support (universal-router PR #491) — deployments that predate it revert.
 
 The SDK's ABIs, selectors, and account derivation are test-anchored against this live deployment
 (see `src/*.test.ts`).
@@ -361,12 +424,12 @@ bun run demo
 
 All SDK validation throws `MarginSdkError` with a stable `code`
 (`INVALID_LEVERAGE`, `INVALID_AMOUNT`, `AMOUNT_OVERFLOW`, `SLIPPAGE_BOUND_REQUIRED`,
-`MARKET_MISMATCH`, `INVALID_PLAN`, …) — catch with `isMarginSdkError` and forward. Onchain reverts
-(`SlippageBoundRequired`, `ZeroAmount`, `PositionUnhealthy`, `AdapterNotAllowed`,
+`INEFFECTIVE_LTV_BOUND`, `UNIVERSAL_ROUTER_REQUIRED`, `MARKET_MISMATCH`, `INVALID_PLAN`, …) —
+catch with `isMarginSdkError` and forward. Onchain reverts (`SlippageBoundRequired`, `ZeroAmount`,
+`IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`, `AdapterNotAllowed`,
 `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`, …) are declared in
 `MARGIN_ROUTER_ABI`, so viem's `simulateContract` decodes them into readable messages — always
-simulate before writing. (`ZeroAmount` is new in current v4-periphery source; the live mainnet
-router predates it and still reverts zero-amount inputs with `SlippageBoundRequired`.)
+simulate before writing.
 
 ## Reference
 
