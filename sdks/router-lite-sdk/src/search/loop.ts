@@ -265,19 +265,27 @@ function reportSignature(state: SearchState, ctx: SearchContext, req: QuoteReque
 /**
  * Grows `state.intermediates.selected` by one batch (`MAX_INTERMEDIATES`) from the pump's discovered
  * ordering — hinted → cores → newest-touching-pool — and refreshes `discovered` from the same walk,
- * so the selected/discovered ratio always describes one look at the index. Returns whether anything
- * was selected; a frontier at the eligible limit is a no-op, which is also the loop's termination
- * predicate for this dimension (`selected.length >= discovered`).
+ * so the selected/discovered ratio always describes one look at the index.
+ *
+ * Returns whether the frontier's OBSERVABLE STATE moved — a selection, or a `discovered` shift —
+ * and the caller pokes on either. A selection makes new legs due, which is the obvious wake; the
+ * shift arm exists for the quieter hazard: the shared index can SHRINK under this search (a
+ * concurrent search's upserts evicting never-quoted pools under `maxPools`) without touching this
+ * search's `indexVersion`, so the pump stays clean and the termination check keeps reading the last
+ * planning pass's `discovered` — stale-high. That check runs BEFORE this refresh in the cycle, so a
+ * refresh-down that selected nothing must still wake the loop once, or a search whose sources have
+ * all settled parks one comparison short of `final`, forever.
  *
  * Called once BEFORE the first pump cycle (the seed — a cold two-hop must not wait for a dry cycle
- * to learn that cores exist) and once per dry cycle thereafter.
+ * to learn that cores exist) and once per quiet dry cycle thereafter.
  */
 function advanceIntermediates(state: SearchState, ctx: PumpCtx, req: QuoteRequest): boolean {
   const ordered = orderedIntermediates(ctx, req)
+  const shifted = state.intermediates.discovered !== ordered.length
   state.intermediates.discovered = ordered.length
   const have = new Set(state.intermediates.selected)
   const batch = ordered.filter((node) => !have.has(node)).slice(0, MAX_INTERMEDIATES)
-  if (batch.length === 0) return false
+  if (batch.length === 0) return shifted
   state.intermediates.selected.push(...batch)
   state.intermediates.notch++
   return true
@@ -445,6 +453,10 @@ export async function* search(
       // preflight is still answering.
       if (dry && readinessSettled() && (verifier?.idle() ?? true)) {
         worker.demandFull() // the gate — the ONLY writer of state.gateOpened, idempotent
+        // Poked on a selection AND on a bare `discovered` refresh: the termination check above read
+        // the pre-refresh value, and if the eligible set shrank under this search (cross-search
+        // eviction) that read was stale-high with nothing else left to wake the loop — see
+        // {@link advanceIntermediates}. A spurious poke coalesces and costs one O(1) cycle.
         if (advanceIntermediates(state, pumpCtx, req)) wake.poke()
       }
       if (dispatched) wake.poke() // this round's outcomes may have made new legs due

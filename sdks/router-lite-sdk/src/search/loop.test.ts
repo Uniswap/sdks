@@ -184,8 +184,8 @@ type ServedLog = { scope: 'pair' | 'adjacency' | 'other'; from: bigint; to: bigi
 
 function makeClient(
   opts: {
-    logs?: (q: { from: bigint; to: bigint }) => Log[] | Promise<Log[]>
-    preflight?: () => void
+    logs?: (q: { from: bigint; to: bigint; scope: ServedLog['scope'] }) => Log[] | Promise<Log[]>
+    preflight?: () => void | Promise<void>
   } = {},
 ): { client: Pick<PublicClient, 'request'>; served: ServedLog[]; preflights: () => number } {
   const served: ServedLog[] = []
@@ -204,13 +204,13 @@ function makeClient(
         const topic0 = Array.isArray(filter.topics[0]) ? (filter.topics[0] as string[]) : [filter.topics[0] as string]
         const scope = topic0.includes(V4_TOPIC) ? 'pair' : topic0.includes(V2_TOPIC) ? 'adjacency' : 'other'
         served.push({ scope, from, to })
-        return (await opts.logs?.({ from, to })) ?? []
+        return (await opts.logs?.({ from, to, scope })) ?? []
       }
       if (method === 'eth_call') {
         const to = ((params[0] as { to: string }).to ?? '').toLowerCase()
         if (to === UR.toLowerCase()) {
           preflights++
-          opts.preflight?.()
+          await opts.preflight?.()
           return '0x'
         }
         // The readiness reads: balanceOf/allowance on the token, allowance on Permit2 — all
@@ -570,6 +570,138 @@ test('a pool only the eager pair scan can find still routes', async () => {
     }
     if (e.type === 'final') throw new Error('the scanned pool never led')
   }
+})
+
+// ---------------------------------------------------------------------------
+// Regression: cross-search frontier shrink must not park the loop one
+// comparison short of final.
+//
+// The termination check reads `state.intermediates.discovered` — last written
+// by a planning pass — while a CONCURRENT search's upserts can evict this
+// search's never-quoted neighbor pools under `maxPools` WITHOUT touching this
+// search's `indexVersion`. The pump then stays clean (O(1) exit, no re-plan),
+// the termination check reads the stale-high `discovered`, fails, and the
+// advance that follows refreshes `discovered` down while selecting nothing.
+// Before the fix that advance returned false without poking, and — with
+// sources settled and the verifier idle — nothing ever woke the loop again:
+// the iterator hung forever, no final.
+//
+// Reaching the stale window deterministically needs a swap (only a busy
+// verifier suppresses the quiet-gate advance that would otherwise re-refresh
+// `discovered` every dry cycle):
+//   1. no candidates at launch -> the first quiet dry cycle opens the gate;
+//   2. adjacency query #1 delivers the direct pool + X-pair pools (raising
+//      `discovered` past `selected`) while query #2 is held, keeping the
+//      worker unsettled; the direct pool's lead puts a HELD preflight in
+//      flight, so no later cycle is quiet;
+//   3. query #2 is released -> the worker converges and settles while the
+//      verifier is still busy (no advance runs);
+//   4. the eligible set shrinks (simulated eviction), then the preflight
+//      settles -> the wake's termination check reads the stale `discovered`.
+// ---------------------------------------------------------------------------
+
+test('termination survives a cross-search frontier shrink while parked quiet (stale discovered > selected)', async () => {
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const index = new PoolIndex(WETH)
+
+  // The direct pool and 4 X-pair pools arrive ONLY via the adjacency scan.
+  const direct = newPool(undefined, world, T_IN, T_OUT)
+  const scanned: PoolRef[] = [direct]
+  for (let i = 0; i < 4; i++) {
+    const x = addr(0xd100 + i)
+    scanned.push(newPool(undefined, world, T_IN, x), newPool(undefined, world, x, T_OUT))
+  }
+  const scanLogsPayload = scanned.map(
+    (pool) =>
+      ({
+        address: V2_FACTORY,
+        topics: [V2_TOPIC],
+        data: '0x',
+        blockNumber: 10n,
+        record: { pool, createdAtBlock: 10n, source: 'event' },
+      }) as unknown as Log,
+  )
+
+  let releaseHeldScan!: () => void
+  const heldScan = new Promise<void>((resolve) => (releaseHeldScan = resolve))
+  let releasePreflight!: () => void
+  const heldPreflight = new Promise<void>((resolve) => (releasePreflight = resolve))
+
+  let adjacencyCalls = 0
+  const { client } = makeClient({
+    logs: async ({ scope }) => {
+      if (scope !== 'adjacency') return []
+      adjacencyCalls++
+      if (adjacencyCalls === 1) return scanLogsPayload // query #1: the pools land, discovered rises
+      await heldScan // query #2: held, so the worker cannot settle yet
+      return []
+    },
+    preflight: () => heldPreflight, // the verifier stays busy, suppressing the quiet-gate advance
+  })
+  const ctx = ctxOf(client, manifest, world, { index })
+  // The scan-ingest channel: this test's v2 module parses pool logs (the default fake drops them).
+  ctx.modules = {
+    ...ctx.modules,
+    v2: { ...ctx.modules.v2, parsePoolLog: (log) => (log as Log & { record?: PoolRecord }).record ?? null },
+  }
+  const req: SwapRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n, trader: TRADER }
+  const gen = search(ctx, req, 'swap')
+
+  // Phase 1: the scanned direct pool leads (unverified; its preflight is now held in flight), and
+  // the planning pass that priced it recorded the wide frontier.
+  let evt = await gen.next()
+  while (!evt.done && evt.value!.type !== 'lead') evt = await gen.next()
+  if (evt.done || evt.value!.type !== 'lead') throw new Error('no lead from the scanned pool')
+  const state = evt.value!.state
+  expect(evt.value!.ranked[0]!.route.legs[0]!.pool.id).toBe(direct.id)
+  expect(state.intermediates.discovered).toBe(5) // WETH core + 4 X
+  expect(state.intermediates.selected.length).toBe(1) // the seed alone — every later dry cycle was unquiet
+
+  // Phase 2: let the worker converge and settle while the verifier is still busy.
+  const untilSettled = gen.next()
+  releaseHeldScan()
+  let settled = await untilSettled
+  while (
+    !settled.done &&
+    !(state.discovery.v2.complete.has(T_IN.toLowerCase()) && state.discovery.v2.complete.has(T_OUT.toLowerCase()))
+  ) {
+    settled = await gen.next()
+  }
+  expect(settled.done).toBe(false)
+  expect(state.intermediates.discovered).toBe(5) // still wide, still > selected
+
+  // Phase 3: park the loop, then shrink the eligible set out from under it — the observable effect
+  // of a concurrent search's upserts evicting these never-quoted pools under `maxPools`: the
+  // neighbor intersection empties and NOTHING bumps this search's indexVersion.
+  const untilVerified = gen.next()
+  await ticks(5) // let the loop park on wake.next()
+  const noNeighbors = () => new Map<string, never>()
+  ;(index as unknown as { neighbors: typeof noNeighbors }).neighbors = noNeighbors
+
+  // Phase 4: the preflight settles. Its wake's termination check reads the STALE discovered (5 > 1)
+  // and fails; the advance then refreshes discovered down and selects nothing.
+  releasePreflight()
+  const lead = await untilVerified
+  expect(lead.done).toBe(false)
+  expect(lead.value!.type).toBe('lead')
+  if (lead.value!.type !== 'lead') throw new Error('unreachable')
+  expect(lead.value!.ranked[0]!.execution).toBe('verified')
+  expect(state.intermediates.discovered).toBe(5) // the stale value the termination check just read
+
+  // THE REGRESSION: the next pull must reach final, not park forever.
+  const outcome = await Promise.race([
+    gen.next(),
+    ticks(100).then(() => 'hung' as const),
+  ])
+  expect(outcome).not.toBe('hung')
+  if (outcome === 'hung') throw new Error('unreachable')
+  expect(outcome.done).toBe(false)
+  expect(outcome.value!.type).toBe('final')
+  if (outcome.value!.type !== 'final') throw new Error('unreachable')
+  expect(outcome.value!.state.aborted).toBe(false)
+  expect(outcome.value!.state.intermediates.discovered).toBe(1) // healed by the advance
+  expect((await gen.next()).done).toBe(true)
 })
 
 test('RpcUnavailableError from the pinned-block fetch propagates', async () => {
