@@ -822,8 +822,11 @@ function bruteBest(built: BuiltWorld, amountIn: bigint): bigint | undefined {
 }
 
 test('property: dominance under partial failure — the best composed route equals the brute-force best over everything that actually priced', async () => {
-  /** Set on any run where a two-hop's BEST in-leg reverted and the world still composed a route —
-   * the specific interleaving this property exists for, where `mX` has to fall back to a survivor. */
+  /** Set on any run where SOME in-leg of a two-hop died while another survived and the world still
+   * composed a route — the partial-failure interleaving this property exists for, where `mX` is a
+   * survivor's amount. (Deliberately weaker than "the BEST in-leg died": a reverted leg has no
+   * hypothetical price to compare against, so "the dead one would have won" is not decidable from
+   * the world spec — the guard pins that partial failure was exercised at all, not which leg lost.) */
   let sawSurvivorFallback = false
 
   await fc.assert(

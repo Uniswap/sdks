@@ -105,6 +105,14 @@ const V3_TICK_SPACING: Record<number, number> = { 100: 1, 500: 10, 3000: 60, 100
 
 export type World = ReturnType<typeof createWorld>
 
+/**
+ * `liquidity` is a REQUEST, not a setting (for v4 pools too — same `fullRangeAmounts` path): the
+ * position manager mints whatever L the supplied token amounts support, and those amounts carry
+ * ~2% headroom (see {@link fullRangeAmounts}), so the pool's actual liquidity lands anywhere in
+ * roughly `[liquidity, liquidity * 1.02]`. Tests must treat outputs derived from it as
+ * approximate (compare against on-chain quotes, or use tolerances), never recompute exact
+ * amounts from the requested L.
+ */
 export type V3PoolOptions = { liquidity: bigint; priceApprox: number }
 
 export type V4PoolOptions = {
@@ -351,7 +359,8 @@ export function createWorld(anvil: AnvilClient) {
 
   /**
    * Create (or reuse) a v3 pool at `fee`, initialize it at `priceApprox`, and add a full-range
-   * position of ~`liquidity` through the real NonfungiblePositionManager.
+   * position of ~`liquidity` through the real NonfungiblePositionManager — "~" is load-bearing;
+   * see {@link V3PoolOptions} for why the minted L can run up to ~2% over the request.
    *
    * `priceApprox` is the raw-unit price of `b` per one `a` — i.e. the number the caller thinks in,
    * before sorting; the harness flips it if `a` turns out to be token1.

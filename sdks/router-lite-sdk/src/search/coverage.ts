@@ -14,6 +14,7 @@ import { PROTOCOLS } from '../types'
 
 import { planAdjacencyScans, scopeKey } from './adjacencyPlan'
 import type { ScopeDemand } from './adjacencyPlan'
+import { createNotifier } from './notify'
 import type { Notifier } from './notify'
 import { applyCoverage } from './state'
 import type { SearchState } from './state'
@@ -397,7 +398,9 @@ export class CoverageWorker {
    * outcome per real transition rather than one per settle. `applyCoverage` is idempotent for the
    * STATE either way; this is about the outcome log golden replays are built from. */
   private readonly reported = new Set<string>()
-  /** Poked when demand widens — the only thing that re-arms a settled `run()`. */
+  /** Poked when demand widens — the only thing that re-arms a settled `run()`. Its own private
+   * notifier, NOT the search's `wake`: this is the worker's internal demand-widened channel, and
+   * poking the search for it would cost a full loop cycle per widening for nothing. */
   private readonly widened: Notifier
   /**
    * Bumped by every widening. A pass SNAPSHOTS it and a zero-progress pass compares before it
@@ -428,7 +431,7 @@ export class CoverageWorker {
         ctx.wake.poke()
       },
     }
-    this.widened = makeLatch()
+    this.widened = createNotifier()
     this.scopes = this.buildScopes(req)
   }
 
@@ -656,37 +659,6 @@ export class CoverageWorker {
         applyCoverage(this.state, s.protocol, s.scope.toLowerCase(), { kind: 'failed' })
       }
     }
-  }
-}
-
-/**
- * A one-shot-per-wait latch: `poke` before a `next()` is remembered, so `demandFull()` can never
- * land in the window between two passes and be lost. Deliberately the same shape as
- * `notify.ts#createNotifier`, and it stays private here because it is the worker's internal
- * demand-widened channel, not the search's wake.
- */
-function makeLatch(): Notifier {
-  let pending = false
-  let waiters: (() => void)[] = []
-  return {
-    poke() {
-      if (waiters.length > 0) {
-        const toWake = waiters
-        waiters = []
-        for (const wake of toWake) wake()
-      } else {
-        pending = true
-      }
-    },
-    next() {
-      if (pending) {
-        pending = false
-        return Promise.resolve()
-      }
-      return new Promise<void>((resolve) => {
-        waiters.push(resolve)
-      })
-    },
   }
 }
 
