@@ -14,6 +14,20 @@ import { mainnet } from 'viem/chains'
 // matrix referenced throughout the suite (Alchemy / Infura / a public node,
 // in whatever order the caller assigns them) — `_2`/`_3` are optional and
 // only light up the cross-provider tests when present.
+//
+// RESOLUTION + FRESHNESS. Every file under `canary/` imports the SDK by package name
+// (`@uniswap/router-lite-sdk`[`/experimental`]), which the workspace symlinks to this package's own
+// root — so it resolves through `package.json`'s `exports` map to `dist/`, not `src/`, unlike
+// `cli/`, which always runs the working tree's source with no build step (see `README.md`'s
+// "Development" section). That means canary tests the SHIPPED ARTIFACT, which is the point (it is
+// the closest thing to what a real consumer gets) but it also means canary silently tests WHATEVER
+// WAS LAST BUILT, not necessarily the working tree, if `dist/` is stale. CI's own workflow
+// (`.github/workflows/router-lite-canary.yml`) always runs `bun run g:build` immediately before the
+// canary test step, so the nightly/on-demand run is guaranteed fresh. Running canary LOCALLY after
+// editing `src/` has no such guarantee — `bun test canary` does not rebuild first — so rebuild
+// (`bun run build` here, or `bun run g:build` from the repo root) before trusting a local canary run
+// against a source change; otherwise a stale `dist/` can make new test assertions pass or fail
+// against old behavior with no signal that anything is out of date.
 // ---------------------------------------------------------------------------
 
 const RPC_ENV_VARS = ['CANARY_RPC_URL_1', 'CANARY_RPC_URL_2', 'CANARY_RPC_URL_3'] as const

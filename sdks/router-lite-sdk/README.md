@@ -812,6 +812,9 @@ Three private workspaces sit beside `src/`, none of them published:
 
 - **`integration/`** — anvil-fork integration suite (opt-in via `ROUTER_LITE_FORK=1`).
 - **`canary/`** — live-RPC nightly canary over `eth_simulateV1` (opt-in via `ROUTER_LITE_CANARY=1`).
+  Imports the SDK by package name, resolving through `dist/` rather than `src/` (unlike `cli/`
+  below) — CI always rebuilds before running it, but a local run after editing `src/` needs a
+  rebuild first too, or it silently tests the last build. See `canary/env.ts`'s header.
 - **`cli/`** — a local-testing CLI (`ETH_RPC_URL=… bun cli/rl.ts quote eth usdc 1`, or e.g.
   `chainz exec 1 -- bun cli/rl.ts quote eth usdc 1`) that runs the SDK straight from `src/` with
   no build step: quotes, swaps (with an `eth_simulateV1` execution proof), per-token pool
