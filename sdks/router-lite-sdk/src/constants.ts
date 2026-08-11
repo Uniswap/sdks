@@ -191,6 +191,10 @@ export const MAX_INTERMEDIATES = 8
 /** Max pools measured on one pair. policy — abuse backstop against pool-spam pairs, not a selection cap. */
 export const MEASUREMENT_PAIR_CEILING = 128
 
+/** Max legs one pump cycle dispatches in a single measurement round. policy — keeps one round under
+ * ~8 aggregate3 chunks (`MULTICALL_CHUNK` = 50); leftover due legs stay due for the next cycle. */
+export const PUMP_ROUND_CAP = 400
+
 /**
  * Max route candidates quoted in a single search (C4-P7) — DERIVED, never a bare literal, so it can
  * never silently drift out of sync with the caps that actually generate candidates.
