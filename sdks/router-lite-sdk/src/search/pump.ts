@@ -216,6 +216,20 @@ function stampHookData(leg: RouteLeg, hookData: Map<string, Hex>): RouteLeg {
 }
 
 /**
+ * The pump's private memo of its last {@link orderedIntermediates} walk, keyed (like the cursor
+ * above) OFF the shared state rather than on it: a derivation cache, not search knowledge — a
+ * replayed outcome log must not need to reproduce it.
+ *
+ * `indexPoolsVersion` is `PoolIndex.version()` — the INDEX's own mutation counter, not this
+ * search's `state.indexVersion` — because the walk's only non-constant input is the index's pool
+ * set, and that set moves under CONCURRENT searches (upserts, `maxPools` evictions) in ways a
+ * per-search counter never sees. `reqKey` guards a ctx reused across requests (unit pumps).
+ */
+type IntermediatesMemo = { indexPoolsVersion: number; reqKey: string; ordered: string[] }
+
+const intermediatesMemos = new WeakMap<PumpCtx, IntermediatesMemo>()
+
+/**
  * The pump's discovered intermediates ordering — hinted tokens, then manifest cores, then
  * neighbor-intersection nodes newest-touching-pool first — which is the one selection heuristic that
  * survives from the old enumeration (spec §3.2: a measurement-based ordering is dimensionally
@@ -224,11 +238,30 @@ function stampHookData(leg: RouteLeg, hookData: Map<string, Hex>): RouteLeg {
  *
  * Endpoints are excluded (a token is never its own intermediate) and the list is deduped, so
  * `selected.length === discovered` really does mean "everything eligible is selected".
+ *
+ * MEMOIZED ON `PoolIndex.version()`, AND THE MEMO IS WHY BUDGETS BIND (S1, profiled live on the
+ * Base AERO→USDC whale): this walk runs once per planning pass, a planning pass runs once per
+ * settled measurement envelope, and against a warm dense-endpoint index the un-memoized walk
+ * (`index.neighbors(tokenOut)` materializing every record of every adjacent node) measured 13.4s
+ * of a 14s search — a synchronous burn between abort checks that a 10s budget could never
+ * interrupt (observed live at 44-325s finishes on 10s budgets). Every input except the index is
+ * per-search-constant (hints, cores, endpoints), so the ONE thing that can invalidate the ordering
+ * is the index's pool set — exactly what `version()` counts, across every search sharing the
+ * index. The recompute itself is also restructured from O(max-degree) record materialization to
+ * O(min-degree) key intersection ({@link PoolIndex.commonNeighborNodes}) plus per-common-node
+ * `pair()` reads, so even an invalidation storm (a cold scan upserting per chunk) pays
+ * milliseconds, not seconds.
  */
 export function orderedIntermediates(ctx: PumpCtx, req: QuoteRequest): string[] {
   const wrappedNative = ctx.manifest.wrappedNative
   const inNode = toGraphNode(req.tokenIn, wrappedNative)
   const outNode = toGraphNode(req.tokenOut, wrappedNative)
+
+  const indexPoolsVersion = ctx.index.version()
+  const reqKey = `${inNode}|${outNode}`
+  const memo = intermediatesMemos.get(ctx)
+  if (memo !== undefined && memo.indexPoolsVersion === indexPoolsVersion && memo.reqKey === reqKey) return memo.ordered
+
   const seen = new Set<string>([inNode, outNode])
   const ordered: string[] = []
   const push = (node: string): void => {
@@ -243,19 +276,22 @@ export function orderedIntermediates(ctx: PumpCtx, req: QuoteRequest): string[] 
   }
   for (const core of ctx.manifest.coreIntermediates ?? [wrappedNative]) push(core.toLowerCase())
 
-  const neighborsIn = ctx.index.neighbors(req.tokenIn)
-  const neighborsOut = ctx.index.neighbors(req.tokenOut)
-  const newestOf = (node: string): bigint | undefined => {
+  // Eligible = adjacent to BOTH endpoints (O(min-degree) — see commonNeighborNodes), ranked by the
+  // newest createdAtBlock among the pools linking the node to either endpoint. The newest figure is
+  // precomputed per node — the sort's comparator must never re-derive it, or an n-node sort walks
+  // the records O(n log n) times.
+  const eligible = ctx.index.commonNeighborNodes(req.tokenIn, req.tokenOut).filter((node) => !seen.has(node))
+  const newestByNode = new Map<string, bigint | undefined>()
+  for (const node of eligible) {
     let best: bigint | undefined
-    for (const rec of [...(neighborsIn.get(node) ?? []), ...(neighborsOut.get(node) ?? [])]) {
+    for (const rec of [...ctx.index.pair(req.tokenIn, node as Address), ...ctx.index.pair(req.tokenOut, node as Address)]) {
       if (rec.createdAtBlock !== undefined && (best === undefined || rec.createdAtBlock > best)) best = rec.createdAtBlock
     }
-    return best
+    newestByNode.set(node, best)
   }
-  const eligible = [...neighborsIn.keys()].filter((node) => neighborsOut.has(node) && !seen.has(node))
   eligible.sort((a, b) => {
-    const aNewest = newestOf(a)
-    const bNewest = newestOf(b)
+    const aNewest = newestByNode.get(a)
+    const bNewest = newestByNode.get(b)
     if (aNewest !== bNewest) {
       if (aNewest === undefined) return 1
       if (bNewest === undefined) return -1
@@ -264,6 +300,8 @@ export function orderedIntermediates(ctx: PumpCtx, req: QuoteRequest): string[] 
     return a < b ? -1 : a > b ? 1 : 0
   })
   for (const node of eligible) push(node)
+
+  intermediatesMemos.set(ctx, { indexPoolsVersion, reqKey, ordered })
   return ordered
 }
 
@@ -365,6 +403,12 @@ export function planDueLegs(state: SearchState, ctx: PumpCtx, req: QuoteRequest)
 
   planPair(req.tokenIn, req.tokenOut, inNode, req.amountIn, { kind: 'direct' })
   for (const x of state.intermediates.selected) {
+    // The checked yield point that keeps a budget structurally bindable: with the frontier grown to
+    // hundreds of intermediates this loop is the one legitimately long synchronous pass left in a
+    // cycle, and an abort that lands mid-pass must stop costing CPU within one pair's worth of work
+    // — the loop's own abort check only runs between cycles. `pump` re-checks after planning and
+    // never dispatches what a partial pass produced.
+    if (ctx.signal?.aborted === true) break
     if (x === inNode || x === outNode) continue
     planPair(req.tokenIn, x as Address, inNode, req.amountIn, { kind: 'in', x })
     const mx = state.mX.get(x)
@@ -506,6 +550,11 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
   if (cursorClean(state)) return false
 
   const planned = planDueLegs(state, ctx, req)
+  // An abort that landed WHILE planning ran: the plan may be partial (planDueLegs breaks at its
+  // checked yield point), so neither dispatch it — an aborted search never starts a NEW round — nor
+  // record a clean cursor over it. (`Boolean(...)`, not `=== true`: the entry guard above already
+  // narrowed `aborted` to false for the compiler, which cannot see that a signal flips mid-call.)
+  if (state.aborted || Boolean(ctx.signal?.aborted)) return false
   const selectedCount = state.intermediates.selected.length
   if (planned.length === 0) {
     cursors.set(state, { indexVersion: state.indexVersion, selectedCount, dirty: false })

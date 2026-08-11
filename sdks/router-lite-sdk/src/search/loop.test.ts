@@ -601,6 +601,53 @@ test('an abort between wakes emits a final with aborted: true and the best-so-fa
   expect(third.done).toBe(true)
 })
 
+test('a mid-search abort on a pathological world (hundreds of intermediates, thousands of pools) reaches final within bounded ticks', async () => {
+  // The S1 regression shape: a warm, dense index whose frontier discovers hundreds of eligible
+  // intermediates with thousands of pools behind them. Before the intermediates-ordering memo and
+  // planning's checked yield point, every settled envelope re-ran an O(index) planning walk, so an
+  // abort could sit behind tens of seconds of synchronous work before the loop's between-cycle
+  // check ever saw it (live: 10s budgets finishing at 44-325s). The tick race below is the hang
+  // detector: final must arrive within a bounded number of macrotasks of the abort, not after the
+  // backlog drains at its own pace.
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const index = new PoolIndex(WETH)
+  const direct = newPool(index, world, T_IN, T_OUT)
+  for (let i = 0; i < 250; i++) {
+    const x = addr(0xa000 + i)
+    for (let j = 0; j < 4; j++) {
+      newPool(index, world, T_IN, x)
+      newPool(index, world, x, T_OUT)
+    }
+  }
+  const { client } = makeClient()
+  const controller = new AbortController()
+  const ctx = ctxOf(client, manifest, world, { index })
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n, signal: controller.signal }
+
+  const gen = search(ctx, req, 'quote')
+  const first = await gen.next()
+  expect(first.done).toBe(false)
+  expect(first.value!.type).toBe('lead') // the search is live and mid-frontier: 2,001 pools, 250 intermediates discovered
+
+  controller.abort()
+
+  // The drain may emit bounded progress events (the abort flag moves the report; unattempted
+  // settlements move it again) — what is being pinned is that FINAL lands within the tick budget.
+  const drained = await Promise.race([
+    (async () => {
+      for await (const e of gen) if (e.type === 'final') return e
+      throw new Error('the iterator ended without a final')
+    })(),
+    ticks(100).then(() => 'hung' as const),
+  ])
+  expect(drained).not.toBe('hung')
+  if (drained === 'hung') throw new Error('unreachable')
+  expect(drained.state.aborted).toBe(true)
+  // The abort kept what the wire already paid for — the direct route is still the answer.
+  expect(drained.ranked[0]!.route.legs[0]!.pool.id).toBe(direct.id)
+})
+
 // ---------------------------------------------------------------------------
 // The eager slice and the error contract
 // ---------------------------------------------------------------------------
@@ -1075,22 +1122,26 @@ test('termination survives a cross-search frontier shrink while parked quiet (st
   // neighbor intersection empties and NOTHING bumps this search's indexVersion.
   //
   // SIMULATED, AND COUPLED TO ONE IMPLEMENTATION DETAIL — read this before changing `pump.ts`.
-  // The shrink is staged by overwriting `index.neighbors`, because it is the only lever that empties
-  // the eligible set at a chosen instant: real eviction needs a second search interleaved to the
-  // exact microtask (that version exists, at the router level — see `router.test.ts`, "two concurrent
-  // searches under maxPools pressure"; it proves eviction is real but cannot park the loop on a
-  // chosen await, which is what THIS test is about). The cost is a coupling:
-  // `pump.ts#orderedIntermediates` derives its eligible set from `ctx.index.neighbors(tokenIn)` ∩
-  // `ctx.index.neighbors(tokenOut)`, and this stub only empties the frontier for as long as that
-  // stays true. If `orderedIntermediates` is ever rerouted onto a different index accessor (a cached
-  // adjacency snapshot, a `pair()`-based derivation, anything else), this test will keep passing
-  // while testing nothing — the frontier will not shrink, phase 4's assertions will describe a
-  // search that was never disturbed, and the regression it guards will be unguarded. Revisit it
-  // together with any such change.
+  // The shrink is staged by overwriting `index.commonNeighborNodes` (the accessor
+  // `pump.ts#orderedIntermediates` derives its eligible set from), because it is the only lever that
+  // empties the eligible set at a chosen instant: real eviction needs a second search interleaved to
+  // the exact microtask (that version exists, at the router level — see `router.test.ts`, "two
+  // concurrent searches under maxPools pressure"; it proves eviction is real but cannot park the
+  // loop on a chosen await, which is what THIS test is about). If `orderedIntermediates` is ever
+  // rerouted onto a different accessor, this test will keep passing while testing nothing — the
+  // frontier will not shrink, phase 4's assertions will describe a search that was never disturbed,
+  // and the regression it guards will be unguarded. Revisit it together with any such change.
+  //
+  // TWO STUBBED FACTS, BECAUSE A REAL EVICTION MOVES TWO THINGS: the adjacency answer (stubbed
+  // empty) AND `index.version()` (every `evictPool` bumps it — the invalidation key of
+  // `orderedIntermediates`' memo). An unrelated-pair upsert stages the version movement through the
+  // real write path; without it the memo would be entitled to keep serving the pre-shrink ordering,
+  // and the test would be asserting recomputation the contract does not promise.
   const untilVerified = gen.next()
   await ticks(5) // let the loop park on wake.next()
-  const noNeighbors = () => new Map<string, never>()
-  ;(index as unknown as { neighbors: typeof noNeighbors }).neighbors = noNeighbors
+  const noCommonNeighbors = () => []
+  ;(index as unknown as { commonNeighborNodes: typeof noCommonNeighbors }).commonNeighborNodes = noCommonNeighbors
+  index.upsert({ pool: newPool(undefined, world, addr(0xeeee), addr(0xeeef)), source: 'event', createdAtBlock: 10n })
 
   // Phase 4: the preflight settles. Its wake's termination check reads the STALE discovered (5 > 1)
   // and fails; the advance then refreshes discovered down and selects nothing.

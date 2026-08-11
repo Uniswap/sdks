@@ -370,6 +370,123 @@ test('orderedIntermediates: hinted nodes, then manifest cores, then neighbor int
 })
 
 // ---------------------------------------------------------------------------
+// The intermediates-ordering memo (S1) — wrong caching here silently
+// wrong-routes (a stale ordering hides a real intermediate), so growth and
+// eviction each pin an invalidation, and a property pins memoized ≡ fresh
+// over generated mutation interleavings.
+// ---------------------------------------------------------------------------
+
+function ctxOver(index: PoolIndex): PumpCtx {
+  const fake = fakeModule(new Map())
+  return { index, modules: { v2: fake, v3: fake, v4: fake }, manifest: FAKE_MANIFEST, hookData: new Map(), hints: [], client: worldClient() }
+}
+
+test('orderedIntermediates memo: a hit returns the identical list; index growth forces a fresh recompute that sees the new node', () => {
+  const { ctx, req, world, index } = fakeSetup()
+  const x1 = X_TOKENS[0]!
+  newPool(index, world, T_IN, x1)
+  newPool(index, world, x1, T_OUT)
+
+  const first = orderedIntermediates(ctx, req)
+  expect(first).toContain(x1.toLowerCase())
+  // Identity, not mere equality: nothing about the index moved, so this is the memoized list.
+  expect(orderedIntermediates(ctx, req)).toBe(first)
+
+  // Growth — an upsert (any caller's) moves `index.version()` and forces a recompute.
+  const x2 = X_TOKENS[1]!
+  newPool(index, world, T_IN, x2)
+  newPool(index, world, x2, T_OUT)
+  const grown = orderedIntermediates(ctx, req)
+  expect(grown).not.toBe(first)
+  expect(grown).toContain(x2.toLowerCase())
+})
+
+test('orderedIntermediates memo: a maxPools eviction forces a fresh recompute that no longer offers the evicted intermediate', () => {
+  const index = new PoolIndex(WN, { maxPools: 2 })
+  const ctx = ctxOver(index)
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1n }
+  const x = X_TOKENS[0]!
+  const inPool = v2Ref(addr(0xe001), T_IN, x)
+  const outPool = v2Ref(addr(0xe002), x, T_OUT)
+  index.upsert({ pool: inPool, source: 'event', createdAtBlock: 1n })
+  index.upsert({ pool: outPool, source: 'event', createdAtBlock: 2n })
+
+  const before = orderedIntermediates(ctx, req)
+  expect(before).toContain(x.toLowerCase())
+  expect(orderedIntermediates(ctx, req)).toBe(before) // memo holds while nothing moves
+
+  // A third pool over the cap evicts the least-recently-touched in-pool: x stops being a common
+  // neighbor WITHOUT this search's `state.indexVersion` ever moving — the cross-search shrink.
+  index.upsert({ pool: v2Ref(addr(0xe003), addr(0xe004), addr(0xe005)), source: 'event', createdAtBlock: 3n })
+  const after = orderedIntermediates(ctx, req)
+  expect(after).not.toBe(before)
+  expect(after).not.toContain(x.toLowerCase())
+})
+
+test('property: memoized orderedIntermediates ≡ a fresh computation after every prefix of any upsert/eviction interleaving', () => {
+  const xs = Array.from({ length: 8 }, (_, i) => addr(0xe100 + i))
+  fc.assert(
+    fc.property(
+      fc.array(
+        fc.record({
+          x: fc.integer({ min: 0, max: 7 }),
+          side: fc.constantFrom('in', 'out', 'both', 'unrelated'),
+          createdAt: fc.bigInt({ min: 1n, max: 40n }),
+        }),
+        { maxLength: 24 },
+      ),
+      (ops) => {
+        // A small cap so the interleaving generates real evictions, not only growth.
+        const index = new PoolIndex(WN, { maxPools: 10 })
+        const memoizedCtx = ctxOver(index) // ONE ctx across every prefix — this is the memo under test
+        const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1n }
+        let nextAddr = 0xe200
+        for (const op of ops) {
+          const x = xs[op.x]!
+          if (op.side === 'in' || op.side === 'both') {
+            index.upsert({ pool: v2Ref(addr(nextAddr++), T_IN, x), source: 'event', createdAtBlock: op.createdAt })
+          }
+          if (op.side === 'out' || op.side === 'both') {
+            index.upsert({ pool: v2Ref(addr(nextAddr++), x, T_OUT), source: 'event', createdAtBlock: op.createdAt })
+          }
+          if (op.side === 'unrelated') {
+            index.upsert({ pool: v2Ref(addr(nextAddr++), addr(0xeff0), addr(0xeff1)), source: 'event', createdAtBlock: op.createdAt })
+          }
+          // A fresh PumpCtx has no memo entry, so it always computes from the live index.
+          expect(orderedIntermediates(memoizedCtx, req)).toEqual(orderedIntermediates(ctxOver(index), req))
+        }
+      },
+    ),
+  )
+})
+
+test('planDueLegs stops at its checked yield point under an abort, and pump dispatches nothing over the partial plan', async () => {
+  const { state, ctx, req, world, index, record } = fakeSetup()
+  // A pathological frontier: hundreds of selected intermediates, each with pools on both sides.
+  const selected: string[] = []
+  for (let i = 0; i < 200; i++) {
+    const x = addr(0xd800 + i)
+    newPool(index, world, T_IN, x, { kind: 'price', r0: 10n ** 9n, r1: 10n ** 9n })
+    newPool(index, world, x, T_OUT, { kind: 'price', r0: 10n ** 9n, r1: 10n ** 9n })
+    selected.push(x.toLowerCase())
+  }
+  state.intermediates.selected = selected
+  const controller = new AbortController()
+  ctx.signal = controller.signal
+  controller.abort()
+
+  // Planning breaks before the per-intermediate loop does any work: only the direct pair (planned
+  // ahead of the yield point) survives, so an abort costs at most one pair's planning.
+  const planned = planDueLegs(state, ctx, req)
+  expect(planned.every((p) => p.role.kind === 'direct')).toBe(true)
+
+  // And the pump never dispatches a new round over a partial plan — nothing reaches the wire.
+  expect(await pump(state, ctx, req)).toBe(false)
+  expect(record).toHaveLength(0)
+  expect(state.inFlightKeys.size).toBe(0)
+})
+
+// ---------------------------------------------------------------------------
 // The pump — dispatch, bookkeeping, invalidation
 // ---------------------------------------------------------------------------
 

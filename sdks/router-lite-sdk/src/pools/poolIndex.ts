@@ -551,6 +551,16 @@ export class PoolIndex {
   private readonly lastTouched = new Map<string, bigint>()
 
   /**
+   * Monotone mutation counter behind {@link version} — bumped by every write that can change what
+   * {@link pair}/{@link neighbors}/{@link commonNeighborNodes} would answer: an {@link upsert}
+   * (insert OR merge — a merge can move `createdAtBlock`, which orderings read) and an eviction
+   * ({@link evictPool}). NOT bumped by {@link markSuccess}/{@link markNegative}/{@link touchAll}:
+   * those move per-block quote evidence, which every reader re-reads per call anyway — bumping for
+   * them would invalidate a derivation cache on every measured leg and make it worthless.
+   */
+  private mutations = 0
+
+  /**
    * What the endpoint behind this index has taught the scanner about `eth_getLogs` window widths —
    * see {@link ScanWidthMemory}, which owns the semantics.
    *
@@ -586,6 +596,44 @@ export class PoolIndex {
    */
   scanWidth(): ScanWidthMemory {
     return this.scanWidthMemory
+  }
+
+  /**
+   * The index's pool-set version: changes whenever a pool is inserted, merged, or evicted — BY ANY
+   * caller, which is the point. A search that caches a derivation over this index's pools (the
+   * pump's intermediates ordering, `search/pump.ts#orderedIntermediates`) keys the cache on this,
+   * so a CONCURRENT search's upserts or `maxPools` evictions invalidate it exactly as this search's
+   * own do — the cross-search shrink that `SearchState.indexVersion` (a per-search counter) can
+   * never see. Monotone within a process; carries no meaning across processes and is deliberately
+   * absent from {@link PoolIndexSnapshot}.
+   */
+  version(): number {
+    return this.mutations
+  }
+
+  /**
+   * The graph nodes adjacent to BOTH endpoints — the eligible two-hop intermediates for (a, b) —
+   * in O(min(degree(a), degree(b))) with no record materialization.
+   *
+   * THE WHOLE REASON THIS EXISTS IS THAT {@link neighbors} IS THE WRONG SHAPE FOR THE QUESTION
+   * (S1-profiled live, Base AERO→USDC): `neighbors(USDC)` materializes a `PoolRecord[]` for every
+   * one of a dense endpoint's tens of thousands of adjacent nodes — hundreds of thousands of
+   * records — when the caller only ever intersects the KEY SETS and then looks at the handful of
+   * common nodes. That walk measured 13.4s of a 14s search (~430ms per planning pass, once per
+   * measurement envelope). Iterating the smaller endpoint's edge keys against the larger's map
+   * makes the same answer O(min-degree) map probes. Order is whichever side was smaller — callers
+   * that need a deterministic order (the pump's newest-first sort is total) impose their own.
+   */
+  commonNeighborNodes(a: CurrencyRef, b: CurrencyRef): string[] {
+    const edgesA = this.adjacency.get(toGraphNode(a, this.wrappedNative))
+    const edgesB = this.adjacency.get(toGraphNode(b, this.wrappedNative))
+    if (!edgesA || !edgesB) return []
+    const [small, large] = edgesA.size <= edgesB.size ? [edgesA, edgesB] : [edgesB, edgesA]
+    const common: string[] = []
+    for (const node of small.keys()) {
+      if (large.has(node)) common.push(node)
+    }
+    return common
   }
 
   private link(nodeA: string, nodeB: string, key: string): void {
@@ -637,6 +685,7 @@ export class PoolIndex {
   private evictPool(id: string): void {
     const rec = this.pools.get(id)
     if (!rec) return
+    this.mutations++
     this.pools.delete(id)
     this.lastTouched.delete(id)
     const [c0, c1] = rec.pool.currencies
@@ -710,6 +759,7 @@ export class PoolIndex {
     const key = rec.pool.id
     const existing = this.pools.get(key)
     const touchBlock = rec.createdAtBlock ?? rec.lastQuoteSuccessBlock ?? rec.lastQuoteFailureBlock
+    this.mutations++ // insert or merge alike — see {@link mutations} for what may and must not bump
     if (!existing) {
       this.pools.set(key, rec)
       this.touch(key, touchBlock)
