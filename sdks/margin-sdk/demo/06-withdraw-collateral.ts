@@ -17,6 +17,7 @@ import {
   balanceOf,
   deadline,
   deal,
+  demoRoute,
   ensurePermit2,
   fmt,
   fmtWad,
@@ -46,8 +47,9 @@ const NATIVE_SUB_ID = 8n
 
 /** Opens a fresh 2x long under `subId` and returns the account address. */
 async function open2xLong(ctx: Ctx, subId: bigint, equity: bigint): Promise<`0x${string}`> {
-  const { addresses, deployer, longMarket: market, poolKey } = ctx
+  const { addresses, deployer, longMarket: market } = ctx
   const adapter = addresses.lendingAdapters.morphoBlue!
+  const account = getMarginAccountAddress(1, deployer, subId)
   const collateralToBuy = collateralToBuyForLeverage(equity, parseLeverageX18(2))
   const { capped: maxDebtIn } = await quoteSwapInput(ctx, market, market.debt, collateralToBuy, 50)
   await send(
@@ -57,16 +59,22 @@ async function open2xLong(ctx: Ctx, subId: bigint, equity: bigint): Promise<`0x$
       params: {
         adapter,
         market,
-        poolKey,
         equity,
         collateralToBuy,
         maxDebtIn,
+        ...demoRoute(ctx, {
+          input: market.debt,
+          output: market.collateral,
+          amountOut: collateralToBuy,
+          maxIn: maxDebtIn,
+          recipient: account,
+        }),
         subId,
         deadline: await deadline(ctx),
       },
     })
   )
-  return getMarginAccountAddress(1, deployer, subId)
+  return account
 }
 
 export async function run(ctx: Ctx): Promise<void> {
@@ -149,7 +157,14 @@ export async function run(ctx: Ctx): Promise<void> {
   // through _mapRecipient, so MSG_SENDER would arrive as the literal 0x…01 and revert.
   let rejectedSentinel = false
   try {
-    withdrawCollateralPlan({ adapter, market, amount: slice, to: MSG_SENDER, maxLtvAfter: before.maxLtv, subId: SUB_ID })
+    withdrawCollateralPlan({
+      adapter,
+      market,
+      amount: slice,
+      to: MSG_SENDER,
+      maxLtvAfter: before.maxLtv,
+      subId: SUB_ID,
+    })
   } catch (error) {
     rejectedSentinel = isMarginSdkError(error)
   }
