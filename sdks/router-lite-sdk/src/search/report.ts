@@ -1,11 +1,12 @@
 import type { Address } from 'viem'
 
+import { toGraphNode } from '../internal/currency'
 import { intersectAll, subtractRanges } from '../internal/ranges'
-import type { BlockRange, BlockRef, Protocol, QuoteRequest, SearchReport } from '../types'
+import { deploymentBlockOf } from '../manifest'
+import type { PoolIndex } from '../pools/poolIndex'
+import type { ProtocolModule } from '../protocols/types'
+import type { BlockRange, BlockRef, ChainManifest, Protocol, QuoteRequest, SearchReport } from '../types'
 import { protocolRecord } from '../types'
-
-import { deploymentBlockOf, node } from './context'
-import type { EngineState, SearchContext } from './waves'
 
 // ---------------------------------------------------------------------------
 // Engine-side report assembly: what the finished (or abandoned) search can
@@ -24,9 +25,20 @@ import type { EngineState, SearchContext } from './waves'
 // ---------------------------------------------------------------------------
 
 /**
+ * The slice of the surroundings a report is folded from: the enabled modules and manifest (which
+ * protocols count at all), and the index (whose coverage cache is what the bars read). Structural
+ * rather than the loop's own `SearchContext`, so this module needs no edge back into the loop and a
+ * test can fold a report from three plain fields.
+ */
+export type ReportCtx = {
+  modules: Record<Protocol, ProtocolModule>
+  manifest: ChainManifest
+  index: PoolIndex
+}
+
+/**
  * The slice of `search/state.ts`'s `SearchState` a report is folded from — structural rather than a
- * `Pick`, so this module stays out of the event-core's import graph until the loop lands, and so the
- * wave engine can hand over its own state through one adapter until Task 9 deletes it.
+ * `Pick`, so a test can seed exactly the fields one scenario is about.
  * `intermediates.selected` is read for its length alone: the report prints a count, never the nodes.
  */
 export type ReportState = {
@@ -43,41 +55,13 @@ export type ReportState = {
 }
 
 /**
- * TRANSITIONAL, deleted with `waves.ts` in Task 9: the wave engine's state folded into the shape the
- * report now reads.
- *
- * `legsMeasured` is its `quoting.attempted` — the wave engine keeps no leg ledger, so every quote
- * call it dispatched and got a settlement for counts as one (which double-counts a transport-retried
- * candidate, where the new engine settles a key once). `pairCeilingHit` carries its per-pair pool
- * caps: `MAX_POOLS_DIRECT`/`MAX_POOLS_PER_LEG` (and the derived total-candidate backstop) drop pools
- * from a pair without measuring them, which is the same forfeit of exhaustiveness the ceiling names.
- */
-export function engineReportState(state: EngineState): ReportState {
-  return {
-    block: state.block,
-    aborted: state.aborted,
-    headRegressed: state.headRegressed,
-    discovery: state.discovery,
-    intermediates: {
-      discovered: state.enumeration.intermediatesDiscovered,
-      selected: { length: state.enumeration.intermediatesSelected },
-    },
-    legsMeasured: state.quoting.attempted,
-    pairCeilingHit: state.enumeration.prunedPools > 0 || state.enumeration.prunedCandidates > 0,
-    quoting: state.quoting,
-    verificationDegraded: state.verificationDegraded,
-    verification: state.verification,
-  }
-}
-
-/**
  * Completeness is judged against *this trade's two endpoints by name*. A count of scanned endpoints
- * would let any two scans (say, a focus token that is not an endpoint, plus one endpoint) satisfy
- * it while the other endpoint's adjacency was never touched — reporting `complete` for a search
- * that never looked, which the facade would then classify as an authoritative `no-route`.
+ * would let any two scans satisfy it while one endpoint's adjacency was never touched — reporting
+ * `complete` for a search that never looked, which the facade would then classify as an
+ * authoritative `no-route`.
  */
 export function discoveryStatus(
-  ctx: SearchContext,
+  ctx: ReportCtx,
   state: ReportState,
   protocol: Protocol,
   endpointNodes: [Address, Address],
@@ -108,7 +92,7 @@ export function discoveryStatus(
  * is no demand to measure against.
  */
 function coveredRangesFor(
-  ctx: SearchContext,
+  ctx: ReportCtx,
   state: ReportState,
   protocol: Protocol,
   endpointNodes: Address[],
@@ -125,11 +109,11 @@ function coveredRangesFor(
 
 export function buildReport(
   state: ReportState,
-  ctx: SearchContext,
+  ctx: ReportCtx,
   req: Pick<QuoteRequest, 'tokenIn' | 'tokenOut'>,
 ): SearchReport {
-  const inNode = node(req.tokenIn, ctx.manifest)
-  const outNode = node(req.tokenOut, ctx.manifest)
+  const inNode = toGraphNode(req.tokenIn, ctx.manifest.wrappedNative)
+  const outNode = toGraphNode(req.tokenOut, ctx.manifest.wrappedNative)
 
   const discovery = protocolRecord<SearchReport['discovery'][Protocol]>((p) => {
     const deployBlock = deploymentBlockOf(ctx.manifest, p)

@@ -91,120 +91,43 @@ describe('the error capture/rebuild round trip', () => {
 })
 
 // ---------------------------------------------------------------------------
-// QUARANTINE: sessions whose recorded conversation predates a change in what
-// the search ASKS, and which cannot be re-recorded today.
+// QUARANTINE — THE WHOLE CORPUS, pending the outcome-log golden format
+// (docs/superpowers/plans/2026-08-10-event-driven-search-core.md, Task 13).
 //
-// A session is a conversation, so changing the SHAPE of a request retires every
-// recording of it — that is the corpus working, not failing. The normal fix is
-// one live re-record (`scripts/recordSession.ts --label <label>`); `--regold`
-// cannot help, because it rebuilds a golden from bytes that were never
-// recorded for the new shape.
+// Every session here is one wave engine run's complete, block-pinned RPC
+// conversation. The event-driven cutover is a HARD CUT: the engine now asks in
+// leg-measurement rounds and coverage-worker scans whose request shapes no
+// wave-era recording holds, so a replay meets unrecorded (method, params) keys
+// immediately — that is the corpus working (a conversation cannot outlive a
+// change in what the search asks), and no `--regold` can help, because a
+// golden rebuilt from bytes recorded for the old shapes asserts nothing.
 //
-// WHY THESE TWO CANNOT BE RE-RECORDED RIGHT NOW. C5-C merged the adjacency
-// scans (address arrays + OR-topics), so every adjacency `eth_getLogs` key
-// changed — and these are the only two sessions in the corpus that reach an
-// adjacency wave at all (the rest answer in wave 0/1 and replay unchanged,
-// which is itself the evidence that routes and amounts did not move). Both were
-// recorded on 2026-08-08 against an endpoint serving multi-million-block
-// windows: 66 `eth_getLogs`, no refusals, discovery complete inside wave 2. That
-// endpoint now caps `eth_getLogs` at 100,000 blocks, and no other reachable
-// archive endpoint serves wide historical windows (checked 2026-08-10: drpc
-// 10k/free, publicnode 403 on archive, 1rpc 50 blocks, blastapi 10 blocks,
-// ankr/alchemy keyed, tenderly hangs past 90s). A live re-record against the
-// capped endpoint produces a ~1,700kB / 1,228-entry session carrying ~227
-// recorded cap-refusals, whose replay spends minutes in `scanLogs`' real
-// backoff ladder — past this test's budget — and whose golden degrades from the
-// route it exists to pin to `inconclusive`, because a discovery that large only
-// finds the route through the 5s quote interleave, which is quiescent under
-// replay by construction (see this file's header).
+// Task 13 replaces this format wholesale: goldens become recorded OUTCOME LOGS
+// replayed through `search/state.ts`'s `apply*` + composition + `buildReport`
+// — independent of RPC request shapes, which is exactly the coupling that
+// retired this corpus. RPC-level replay (`internal/replay.ts`) survives for
+// provider-conformance tests, which are genuinely about wire shapes.
 //
-// VERIFIED NOT A REGRESSION: the same live re-record on the pre-C5-C commit
-// degrades identically (3,538 `eth_getLogs`, 706 refusals, live `quote` vs
-// replayed `inconclusive`), and C5-C makes that same recording 2.9x cheaper
-// (1,209 `eth_getLogs` / 227 refusals against 3,538 / 706).
-//
-// TO LIFT THIS: point `scripts/recordSession.ts --rpc` at an archive endpoint
-// that serves wide `eth_getLogs` windows, re-record both labels, and delete the
-// entry. Nothing about that is left to memory: the `test.skip` names the gap in
-// every run, the warning below prints it on a bare `bun test`, the guard keeps
-// the list from outliving the sessions it names, and the companion test below
-// FAILS the moment a re-recorded session reproduces its golden — so a
-// quarantine cannot survive the fix it is waiting for.
+// Until then every session is skipped BY NAME below, so a bare `bun test`
+// prints the gap instead of reporting green over a corpus that has quietly
+// stopped asserting anything.
 // ---------------------------------------------------------------------------
 
-const QUARANTINED: Record<string, string> = {
-  'mainnet-atokens-two-hop': 'C5-C changed the adjacency request shapes; needs a wide-window archive endpoint to re-record',
-  'mainnet-no-route': 'C5-C changed the adjacency request shapes; needs a wide-window archive endpoint to re-record',
-}
+const QUARANTINE_REASON =
+  'wave-era RPC recording cannot replay the event-driven engine; superseded by the outcome-log golden format (plan Task 13)'
 
-/**
- * Wall clock the obsolescence probe gives one quarantined replay.
- *
- * A session whose recording MATCHES what the search asks replays with no misses and no backoff —
- * the six live sessions in this corpus take ~100ms between them — so anything that has not answered
- * inside this is still stale, and is stale precisely BECAUSE it is spending the budget in
- * `scanLogs`' real retry ladder on requests the recording cannot answer.
- */
-const OBSOLESCENCE_PROBE_MS = 8_000
+const QUARANTINED: Record<string, string> = Object.fromEntries(files.map((f) => [loadSession(f).label, QUARANTINE_REASON]))
 
 describe('recorded-replay goldens', () => {
   test('the session corpus exists', () => {
     expect(files.length).toBeGreaterThan(0)
   })
 
-  test('every quarantined label still names a session in the corpus', () => {
-    // A quarantine entry that outlives its session would silently do nothing, and the next label to
-    // collide with it would be skipped without anyone deciding so.
-    const labels = new Set(files.map((f) => loadSession(f).label))
-    expect(Object.keys(QUARANTINED).filter((label) => !labels.has(label))).toEqual([])
-  })
-
   for (const [label, reason] of Object.entries(QUARANTINED)) {
     // ...and it says so out loud, so a bare `bun test` names the gap instead of reporting a green
-    // run over a corpus that has quietly stopped asserting two of its answers.
+    // run over a corpus that has quietly stopped asserting its answers.
     // eslint-disable-next-line no-console
     console.warn(`[replay] QUARANTINED session "${label}" is NOT being replayed — ${reason}`)
-  }
-
-  for (const label of Object.keys(QUARANTINED)) {
-    const file = files.find((f) => loadSession(f).label === label)
-    if (!file) continue // the guard above already fails on this; do not also throw during collection
-
-    /**
-     * THE QUARANTINE'S OWN EXPIRY. It attempts the replay for real and fails if the session now
-     * reproduces its golden — which is exactly the state a successful re-record leaves behind, so
-     * the entry above cannot outlive the endpoint problem that justified it.
-     *
-     * Bounded rather than run to completion, because a STALE session does not fail fast: every
-     * unrecorded key surfaces as a provider error inside `scanLogs`, which answers with its real
-     * backoff ladder and would spend minutes proving what it proves in the first second. The
-     * `AbortSignal` is the bound AND the cleanup — without it the losing side of the race would go
-     * on issuing the ladder behind every later test in the file.
-     */
-    test(`${label}: the quarantine is still needed (a re-recorded session must fail this)`, async () => {
-      const session = loadSession(file)
-      const harness = replayClient(session)
-      const router = createRouter({ client: harness.client, manifest: manifestFor(session.chainId) })
-      const controller = new AbortController()
-
-      const replayed = router
-        .getQuote({ ...requestFromSession(session), signal: controller.signal })
-        .then((result) => canonicalizeResult(result))
-        .catch(() => undefined)
-      const timedOut = Symbol('timed out')
-      const outcome = await Promise.race([replayed, new Promise<typeof timedOut>((r) => setTimeout(() => r(timedOut), OBSOLESCENCE_PROBE_MS))])
-      controller.abort()
-      void replayed.catch(() => undefined)
-
-      // The signal only ever fires AFTER the race is decided, so a session that answered inside the
-      // budget answered with the abort unfired — its result is the honest one to compare.
-      if (outcome !== timedOut && outcome !== undefined && JSON.stringify(outcome) === JSON.stringify(session.golden)) {
-        throw new Error(
-          `[replay:${label}] this session REPRODUCES ITS GOLDEN AGAIN — it has been re-recorded, so ` +
-            `delete its entry from QUARANTINED (and this test will go with it).`,
-        )
-      }
-    }, OBSOLESCENCE_PROBE_MS + 10_000)
   }
 
   for (const file of files) {
@@ -276,7 +199,7 @@ describe('recorded-replay goldens', () => {
 //   * the key set is closed — a field that vanished fails, and so does one
 //     that appeared without anybody deciding to add it;
 //   * `gasEstimate` is present EXACTLY when the route has no v2 leg. That is
-//     `quote/quote.ts#sumGasEstimates`' all-or-nothing rule restated: a v2
+//     the all-or-nothing gas rule restated (`search/pump.ts#composeRoutes`): a v2
 //     segment is local constant-product arithmetic over `getReserves()` and
 //     measures no gas, so one v2 leg makes the whole route's sum undefined.
 //     Stated as an `iff`, so "gas stopped being reported" and "gas got

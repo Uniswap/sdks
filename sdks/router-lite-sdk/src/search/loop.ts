@@ -7,7 +7,7 @@ import { reorgOverlapBlocksOf, requireExecution } from '../manifest'
 import type { PoolIndex } from '../pools/poolIndex'
 import { routeId } from '../protocols'
 import type { ProtocolModule } from '../protocols/types'
-import type { BlockRef, ChainManifest, Protocol, QuoteRequest, RankedRoute, SwapRequest } from '../types'
+import type { BlockRef, ChainManifest, Protocol, QuoteRequest, RankedRoute, SearchReport, SwapRequest } from '../types'
 import { checkReadiness } from '../verify/readiness'
 
 import { CoverageWorker } from './coverage'
@@ -80,9 +80,9 @@ type SearchClient = Pick<PublicClient, 'request'>
 export type HeadWatermark = { lastPinnedBlock?: bigint }
 
 /**
- * Everything one search reads from its surroundings. Moved here from `waves.ts` (which re-extends it
- * with its own two transitional fields until Task 9 deletes it): the loop is the engine now, so the
- * engine's context lives with it.
+ * Everything one search reads from its surroundings. The facade (`router.ts#buildContext`) builds
+ * one per search; a one-off engine run (unit tests, `experimental` callers) can build it from a
+ * client and a manifest alone.
  */
 export type SearchContext = {
   client: SearchClient
@@ -116,7 +116,7 @@ export type SearchContext = {
 }
 
 // ---------------------------------------------------------------------------
-// The pinned block (moved verbatim from waves.ts)
+// The pinned block
 // ---------------------------------------------------------------------------
 
 /**
@@ -230,20 +230,25 @@ export async function fetchBlock(
 // ---------------------------------------------------------------------------
 
 /**
- * What the loop tells its consumer. Internal — the facade (Task 9) shapes these into the public
- * `SearchEvent` union; `state` rides along LIVE (never snapshotted) so the facade can fold a report
- * from it at receipt time.
+ * What the loop tells its consumer. Internal — the facade shapes these into the public
+ * `SearchEvent` union, folding each into a public result AT RECEIPT (spec §5's carve-out: `state`
+ * rides along LIVE, never snapshotted, and an in-flight preflight settling after `final` may still
+ * write through `applyPreflight` — so nothing may hold `state` and read it later).
  *
  *  - `lead`: the leader's observable identity changed — routeId, amountOut, execution status, or
  *    tx presence. `ranked` is leader-first: `pickLeader`'s verdict (which keeps a verified route in
  *    front of an unverified out-pricer) is applied HERE, so consumers never re-derive it.
  *  - `progress`: something report-relevant moved without a new lead; at most one per wake cycle.
  *  - `final`: exactly once, always last.
+ *
+ * `report` is the cycle's own `buildReport` fold, taken at the moment of emission — the loop folds
+ * one per cycle anyway (it is what `progress` coalescing compares), so the event carries that exact
+ * fold and a consumer never re-derives a report the emission decision did not see.
  */
 export type EngineEvent =
-  | { type: 'lead'; ranked: RankedRoute[]; state: SearchState }
-  | { type: 'progress'; state: SearchState }
-  | { type: 'final'; ranked: RankedRoute[]; state: SearchState }
+  | { type: 'lead'; ranked: RankedRoute[]; state: SearchState; report: SearchReport }
+  | { type: 'progress'; state: SearchState; report: SearchReport }
+  | { type: 'final'; ranked: RankedRoute[]; state: SearchState; report: SearchReport }
 
 /** The leader's observable identity — the four fields whose change means "new lead". */
 function leadSignature(state: SearchState, best: RankedRoute): string {
@@ -251,11 +256,11 @@ function leadSignature(state: SearchState, best: RankedRoute): string {
   return [id, best.quote.amountOut, best.execution, state.compiledById.has(id)].join('|')
 }
 
-/** The report's observable identity, for `progress` coalescing: one fold, stringified with bigints
- * spelled out. Built from the same `buildReport` the facade uses, so "report-relevant" can never
- * drift from what the report actually shows. */
-function reportSignature(state: SearchState, ctx: SearchContext, req: QuoteRequest): string {
-  return JSON.stringify(buildReport(state, ctx, req), (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value))
+/** The report's observable identity, for `progress` coalescing: the cycle's fold, stringified with
+ * bigints spelled out. The same fold rides out on the emitted event, so "report-relevant" can never
+ * drift from what a consumer actually receives. */
+function reportSignature(report: SearchReport): string {
+  return JSON.stringify(report, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value))
 }
 
 // ---------------------------------------------------------------------------
@@ -298,25 +303,35 @@ function advanceIntermediates(state: SearchState, ctx: PumpCtx, req: QuoteReques
 
 /** `checkReadiness` never throws for a business outcome (a failed READ widens the requirement set or
  * degrades the result); anything it does throw is a bug, which the SourceSet records in `failures()`
- * without taking the search down. */
+ * without taking the search down. THE BUG STILL DEGRADES THE REPORT: a readiness source that died
+ * settles as an empty, known-incomplete requirement list (`degraded: true` — readinessDegraded +
+ * verificationDegraded), because a search whose funding-state reads never landed must not classify
+ * as authoritative however the reads were lost. Without that write the failure would be invisible:
+ * `state.requirements` would stay unset, the verifier would never run, and the report would show a
+ * clean search that simply never verified anything. */
 function launchReadiness(sources: SourceSet, state: SearchState, ctx: SearchContext, req: SwapRequest, block: BlockRef): void {
   sources.launch('readiness', async () => {
-    // Safe to require here: `validateSwapRequest` already rejected a swap request against an
-    // execution-less manifest, synchronously, before this search started (C4-P3).
-    const execution = requireExecution(ctx.manifest)
-    const outcome = await checkReadiness({
-      client: ctx.client,
-      trader: req.trader,
-      currencyIn: req.tokenIn,
-      amountIn: req.amountIn,
-      permit2: execution.permit2,
-      router: execution.address,
-      ...(req.permit !== undefined && { permit: req.permit }),
-      blockNumber: block.number,
-      blockTimestamp: block.timestamp,
-      semaphore: ctx.semaphore,
-    })
-    applyReadiness(state, outcome)
+    try {
+      // Safe to require here: `validateSwapRequest` already rejected a swap request against an
+      // execution-less manifest, synchronously, before this search started (C4-P3).
+      const execution = requireExecution(ctx.manifest)
+      const outcome = await checkReadiness({
+        client: ctx.client,
+        trader: req.trader,
+        currencyIn: req.tokenIn,
+        amountIn: req.amountIn,
+        permit2: execution.permit2,
+        router: execution.address,
+        ...(req.permit !== undefined && { permit: req.permit }),
+        blockNumber: block.number,
+        blockTimestamp: block.timestamp,
+        semaphore: ctx.semaphore,
+      })
+      applyReadiness(state, outcome)
+    } catch (err) {
+      applyReadiness(state, { requirements: [], degraded: true })
+      throw err // still a recorded source failure — it is a bug, but no longer a silent one
+    }
   })
 }
 
@@ -329,9 +344,8 @@ function launchReadiness(sources: SourceSet, state: SearchState, ctx: SearchCont
  * and the intermediates frontier, sequenced by wakes. See the module header for the two ordering
  * decisions; see the spec (§3.1) for the model.
  *
- * `req` and `kind` are the same correlated pair `searchWaves` took — every caller passes them
- * paired (`'swap'` always with a `SwapRequest`), and the single cast below is the one seam where
- * that correlation is asserted.
+ * `req` and `kind` are a correlated pair — every caller passes them paired (`'swap'` always with
+ * a `SwapRequest`), and the single cast below is the one seam where that correlation is asserted.
  */
 export async function* search(
   ctx: SearchContext,
@@ -396,7 +410,7 @@ export async function* search(
     verifier === undefined || state.requirements !== undefined || sources.failures().some((f) => f.name === 'readiness')
 
   let lastLead: string | undefined
-  let lastReport = reportSignature(state, ctx, req)
+  let lastReport = reportSignature(buildReport(state, ctx, req))
   // The caller's abort must reach a loop parked on `wake.next()`; observed at the loop top as today.
   const onAbort = (): void => wake.poke()
   req.signal?.addEventListener('abort', onAbort, { once: true })
@@ -418,6 +432,10 @@ export async function* search(
       // `pumpDry`'s second parameter is unused today (blessed signature): dryness is the pump
       // cursor's own verdict, and the ctx rides along for the day planning needs it.
       const dry = pumpDry(state, pumpCtx)
+      // One fold per cycle, AFTER the pump/verifier writes above: it decides `progress` coalescing
+      // and rides out on whichever event this cycle emits.
+      const report = buildReport(state, ctx, req)
+
       // The worker's converged-or-settled is carried by `sources.settled()`: `run()` resolves only
       // once the gate is open and a pass made no progress — converged, or starved with the failure
       // already reported on the discovery axis. A failed scope therefore terminates, never spins.
@@ -430,7 +448,7 @@ export async function* search(
           (verifier?.idle() ?? true) &&
           state.intermediates.selected.length >= state.intermediates.discovered)
       ) {
-        yield { type: 'final', ranked, state }
+        yield { type: 'final', ranked, state, report }
         return
       }
 
@@ -438,13 +456,13 @@ export async function* search(
       const lead = best === undefined ? undefined : leadSignature(state, best)
       if (lead !== undefined && lead !== lastLead) {
         lastLead = lead
-        lastReport = reportSignature(state, ctx, req)
-        yield { type: 'lead', ranked, state }
+        lastReport = reportSignature(report)
+        yield { type: 'lead', ranked, state, report }
       } else {
-        const report = reportSignature(state, ctx, req)
-        if (report !== lastReport) {
-          lastReport = report
-          yield { type: 'progress', state }
+        const signature = reportSignature(report)
+        if (signature !== lastReport) {
+          lastReport = signature
+          yield { type: 'progress', state, report }
         }
       }
 

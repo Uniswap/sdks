@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // The `@uniswap/router-lite-sdk/experimental` subpath — the internal-facing
-// route generation, execution-plan compilation, and calldata encoding stage
+// pool-index, execution-plan compilation, and calldata encoding stage
 // primitives, exported directly for callers who need to build their own
 // search policy on top of them instead of going through `createRouter`'s
 // `getQuote`/`getSwap` facade.
@@ -22,9 +22,7 @@
 // puzzle. `cli/cache.ts` is the reference consumer.
 //
 // Every argument type below is constructible from exports reachable through
-// this file (plus the public types from the package root): `generateRoutes`
-// needs a `PoolIndex` (exported here) and, unless the caller has v4 hookData
-// to stamp, nothing else — `hookData` defaults to an empty map.
+// this file (plus the public types from the package root):
 // `compileExecutionPlan` needs `modules`, which defaults to
 // `PROTOCOL_MODULES` (the real v2/v3/v4 modules, exported here) so a caller
 // only has to pass it when substituting a custom module. See
@@ -37,9 +35,6 @@
 // onto this package (rather than mixing it with a second, source-resolved copy of the same code) and
 // giving cli/ a public name for what it already depended on.
 // ---------------------------------------------------------------------------
-
-export { generateRoutes } from '../search/candidates'
-export type { GenerateRoutesArgs, GenerateRoutesResult } from '../search/candidates'
 
 export { compileExecutionPlan } from '../plan/compile'
 export type { CompileExecutionPlanArgs } from '../plan/compile'
@@ -61,8 +56,8 @@ export { adjacencyQueries } from '../protocols'
 export type { AdjacencyShape } from '../protocols'
 
 // `PoolRef` carries derived fields (`id`, `currencies`) that only its constructors know how to fill,
-// so a caller holding `PoolIndex.upsert` or `generateRoutes` cannot build one without these — the
-// same constructibility rule the rest of this file exists to keep (see `surface.test.ts`).
+// so a caller holding `PoolIndex.upsert` cannot build one without these — the same constructibility
+// rule the rest of this file exists to keep (see `surface.test.ts`).
 export { isHooked, v2PoolRef, v3PoolRef, v4PoolRef } from '../protocols'
 
 export type { Custody } from '../types'
@@ -96,8 +91,8 @@ export { assertResultCoherent, emptyReport } from '../internal/resultCoherence'
 export { DEFAULT_SLIPPAGE_BPS } from '../constants'
 
 // `scanLogs` is the adaptive, bisecting `eth_getLogs` walker every discovery scan in this package is
-// built from — the log-scanning stage primitive, the same category as `generateRoutes`/
-// `compileExecutionPlan` above for a caller assembling its own search policy, and the one piece
+// built from — the log-scanning stage primitive, the same category as `compileExecutionPlan` above
+// for a caller assembling its own search policy, and the one piece
 // canary's provider-behavior suite exists to exercise directly (its bisection converging against a
 // real provider's cap is the thing under test, not a reimplementation of it).
 export { scanLogs } from '../internal/logScan'

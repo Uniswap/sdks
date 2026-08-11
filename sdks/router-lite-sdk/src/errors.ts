@@ -99,12 +99,12 @@ export class NodeStateError extends TransportError {
  * `quoteCandidates` already treats a candidate dropped between rounds.
  *
  * WHY THE SKIP EXISTS AT ALL. `createSemaphore` is a plain FIFO queue with no abort awareness: a
- * quoting round that dispatched 47 calls against 20 permits has most of them waiting, and each one
- * resolves whenever a permit frees with no idea the signal fired meanwhile. Without this check every
- * one of them goes to the wire AFTER the caller walked away — measured as a 74s wall clock on a
- * `--budget 60s` search once quoting began running alongside the scans
- * (`search/waves.ts#quoteWhileDiscovering`). `internal/logScan.ts#fetchChunk` closes the identical
- * gap for `eth_getLogs`; this is the `eth_call` half of it.
+ * measurement round that dispatched 47 calls against 20 permits has most of them waiting, and each
+ * one resolves whenever a permit frees with no idea the signal fired meanwhile. Without this check
+ * every one of them goes to the wire AFTER the caller walked away — measured as a 74s wall clock on
+ * a `--budget 60s` search once quoting began running alongside the scans.
+ * `internal/logScan.ts#fetchChunk` closes the identical gap for `eth_getLogs`; this is the
+ * `eth_call` half of it.
  */
 export class AbortedCallError extends Error {
   constructor(message: string) {
@@ -116,7 +116,7 @@ export class AbortedCallError extends Error {
 }
 
 /**
- * Thrown by the wave engine (`search/waves.ts`) when it cannot even fetch the pinned block to
+ * Thrown by the engine (`search/loop.ts`) when it cannot even fetch the pinned block to
  * search against — a provider outage, or a malformed/absent `eth_getBlockByNumber` response. This
  * is the engine's *only* throw: everything else it observes (a reverting quote, an uncompilable
  * route, a capped log scan) is a recorded business outcome, never an exception.

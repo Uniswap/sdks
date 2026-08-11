@@ -65,10 +65,10 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
  * study's ceiling search found ALL-LIVE two-hop rounds succeeding through N=300 (~55M inner gas) on
  * free public endpoints and failing only beyond that, so 50 sits ~6x under the worst measured
  * ceiling — deep enough that a chain of unusually expensive quotes (hooked v4 pools running arbitrary
- * hook code) still clears it. Meanwhile 50 captures effectively all of the win: a full quoting round
- * is at most `MAX_QUOTE_CANDIDATES` (78) calls, i.e. <= 2 chunks where the per-call path spent up to
- * 78 permits, and the burst-limited-endpoint fix (one charge per chunk) needs only that the chunk
- * count be small, not that it be 1. Larger chunks buy nothing further and spend headroom; smaller
+ * hook code) still clears it. Meanwhile 50 captures effectively all of the win: a measurement round
+ * is capped at `PUMP_ROUND_CAP` legs, i.e. a handful of chunks where the per-call path spent one
+ * permit per leg, and the burst-limited-endpoint fix (one charge per chunk) needs only that the
+ * chunk count be small, not that it be 1. Larger chunks buy nothing further and spend headroom; smaller
  * ones re-approach the per-call burst behavior this exists to escape.
  */
 export const MULTICALL_CHUNK = 50
@@ -79,7 +79,7 @@ export const MULTICALL_CHUNK = 50
  *
  * `revertData === undefined` means the revert carried NO bytes (aggregate3 returns `0x` for it) —
  * the same amount-independent, pool-absent shape `revertDataOf(err) === undefined` identifies on the
- * per-call path, and the only shape `quote/quote.ts` may hand to the negative cache (C4-H3). It is
+ * per-call path, and the only shape `quote/measure.ts` may hand to the negative cache (C4-H3). It is
  * an `Error` subclass so `mapConcurrent`-shaped result slots (`R | Error`) hold it without a new
  * union arm, but it deliberately carries no `data` field: nothing about it is meant to survive a
  * `collectFacts` walk, because it never came from a transport and must never be re-classified as if

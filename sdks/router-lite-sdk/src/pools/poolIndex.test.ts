@@ -701,7 +701,7 @@ describe('PoolIndexSnapshot', () => {
       // --- the DISCRIMINANT, and the per-arm identity fields it promises -------------------
       // `protocol` is what every consumer switches on before touching an arm-specific field, and
       // nothing checked it: `{ protocol: 'v4' }` with no `poolKey` loads clean and then detonates
-      // as a TypeError in `search/candidates.ts#comparePoolPriority` (via `isHooked`, which reads
+      // as a TypeError in `quote/rank.ts#isComplex` (via `isHooked`, which reads
       // `ref.poolKey.hooks`) or as a viem `InvalidAddressError` in `plan/compile.ts`'s
       // recipient-vs-pool check — both mid-search, both outside `cli/cache.ts`'s try.
       ['a pool ref with no protocol', () => { const s = valid(); const { protocol: _p, ...rest } = s.pools[0]!.pool; return { ...s, pools: [{ ...s.pools[0]!, pool: rest }] } }],
@@ -745,7 +745,7 @@ describe('PoolIndexSnapshot', () => {
     test('a v4-claiming ref with no poolKey used to load clean and detonate in RANKING — now it cannot load at all', () => {
       // The discriminant's own version of the poisoned-coverage regression, and the reason
       // `protocol` has to be checked alongside the arm it selects. `comparePoolPriority`
-      // (`search/candidates.ts`) calls `isHooked`, which reads `ref.poolKey.hooks` the instant
+      // (`quote/rank.ts`) calls `isHooked`, which reads `ref.poolKey.hooks` the instant
       // `protocol === 'v4'` — so this payload restores into a perfectly ordinary-looking index and
       // then throws a bare TypeError from the middle of candidate enumeration, in a stack that
       // names nothing about caches and outside `cli/cache.ts`'s try.

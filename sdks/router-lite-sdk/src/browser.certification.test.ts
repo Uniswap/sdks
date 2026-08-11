@@ -67,7 +67,7 @@ const NODE_BUILTINS = [
  * stray CommonJS `require()` in ESM source is the same failure wearing a different hat.
  *
  * `setTimeout`/`clearTimeout` are deliberately NOT here: they are standard everywhere this package
- * claims to run (`internal/logScan.ts`, `search/waves.ts` use them), and Node's returning a `Timeout`
+ * claims to run (`internal/logScan.ts`'s backoff uses them), and Node's returning a `Timeout`
  * object rather than a number is irrelevant to code that only ever passes the handle back to
  * `clearTimeout`.
  */

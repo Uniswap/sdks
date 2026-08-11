@@ -13,10 +13,11 @@ import type { ProtocolModule, QuoteProbe } from './types'
 // v2 module — speculative reserves quoting.
 //
 // v2 pair addresses are pure CREATE2 (no factory lookup required), so
-// `speculativeDirect` never touches the factory: it computes the pair address
-// locally and emits a single `getReserves` probe. A v2-v2 two-hop is two
-// single-leg segments chained by the caller (`encodeQuote` never sees more
-// than one leg) — reserves compose leg-by-leg, not within one call.
+// `hypotheses` never touches the factory: it derives the pair address locally,
+// and the measurement that follows is a single `getReserves` read. A v2-v2
+// two-hop is two single-leg measurements chained by the caller (`encodeQuote`
+// never sees more than one leg) — reserves compose leg-by-leg, not within one
+// call.
 // ---------------------------------------------------------------------------
 
 /**
@@ -91,8 +92,8 @@ function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigi
       // NO `gasEstimate`, DELIBERATELY. This is local constant-product arithmetic over a
       // `getReserves()` read — no swap was simulated on-chain, so there is no gas measurement to
       // report and any number here would be a fabrication. Absence is the honest answer, and it
-      // propagates: a two-segment route with a v2 segment reports no estimate at all
-      // (`quote/quote.ts`), rather than a sum that quietly omits this leg.
+      // propagates: a two-hop route with a v2 leg reports no estimate at all
+      // (`search/pump.ts#composeRoutes`), rather than a sum that quietly omits this leg.
       return { amountOut: getAmountOut(amountIn, reserveIn, reserveOut) }
     },
   }

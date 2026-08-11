@@ -31,11 +31,10 @@ import type { CurrencyRef, QuoteRequest, QuoteResult, QuotedRoute, SearchReport 
 // a retried key is idempotent by construction. Remaining, by design of the
 // engine itself: the package has NO `Date.now`/`Math.random` anywhere in `src`
 // (verified; the log-scan backoff is un-jittered and its width policy is a
-// pure reducer over the response sequence), so the only wall-clock behavior is
-// `quoteWhileDiscovering`'s interleave timer (`QUOTE_INTERLEAVE_MS` = 5s).
-// Under replay every response resolves in a microtask, so a scan-bound wave
-// finishes long before the first 5s tick and the interleave is QUIESCENT —
-// deterministically zero mid-wave passes on every replay run. (During a live
+// pure reducer over the response sequence), and the engine creates no timers at
+// all — every cadence is data-driven (chunk arrivals, settlements, wakes).
+// Under replay every response resolves in a microtask, so the whole search is
+// deterministic scheduling over recorded answers. (During a live
 // RECORDING the timer does fire, which can quote a superset of what replay
 // quotes; `scripts/recordSession.ts` closes that gap by deriving the golden
 // from a strict replay of the recording, then proving the replay reproduces

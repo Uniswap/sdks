@@ -10,7 +10,7 @@ import { computeV2PairAddress } from '../protocols/v2'
 import { computeV3PoolAddress } from '../protocols/v3'
 import type { LegRequest } from '../quote/measure'
 import { measureLegs } from '../quote/measure'
-import { rankRoutes } from '../quote/quote'
+import { rankRoutes } from '../quote/rank'
 import type {
   ChainManifest,
   CurrencyRef,
@@ -458,8 +458,7 @@ function legOf(m: Measurement, ctx: PumpCtx): RouteLeg {
  * dominated ones are not priced and not reported as priced.
  *
  * `intermediateAmounts` carries `[m_X]`; `gasEstimate` is the two legs' sum, absent if either leg
- * lacks one (v2 legs never carry one — `quote/quote.ts#sumGasEstimates`' rule, replicated for the
- * per-leg shape). A route with any leg negative at the pinned block is excluded. Ranking — order,
+ * lacks one (v2 legs never carry one — a v2 quote is local reserve math and measures no gas). A route with any leg negative at the pinned block is excluded. Ranking — order,
  * tie-breaks, and the simplicity margin — is `rankRoutes`, unchanged.
  */
 export function composeRoutes(state: SearchState, ctx: PumpCtx, req: QuoteRequest): QuotedRoute[] {

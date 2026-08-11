@@ -91,16 +91,15 @@ function rank(source: PoolRecord['source']): number {
  * the index with its `source: 'hint'` intact and merely loses its ranking privilege. The evidence
  * required is failures at {@link HINT_DISCREDIT_FAILURE_BLOCKS} DISTINCT blocks — and only failures
  * of the pool-absent shape, since that is the only shape `markNegative` is ever called for (see its
- * docstring and `search/waves.ts#recordFailures`), so a pool that reverts on liquidity or on a
- * hook's own rules is never discredited by this.
+ * docstring and `search/pump.ts`'s reverted-measurement handling), so a pool that reverts on
+ * liquidity or on a hook's own rules is never discredited by this.
  *
  * TWO ROUTES BACK, AND THE LIMITS OF EACH:
  *
  *  1. A successful quote. `lastQuoteSuccessBlock === undefined` is part of the test, so the first
  *     one clears the demotion outright. This is the ordinary path — a demoted pool is still
- *     enumerated, just behind the proved ones, so on a pair with spare capacity under its pool cap
- *     (`MAX_POOLS_DIRECT` direct, `MAX_POOLS_PER_LEG` per two-hop leg) it keeps getting quoted and
- *     keeps its chance to recover.
+ *     measured (there is no per-pair selection to lose; only the `MEASUREMENT_PAIR_CEILING` abuse
+ *     backstop trims a pair), so it keeps getting quoted and keeps its chance to recover.
  *  2. A creation log. `upsert` clears the failure counters when an `event`-sourced record arrives
  *     (see there), because a creation log answers the existence question directly.
  *
@@ -266,7 +265,7 @@ function bad(what: string): never {
  * WHY THE DISCRIMINANT IS NOT LIKE THE OTHER FIELDS. `id` and `currencies` are checked above because
  * the index itself keys and links on them. `protocol` is checked here because everything DOWNSTREAM
  * of the index switches on it and then reaches straight for an arm-specific field without looking:
- * `search/candidates.ts#comparePoolPriority` calls `isHooked`, which reads `ref.poolKey.hooks` the
+ * `quote/rank.ts#isComplex` calls `isHooked`, which reads `ref.poolKey.hooks` the
  * moment `protocol === 'v4'`; `plan/compile.ts`'s recipient-vs-pool check reads `leg.pool.address`
  * for anything that is not `'v4'` and hands it to viem's `isAddressEqual`; `protocols/v4.ts` and
  * `encode/ur20.ts` ABI-encode `poolKey.fee`/`tickSpacing`/`hooks` into quote calls and calldata. So a
@@ -837,14 +836,14 @@ export class PoolIndex {
    * calls `markNegative` again after a burst pays nothing extra, but also never gets to rely on a
    * background sweep it never triggered.
    *
-   * Deliberately amount-independent AT THIS LAYER: it is the caller's job (see
-   * `search/waves.ts#recordFailures`) to only mark a pool negative for a failure shape that is
+   * Deliberately amount-independent AT THIS LAYER: it is the caller's job (see the pump's
+   * reverted-measurement handling, `search/pump.ts`) to only mark a pool negative for a failure shape that is
    * itself amount-independent (an empty-data revert — the pool-absent shape). This method has no
    * way to know why the caller decided to mark, so it does not gate on amount at all; it only bounds
    * *how long* a mark can possibly outlive its evidence.
    *
-   * `ref` is not required to already be in the index — a speculative quote candidate the wave engine
-   * probed can fail before anything ever `upsert`s it — so the touch it records for eviction purposes
+   * `ref` is not required to already be in the index — a hypothesis the pump measured can fail
+   * before anything ever `upsert`s it — so the touch it records for eviction purposes
    * is gated on the pool actually being indexed: touching (or worse, creating a `lastTouched` entry
    * for) an id `pools` has never heard of would itself be exactly the kind of key that never gets
    * cleaned up, since {@link evictPool} only ever runs for ids `pools` contains.
@@ -862,19 +861,17 @@ export class PoolIndex {
   }
 
   /**
-   * Touches every pool in `refs` at `block` in one call — for the wave engine's candidate-enumeration
-   * step (`search/waves.ts#quoteEnumerated`), which hands back every pool `generateRoutes` selected as
-   * a route leg *before* anything is quoted, let alone quoted successfully.
+   * Touches every pool in `refs` at `block` in one call — for the pump's planning step
+   * (`search/pump.ts`), which touches every pool it plans a leg for *before* anything is quoted,
+   * let alone quoted successfully.
    *
    * WHY THIS EXISTS (reviewer follow-up to C4-H5). `upsert`/`markSuccess`/`markNegative` all key a
-   * touch to a route's OUTCOME — inserted, quoted successfully, quoted and failed. A pool alive only
-   * as a two-hop intermediate leg can be enumerated by every single search that runs against its pair
-   * and never once hit any of those three: `markSuccess` only fires on the LEG that was actually
-   * quoted and returned, and a leg can be pruned before quoting (`MAX_POOLS_DIRECT`/`MAX_POOLS_PER_LEG`,
-   * `MAX_QUOTE_CANDIDATES`) without ever reaching a call that would touch it. Under `maxPools` that
-   * pool was evictable despite being exactly the kind of pool the cap exists to keep — one this
-   * router's own searches keep finding useful. Being selected as a candidate leg IS evidence the pool
-   * is worth keeping, independent of whether that particular quote later succeeds or fails.
+   * touch to a measurement's OUTCOME — inserted, priced, priced and failed. A pool alive only as a
+   * two-hop intermediate leg can be planned by every single search that runs against its pair and,
+   * cut short by an abort or the pair ceiling, never once hit any of those three. Under `maxPools`
+   * that pool was evictable despite being exactly the kind of pool the cap exists to keep — one
+   * this router's own searches keep finding useful. Being planned as a leg IS evidence the pool is
+   * worth keeping, independent of whether that particular measurement later succeeds or fails.
    *
    * Refs not currently indexed are silently skipped (mirrors `markNegative`'s same guard) — nothing
    * here upserts a pool that is not already known.
@@ -921,7 +918,7 @@ export class PoolIndex {
   /**
    * Drops every negative-cache entry older than {@link NEGATIVE_CACHE_BLOCKS} behind `newBlock`.
    * Run on every {@link markNegative} call rather than on a timer or a separate sweep method: a
-   * search pins blocks close to monotonically (the head watermark in `search/waves.ts` only ever
+   * search pins blocks close to monotonically (the head watermark in `search/loop.ts` only ever
    * regresses across a lagging-replica hiccup, and self-heals even then), so in steady state this is
    * a handful of `Map` key deletions per call — never a scan whose cost grows with how many pools
    * have ever failed, which is what made the un-evicted map unbounded in the first place.

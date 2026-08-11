@@ -327,7 +327,7 @@ describe('classifyRpcError — evidence depth', () => {
 // third (weaker) walk lived in `verify/preflight.ts`. The tests below pin the
 // two properties that made the divergence a live bug rather than a tidiness
 // complaint: the nested geth shape must yield its bytes, and a zero-length
-// '0x' must never be mistaken for payload (it is what `quote/quote.ts`'s
+// '0x' must never be mistaken for payload (it is what `quote/measure.ts`'s
 // amount-independence rule keys off, so a false positive there suppresses a
 // cacheable "pool absent" fact).
 // ---------------------------------------------------------------------------

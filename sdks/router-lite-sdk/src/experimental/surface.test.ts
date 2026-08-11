@@ -34,7 +34,6 @@ import {
   emptyReport,
   encoderFor,
   ethCall,
-  generateRoutes,
   intersectRanges,
   isDiscredited,
   isHooked,
@@ -56,12 +55,12 @@ import {
 // Every value and type below is built ONLY from this subpath's own exports
 // (`./index`, i.e. what a real consumer imports as `.../experimental`) plus
 // the public types re-exported from the package root (`../index`) — never
-// from an internal path like `../search/candidates` or `../protocols/types`.
+// from an internal path like `../protocols/types`.
 // If a future edit to `experimental/index.ts` drops an export, or adds a
 // required argument type that isn't reachable from here, this file stops
 // compiling — that's the point: it is the regression test for the shipped
-// defect this file fixes (generateRoutes/compileExecutionPlan's argument
-// types were unconstructible from outside the package).
+// defect this file fixes (compileExecutionPlan's argument types were
+// unconstructible from outside the package).
 //
 // WHAT THE CASES BELOW CANNOT DO IS NOTICE AN ARRIVAL. Each one names what it
 // uses, so it fails when an export goes missing and stays perfectly green when
@@ -92,7 +91,6 @@ const EXPERIMENTAL_VALUE_EXPORTS = [
   'emptyReport',
   'encoderFor',
   'ethCall',
-  'generateRoutes',
   'intersectRanges',
   'isDiscredited',
   'isHooked',
@@ -142,14 +140,6 @@ test('PoolIndexOptions is nameable from `.../experimental` for PoolIndex\'s cons
   const options: PoolIndexOptions = { maxPools: 10 }
   const index = new PoolIndex(WETH, options)
   expect(index.stats().pools).toBe(0)
-})
-
-test('generateRoutes is callable without hookData — it defaults to an empty map', () => {
-  const index = new PoolIndex(WETH)
-  index.upsert({ pool: v2WethUsdc, source: 'hint' })
-  const { candidates } = generateRoutes({ tokenIn: USDC, tokenOut: WETH, index, wrappedNative: WETH })
-  expect(candidates).toHaveLength(1)
-  expect(candidates[0]!.legs[0]!.pool).toEqual(v2WethUsdc)
 })
 
 test('the PoolRef constructors are reachable, and derive the ref\'s id/currencies', () => {

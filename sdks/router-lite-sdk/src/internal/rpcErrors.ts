@@ -497,8 +497,8 @@ export function classifyRpcError(err: unknown): RpcFailureKind {
  * payload either) — a fact about the *chain*, true for every amount and every caller, so it is safe
  * to remember. A revert WITH data — `NotEnoughLiquidity(poolId)`, a hook rejecting the call, a
  * zero-output rounding revert — names a REASON, and a reason can depend on how much was asked for or
- * who was asking. See `search/waves.ts`'s `recordFailures` for where this decides whether a failure
- * is allowed into the (cross-request-shared) negative cache.
+ * who was asking. See `search/pump.ts`'s reverted-measurement handling for where this decides
+ * whether a failure is allowed into the (cross-request-shared) negative cache.
  */
 export function revertDataOf(err: unknown): Hex | undefined {
   return collectFacts(err).revertData

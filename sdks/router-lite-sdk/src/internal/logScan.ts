@@ -309,8 +309,8 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * caller whose scan is one of several competing for a latency budget and is not the one the caller
  * is waiting on. Running out of it is not an error and needs no new report surface: the scan stops
  * where it is and the blocks it never reached are simply absent from `covered`, which is already how
- * partial discovery is expressed everywhere else. See `constants.ts#FEE_DISCOVERY_MAX_REQUESTS` for
- * the case that motivated it — a full-history scan in an early wave starving every later one.
+ * partial discovery is expressed everywhere else — the seam for a caller that must stop one scan
+ * from starving whatever else shares its latency budget.
  */
 export async function scanLogs(
   client: Pick<PublicClient, 'request'>,
@@ -450,10 +450,9 @@ export async function scanLogs(
       coveredRaw.push(batch[i]!)
       // `opts.onLogs` gets this chunk NOW, rather than the caller getting everything at the end.
       // A multi-million-block scan is minutes long, and until this existed nothing downstream — not
-      // the pool index, not the candidate enumerator, not the quoter — learned a single pool until
-      // the LAST chunk landed. That made a scan an all-or-nothing purchase: aborted at 90%, it
-      // returned its logs but far too late for the wave to price any of them (see
-      // `search/waves.ts#quoteWhileDiscovering` for the live numbers). It is best-effort and purely
+      // the pool index, not the pump — learned a single pool until the LAST chunk landed. That made
+      // a scan an all-or-nothing purchase: aborted at 90%, it returned its logs but far too late
+      // for the search to price any of them. It is best-effort and purely
       // additive: `logs` still accumulates and is still returned in full, so a caller that ignores
       // this sees no difference whatsoever.
       if (chunkLogs.length > 0) opts.onLogs?.(chunkLogs)

@@ -7,9 +7,9 @@ import type { ProtocolModule } from '../protocols/types'
 import type { BlockRef, ChainManifest, Protocol, SwapRequest } from '../types'
 
 import { buildReport, discoveryStatus } from './report'
+import type { ReportCtx } from './report'
 import { createState } from './state'
 import type { SearchState } from './state'
-import type { SearchContext } from './waves'
 
 // ---------------------------------------------------------------------------
 // C4-T1 mutation-audit kill: M15.
@@ -23,7 +23,7 @@ import type { SearchContext } from './waves'
 // branch. Confirmed surviving the pre-existing suite (audit + local
 // reproduction: `bun test` with `every` mutated to `some` in `report.ts`
 // still passes green), so this test pins the two-endpoint check directly
-// rather than through a full multi-wave `searchWaves` scenario.
+// rather than through a full engine scenario.
 // ---------------------------------------------------------------------------
 
 const WETH = `0x${'ee'.repeat(20)}` as Address
@@ -58,20 +58,14 @@ function enabledModule(id: Protocol): ProtocolModule {
 
 /** The three things the report fold reads. `buildReport` takes them separately (`state, ctx, req`);
  * these tests carry them as one bag so each scenario can reach in and seed one of them. */
-type Fold = { ctx: SearchContext; state: SearchState; req: SwapRequest }
+type Fold = { ctx: ReportCtx; state: SearchState; req: SwapRequest }
 
 function makeRun(): Fold {
   const modules = { v2: enabledModule('v2'), v3: enabledModule('v3'), v4: enabledModule('v4') }
-  const ctx: SearchContext = {
-    client: {
-      request: async () => {
-        throw new Error('discoveryStatus must never issue RPC')
-      },
-    },
+  const ctx: ReportCtx = {
     manifest: manifest(),
     modules,
     index: new PoolIndex(WETH), // discoveryStatus never touches the index; a real one is cheapest to build
-    hookData: new Map(),
   }
   const state = createState(BLOCK, false)
   const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: 1n, trader: TRADER }
@@ -153,9 +147,9 @@ test('buildReport: a warm-cache search that scans nothing new still reports the 
   const head = run.state.block.number
 
   // No scan runs in this test at all — the index is seeded as if an EARLIER search already found
-  // everything, and this run's discovery state is populated exactly as `scanAdjacency` would leave
-  // it for two endpoints whose adjacency needed no scanning at all (empty `uncovered` trivially
-  // satisfies "nothing left to cover").
+  // everything, and this run's discovery state is populated exactly as the coverage worker would
+  // leave it for two endpoints whose adjacency needed no scanning at all (empty `uncovered`
+  // trivially satisfies "nothing left to cover").
   run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: head })
   run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 0n, toBlock: head })
   run.state.discovery.v2.complete.add(TOKEN_A)

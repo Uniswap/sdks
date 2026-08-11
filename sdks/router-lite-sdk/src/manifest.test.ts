@@ -422,8 +422,8 @@ describe('chain manifest', () => {
 
       test('an implausibly large blockTimeSeconds is rejected as a unit confusion', () => {
         // The tripwire case: mainnet's 12s written in MILLISECONDS. Nothing throws downstream — it
-        // just silently shrinks wave 0's window from 50,400 blocks to 51, and the fast path stops
-        // finding anything for a reason no report names.
+        // just silently shrinks the eager pair-scan window from 50,400 blocks to 51, and the fast
+        // path stops finding anything for a reason no report names.
         expect(() => manifestFor(1, { chain: { blockTimeSeconds: 12_000 } })).toThrow(RouterConfigError)
         expect(() => manifestFor(1, { chain: { blockTimeSeconds: 12_000 } })).toThrow(/milliseconds/)
         expect(() => manifestFor(1, { chain: { blockTimeSeconds: 3601 } })).toThrow(RouterConfigError)

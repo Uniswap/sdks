@@ -12,7 +12,7 @@ import { classifyRpcError } from './rpcErrors'
 //
 // A raw `request()` call is used instead of viem's `call()` action so this
 // stays block-pinned and free of viem's own batching/multicall behavior —
-// the quoting engine (Task 12) is entirely in control of how many in-flight
+// the measurement engine is entirely in control of how many in-flight
 // calls exist and against which block, and tests only need to stub `request`
 // rather than a full `PublicClient`.
 //
@@ -27,11 +27,11 @@ import { classifyRpcError } from './rpcErrors'
 //
 // `mapConcurrent`'s `limit` used to be the ONLY concurrency bound in this package, and it is
 // per-CALL — every `mapConcurrent(items, MAX_CONCURRENT_CALLS, fn)` batch gets its own fresh
-// budget. That is fine in isolation, but wave 0 fires several such batches at once (hint
-// validation, route probes, and — for swaps — the readiness reads, all under one `Promise.all` in
-// `search/waves.ts#wave0a`), so the REAL peak in-flight `client.request` count is the SUM of every
-// concurrently-running batch's own limit, not any single one of them (measured at ~44 for a
-// realistic wave 0, more than double the doc comment's claimed bound). A {@link Semaphore} fixes
+// budget. That is fine in isolation, but a search runs several such batches at once (measurement
+// rounds, log scans, and — for swaps — the readiness reads, all concurrent under `search/loop.ts`),
+// so the REAL peak in-flight `client.request` count is the SUM of every concurrently-running
+// batch's own limit, not any single one of them (measured at ~44 for a realistic first cycle,
+// more than double the doc comment's claimed bound). A {@link Semaphore} fixes
 // that by being a bound the ROUTER holds once (`createSemaphore` in `router.ts#createRouter`) and
 // threads into every function that actually issues a `client.request`.
 //
@@ -39,9 +39,9 @@ import { classifyRpcError } from './rpcErrors'
 // semaphore around its own `client.request`, and nothing else in this package talks to the
 // transport at all:
 //
-//   - `ethCall` (this file) — every `eth_call`: quoting (`quote.ts`'s `quoteCandidates`/
-//     `probeQuotes`), readiness's three ERC-20/Permit2 reads (`verify/readiness.ts#readErc20State`),
-//     and hint validation (`search/waves.ts#resolveHints`).
+//   - `ethCall` (this file) — every `eth_call`: leg measurement (`quote/measure.ts#measureLegs`,
+//     hinted hypotheses included) and readiness's three ERC-20/Permit2 reads
+//     (`verify/readiness.ts#readErc20State`).
 //   - `scanLogs` (`internal/logScan.ts`) — every `eth_getLogs`: adjacency/fee-tier/exact-pair
 //     discovery (`search/coverage.ts`).
 //   - `preflightTx` (`verify/preflight.ts`) — the leader's simulation `eth_call`
@@ -51,7 +51,7 @@ import { classifyRpcError } from './rpcErrors'
 //     raw for the same reason (`eth_getBalance` has no revert/quote semantics to classify).
 //   - `ethCallLatest` (`router.ts`) — `ingestPool`'s hint-validation `eth_call` at `'latest'`; raw
 //     because ingestion has no pinned search block of its own to reuse.
-//   - `requestHead` (`search/waves.ts`) — the pinned-block `eth_getBlockByNumber` fetch AND its
+//   - `requestHead` (`search/loop.ts`) — the pinned-block `eth_getBlockByNumber` fetch AND its
 //     head-regression refetch (`fetchBlock`); a leaf request with nothing nested inside it, so
 //     gating it carries no lock-ordering risk.
 //

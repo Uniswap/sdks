@@ -12,7 +12,7 @@ import { checkReadiness } from './readiness'
 // ---------------------------------------------------------------------------
 // Stub client — keyed by (to, data) for `eth_call`s, the full identity of a
 // call, plus a separate slot for the one `eth_getBalance` a native-input
-// check issues. Mirrors the stub in `quote/quote.test.ts`.
+// check issues. Mirrors the stubs the measurement suites use.
 // ---------------------------------------------------------------------------
 
 type StubEntry = Hex | 'revert' | 'rate-limit' | 'aborted'
@@ -517,8 +517,8 @@ test('(k) a malformed permit address does not throw — the permit simply does n
 test("(l) a non-integer permit expiration does not throw — `BigInt(1.5)` is a RangeError, not a business outcome", async () => {
   // The sibling of (k), for the numeric half of the struct. `isPermitValid` does
   // `BigInt(permit.details.expiration)` on a plain `number`; a fractional/NaN/Infinite one raises a
-  // raw `RangeError` straight out of `checkReadiness`, which is reached from wave 0's `Promise.all`
-  // and is documented never to throw for a business outcome. A malformed expiration means the same
+  // raw `RangeError` straight out of `checkReadiness`, which is reached from the search's readiness
+  // source and is documented never to throw for a business outcome. A malformed expiration means the same
   // thing a malformed address does: THIS PERMIT DOES NOT AUTHORIZE THIS TRADE.
   const client = stubClient({
     ...entryFor(balanceCall(), balanceReturn(AMOUNT_IN * 2n)),

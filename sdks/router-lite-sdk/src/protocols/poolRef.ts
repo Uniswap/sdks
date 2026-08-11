@@ -32,7 +32,7 @@ export type V4PoolRef = Extract<PoolRef, { protocol: 'v4' }>
  * A canonical lowercased string is exactly what makes two spellings of the same pool collide in the
  * index's `Map`, and `id` is a v4 poolId (a 32-byte hash) as often as an address, which
  * `isAddressEqual` cannot take at all. Every keyed lookup in this package is lowercased for the same
- * reason — see `pools/poolIndex.ts` and `search/waves.ts`. */
+ * reason — see `pools/poolIndex.ts` and `search/state.ts#legKey`. */
 function identity(protocol: Protocol, id: Address | Hex): string {
   return `${protocol}:${id.toLowerCase()}`
 }
@@ -44,9 +44,9 @@ function identity(protocol: Protocol, id: Address | Hex): string {
  * IT LIVES BESIDE {@link identity} BECAUSE IT IS THAT FUNCTION'S ONLY COMPOSITION. `routeId` is
  * nothing but `PoolRef.id` concatenated in leg order, so the two spellings of "what makes this the
  * same thing as that" belong in one file — a change to how a pool is keyed is automatically a
- * change to how a route is keyed, and this is where a reader looking for either finds both. It used
- * to sit in `search/candidates.ts`, which meant `quote/quote.ts` (the ranking tie-break) imported
- * UP the layer stack into the search engine to ask a question with no search in it at all.
+ * change to how a route is keyed, and this is where a reader looking for either finds both. It lives
+ * here rather than in the search engine so `quote/rank.ts` (the ranking tie-break) never imports
+ * UP the layer stack to ask a question with no search in it at all.
  */
 export function routeId(c: RouteCandidate): string {
   return c.legs.map((leg) => leg.pool.id).join('>')

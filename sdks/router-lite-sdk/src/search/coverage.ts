@@ -1,22 +1,22 @@
 import type { Address, Log, PublicClient } from 'viem'
 
+import { toGraphNode } from '../internal/currency'
 import { scanLogs } from '../internal/logScan'
 import type { ScanWidthMemory } from '../internal/logScan'
 import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from '../internal/ranges'
 import type { Semaphore } from '../internal/rpc'
-import { wave0PairScanBlocks } from '../manifest'
+import { deploymentBlockOf, wave0PairScanBlocks } from '../manifest'
 import type { PoolIndex } from '../pools/poolIndex'
 import type { AdjacencyShape } from '../protocols/adjacency'
 import type { FeeDiscovery, ProtocolModule } from '../protocols/types'
-import type { BlockRange, ChainManifest, CurrencyRef, LogQuery, Protocol, QuoteRequest } from '../types'
+import type { BlockRange, ChainManifest, LogQuery, Protocol, QuoteRequest } from '../types'
+import { PROTOCOLS } from '../types'
 
 import { planAdjacencyScans, scopeKey } from './adjacencyPlan'
 import type { ScopeDemand } from './adjacencyPlan'
-import { deploymentBlockOf, enabledModules, node } from './context'
 import type { Notifier } from './notify'
 import { applyCoverage } from './state'
 import type { SearchState } from './state'
-import type { Run } from './waves'
 
 // ---------------------------------------------------------------------------
 // THE COVERAGE WORKER (spec §3.3) — the engine's one convergence process over
@@ -33,20 +33,18 @@ import type { Run } from './waves'
 //   `[deployBlock, head]`.
 //
 //   HAVE is the shared index coverage cache, minus the ranges THIS search has
-//   already covered ({@link CoverageWorker.attempted} — the old
-//   `state.pairScanned`/`adjacencyScanned`, now private). `uncovered` re-opens
-//   its tail on every read (the standing reorg overlap), so without that private
-//   set every later pass would re-buy the last 32 blocks of everything the
-//   previous one just covered.
+//   already covered ({@link CoverageWorker.attempted}, private to the worker).
+//   `uncovered` re-opens its tail on every read (the standing reorg overlap),
+//   so without that private set every later pass would re-buy the last 32
+//   blocks of everything the previous one just covered.
 //
 //   CONVERGE is one loop: compute `uncovered = demand − have`, plan merged
-//   requests over it (`adjacencyPlan.ts`, unchanged), walk them HEAD-BACKWARD,
-//   ingest chunk by chunk, record coverage — and pass again WHILE THE PREVIOUS
-//   PASS MADE PROGRESS. That while-progress rule is what replaces both the fixed
-//   retry wave and `FEE_DISCOVERY_MAX_REQUESTS`: every scope converges
-//   concurrently, metered by the shared semaphore and `scanLogs`' own per-scan
-//   request budget, so the fee scan can no longer starve the adjacency scans by
-//   running ahead of them in a serial order.
+//   requests over it (`adjacencyPlan.ts`), walk them HEAD-BACKWARD, ingest
+//   chunk by chunk, record coverage — and pass again WHILE THE PREVIOUS PASS
+//   MADE PROGRESS. The while-progress rule is the whole retry policy: every
+//   scope converges concurrently, metered by the shared semaphore and
+//   `scanLogs`' own per-scan request budget, so no scope can starve another by
+//   running ahead of it in a serial order.
 //
 //   REPORTING is judged against the LIMIT demand (the deployment floors), never
 //   against what the gate has opened so far: `complete` = covered to the floor;
@@ -56,10 +54,12 @@ import type { Run } from './waves'
 //
 // Nothing here throws for a provider failure: `scanLogs` returns what it managed
 // to cover, and a scope that covered nothing is recorded as `failed`.
-//
-// The four `Run`-shaped functions at the bottom are TRANSITIONAL — the wave
-// engine's entry points into this machinery, deleted with `waves.ts` in Task 9.
 // ---------------------------------------------------------------------------
+
+/** The protocol modules this chain's manifest actually configures, in `PROTOCOLS` order. */
+function enabledModules(ctx: { modules: Record<Protocol, ProtocolModule>; manifest: ChainManifest }): ProtocolModule[] {
+  return PROTOCOLS.map((p) => ctx.modules[p]).filter((m) => m.enabled(ctx.manifest))
+}
 
 export type CoverageCtx = {
   index: PoolIndex
@@ -78,8 +78,7 @@ export type CoverageCtx = {
 
 // ---------------------------------------------------------------------------
 // The I/O primitives — everything that actually issues an `eth_getLogs` and
-// folds the answer back into the index. Shared verbatim by the worker and by the
-// transitional wave-engine entry points.
+// folds the answer back into the index.
 // ---------------------------------------------------------------------------
 
 /**
@@ -326,30 +325,23 @@ async function runAdjacencyScans(
  * so it reports `progress` and the worker bumps `indexVersion` for it. `addEnabledFees` returns
  * void, so growth is detected by comparing the set's size across the call.
  *
- * `maxRequests` is the TRANSITIONAL wave engine's handed-down budget, and it bounds THE CALL rather
- * than each range — the difference between a bound and a multiplier, since a warm index's
- * `uncovered` is routinely two ranges (the unscanned gap plus the re-opened reorg tail). The worker
- * passes none: every scope converges concurrently now, so a full-history fee scan can no longer
- * starve the adjacency scans by running ahead of them.
+ * There is no per-call request budget here: every scope converges concurrently, metered by the
+ * shared semaphore and `scanLogs`' own per-scan budget, so a full-history fee scan cannot starve
+ * the adjacency scans by running ahead of them in a serial order.
  */
 async function runFeeScan(
   env: ScanEnv,
   module_: ProtocolModule,
   feeDiscovery: FeeDiscovery,
   ranges: BlockRange[],
-  maxRequests?: number,
 ): Promise<BlockRange[]> {
   const query = feeDiscovery.query(env.manifest)
   const factory = query.address
   const opts = scanOpts(env)
   const covered: BlockRange[] = []
-  let spent = 0
   for (const range of headBackward(ranges)) {
     if (env.signal?.aborted) break
-    const remaining = maxRequests === undefined ? undefined : maxRequests - spent
-    if (remaining !== undefined && remaining <= 0) break
-    const scan = await scanLogs(env.client, query, range, { ...opts, maxRequests: remaining })
-    spent += scan.requests
+    const scan = await scanLogs(env.client, query, range, opts)
     const before = env.index.enabledFees(module_.id, factory).length
     env.index.addEnabledFees(module_.id, factory, feeDiscovery.feesFromLogs(scan.logs, env.manifest))
     const grew = env.index.enabledFees(module_.id, factory).length > before
@@ -508,7 +500,9 @@ export class CoverageWorker {
 
   private buildScopes(req: Pick<QuoteRequest, 'tokenIn' | 'tokenOut'>): WorkerScope[] {
     const manifest = this.ctx.manifest
-    const endpoints = [...new Set([node(req.tokenIn, manifest), node(req.tokenOut, manifest)])]
+    const endpoints = [
+      ...new Set([toGraphNode(req.tokenIn, manifest.wrappedNative), toGraphNode(req.tokenOut, manifest.wrappedNative)]),
+    ]
     const scopes: WorkerScope[] = []
     for (const module_ of enabledModules(this.env)) {
       const floor = deploymentBlockOf(manifest, module_.id)
@@ -632,10 +626,19 @@ export class CoverageWorker {
    *     scopes have no endpoint of their own and so complete nothing on their own.
    *   * `failed` — this scope still wanted blocks under the CURRENT demand and the pass covered
    *     none of them. That is a source failure, and it is protocol-wide (`state.discovery[p].failed`)
-   *     whichever kind of scope was starved.
+   *     for the adjacency and pair scopes, which are the scopes whose gaps can hide pools this trade
+   *     needs.
    *
-   * A pre-gate settle is NEITHER: the eager slice being covered is not completeness (the limit
-   * demand is untouched), and a scope with no demand yet was not starved. It is just
+   * A STARVED FEE SCOPE IS DELIBERATELY NOT A DISCOVERY FAILURE. Fee-enablement history only widens
+   * the HYPOTHESIS set (extra derivable v3 tiers); it never carries a creation event, so a pool on a
+   * governance-enabled tier is still surfaced by the adjacency/pair scans whenever it exists — and
+   * marking `discovery[p].failed` for a wholesale-refused fee scan would demote a search whose
+   * creation-event coverage is genuinely complete from an authoritative verdict to a permanent
+   * `inconclusive`. When the provider starves everything, the adjacency scopes starve too and carry
+   * the axis; when it starves only the topic-narrow fee scan, exhaustiveness is honestly intact.
+   *
+   * A pre-gate settle is NEITHER verdict: the eager slice being covered is not completeness (the
+   * limit demand is untouched), and a scope with no demand yet was not starved. It is just
    * settled-for-now, waiting for the gate.
    *
    * An abort is reported on its own axis and must never be blamed on the provider, so a search that
@@ -648,7 +651,7 @@ export class CoverageWorker {
         if (s.kind !== 'adjacency' || this.reported.has(`complete:${key}`)) continue
         this.reported.add(`complete:${key}`)
         applyCoverage(this.state, s.protocol, s.endpoint.toLowerCase(), { kind: 'complete' })
-      } else if (this.wanted(s, this.demandOf(s)).length > 0 && !this.reported.has(`failed:${key}`)) {
+      } else if (s.kind !== 'fee' && this.wanted(s, this.demandOf(s)).length > 0 && !this.reported.has(`failed:${key}`)) {
         this.reported.add(`failed:${key}`)
         applyCoverage(this.state, s.protocol, s.scope.toLowerCase(), { kind: 'failed' })
       }
@@ -687,101 +690,3 @@ function makeLatch(): Notifier {
   }
 }
 
-// ---------------------------------------------------------------------------
-// TRANSITIONAL: the wave engine's entry points.
-//
-// `waves.ts` still decides which scan runs in which wave, how far back wave 0's
-// pair scan reaches, and how many requests a fee scan may spend; these four
-// functions carry those decisions out over the primitives above and write the
-// wave engine's own bookkeeping (`EngineState.pairScanned`/`adjacencyScanned`/
-// `discovery`). They are deleted with `waves.ts` in Task 9, along with
-// `runFeeScan`'s `maxRequests` parameter — the coverage worker passes none.
-// ---------------------------------------------------------------------------
-
-/** A `Run`'s scan environment. The wave engine has no `indexVersion` and no wake, so `progress` is
- * a no-op for it: its own `quoteWhileDiscovering` interleave polls the index on a timer instead. */
-function runEnv(run: Run, signal?: AbortSignal): ScanEnv {
-  const effective = signal ?? run.req.signal
-  return {
-    index: run.ctx.index,
-    modules: run.ctx.modules,
-    manifest: run.ctx.manifest,
-    client: run.ctx.client,
-    head: run.state.block.number,
-    semaphore: run.ctx.semaphore,
-    logChunkBlocks: run.ctx.logChunkBlocks,
-    scanSleep: run.ctx.scanSleep,
-    signal: effective,
-    progress: () => {},
-  }
-}
-
-/** Wave 0's leading slice of the exact-pair scan: the most recent `window` blocks only. */
-export async function scanExactPairRecent(run: Run, opts: { window: bigint; signal?: AbortSignal }): Promise<void> {
-  const env = runEnv(run, opts.signal)
-  const plan = exactPairPlan(env, run.req)
-  if (!plan) return
-  const head = env.head
-  const windowStart = maxBig(plan.deployBlock, head - opts.window + 1n)
-  const uncovered = env.index.uncovered('v4', plan.scope, plan.deployBlock, head)
-  const ranges = intersectRanges(uncovered, [{ fromBlock: windowStart, toBlock: head }])
-  run.state.pairScanned.push(...ranges)
-  await runPairScan(env, plan, ranges)
-}
-
-/** The pair's remaining history, completed in the scan-bound waves alongside adjacency. */
-export async function completeExactPairScan(run: Run): Promise<void> {
-  const env = runEnv(run)
-  const plan = exactPairPlan(env, run.req)
-  if (!plan) return
-  const uncovered = env.index.uncovered('v4', plan.scope, plan.deployBlock, env.head)
-  const ranges = subtractRanges(uncovered, run.state.pairScanned)
-  run.state.pairScanned.push(...ranges)
-  await runPairScan(env, plan, ranges)
-}
-
-/** Adjacency for `endpoints`, with the wave engine's own attempted-range and discovery bookkeeping. */
-export async function scanAdjacency(run: Run, endpoints: CurrencyRef[]): Promise<void> {
-  const env = runEnv(run)
-  const { state } = run
-  const nodes = [...new Set(endpoints.map((e) => node(e, env.manifest)))]
-
-  const byEmitter = new Map<string, ProtocolModule>()
-  const demands: ScopeDemand[] = []
-  for (const module_ of enabledModules(env)) {
-    const shape = module_.adjacencyShape(env.manifest)
-    const deployBlock = deploymentBlockOf(env.manifest, module_.id)
-    if (!shape || deployBlock === undefined) continue
-    byEmitter.set(shape.emitter.toLowerCase(), module_)
-    for (const endpoint of nodes) {
-      const uncovered = subtractRanges(
-        env.index.uncovered(module_.id, endpoint, deployBlock, env.head),
-        state.adjacencyScanned.get(scopeKey({ protocol: module_.id, endpoint })) ?? [],
-      )
-      demands.push({ protocol: module_.id, endpoint, shape, uncovered })
-    }
-  }
-
-  const covered = await runAdjacencyScans(env, demands, byEmitter)
-
-  for (const demand of demands) {
-    const key = scopeKey(demand)
-    const got = mergeRanges(covered.get(key) ?? [])
-    const discovery = state.discovery[demand.protocol]
-    for (const range of got) env.index.addCoverage(demand.protocol, demand.endpoint, range)
-    state.adjacencyScanned.set(key, mergeRanges([...(state.adjacencyScanned.get(key) ?? []), ...got]))
-    if (subtractRanges(demand.uncovered, got).length === 0) discovery.complete.add(demand.endpoint)
-    else if (got.length === 0 && !run.req.signal?.aborted) discovery.failed = true
-  }
-}
-
-/** A factory's fee-enablement history, under the wave engine's handed-down request budget. */
-export async function discoverFeeTiers(run: Run, module_: ProtocolModule, opts: { maxRequests: number }): Promise<void> {
-  const env = runEnv(run)
-  const feeDiscovery = module_.feeDiscovery
-  const deployBlock = deploymentBlockOf(env.manifest, module_.id)
-  if (!feeDiscovery || deployBlock === undefined) return
-  const factory = feeDiscovery.query(env.manifest).address
-  const ranges = env.index.uncovered(module_.id, factory, deployBlock, env.head)
-  await runFeeScan(env, module_, feeDiscovery, ranges, opts.maxRequests)
-}

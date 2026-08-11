@@ -10,17 +10,14 @@ import { PoolIndex } from '../pools/poolIndex'
 import type { ProtocolModule } from '../protocols/types'
 import type { BlockRange, ChainManifest, CurrencyRef, PoolRecord, Protocol, QuoteRequest } from '../types'
 
-import { CoverageWorker, discoverFeeTiers } from './coverage'
+import { CoverageWorker } from './coverage'
 import type { CoverageCtx } from './coverage'
 import { createNotifier } from './notify'
 import { createState } from './state'
 import type { SearchState } from './state'
-import type { Run, SearchContext } from './waves'
-import { initialState } from './waves'
 
 // ---------------------------------------------------------------------------
-// The coverage worker's tests — the port of `discovery.test.ts`, re-aimed at the
-// declarative worker (spec §3.3) rather than at four wave-called functions.
+// The coverage worker's tests (spec §3.3).
 //
 // The properties worth a direct test are the ones that are ways to LIE about
 // what was scanned, and they survive the refactor unchanged:
@@ -199,7 +196,7 @@ function stubClient(opts: {
     async request(args: any) {
       if (args.method !== 'eth_getLogs') throw new Error(`stubClient: unexpected method ${args.method}`)
       const filter = args.params[0]
-      // Same guard as `waves.test.ts`: an unfiltered query is a firehose, never a scan.
+      // An unfiltered query is a firehose, never a scan.
       if (!Array.isArray(filter.topics) || filter.topics.length === 0) throw new Error('stubClient: eth_getLogs arrived with no topic filter')
       const from = BigInt(filter.fromBlock)
       const to = BigInt(filter.toBlock)
@@ -514,6 +511,33 @@ describe('convergence and the report', () => {
     expect(h.state.discovery.v3.failed).toBe(true)
   })
 
+  test('a wholesale-refused FEE scope never fails discovery when the creation-event scopes are complete', async () => {
+    // Fee tiers only widen the HYPOTHESIS set — a fee-enablement log never carries a pool, so a pool
+    // on a governance-enabled tier is still surfaced by the adjacency/pair scans whenever it exists.
+    // Marking `discovery.v3.failed` for a starved fee scan would demote a search whose
+    // creation-event coverage is genuinely complete from an authoritative verdict to a permanent
+    // `inconclusive` — the over-conservative reading this test pins the removal of.
+    const { client, served } = stubClient({
+      answer: ({ topics }) => {
+        if (topics[0] === FEE_TOPIC) throw new Error(UNREACHABLE) // the fee-factory scope, starved wholesale
+        return [] // adjacency answers cleanly
+      },
+    })
+    const h = makeWorker(client, manifestWith({ deploymentBlock: DEPLOY }), { logChunkBlocks: CHUNK })
+
+    h.worker.demandFull()
+    await h.worker.run(h.signal)
+
+    // The fee scan really ran, really was refused, and really left its scope uncovered...
+    expect(served.some((s) => s.refused && s.filter.topics[0] === FEE_TOPIC)).toBe(true)
+    expect(blocksIn(h.index.uncovered('v3', V3_FACTORY, DEPLOY, HEAD))).toBeGreaterThan(0n)
+    // ...and the discovery axis is untouched: adjacency is complete for both endpoints, so the
+    // search keeps its claim to exhaustiveness over every pool a creation event can surface.
+    expect(h.state.discovery.v3.failed).toBe(false)
+    expect(h.state.discovery.v3.complete.has(TOKEN_A)).toBe(true)
+    expect(h.state.discovery.v3.complete.has(TOKEN_B)).toBe(true)
+  })
+
   test('a permanent hole: everything around it IS covered, the endpoint is never marked complete', async () => {
     const { client } = stubClient({
       answer: ({ from, to }) => {
@@ -533,9 +557,8 @@ describe('convergence and the report', () => {
     // into an authoritative `no-route`, so this is the coverage lie with the largest blast radius.
     expect(h.state.discovery.v3.complete.has(TOKEN_A)).toBe(false)
     // ...and the scope settles as `failed`, because the pass that asked for the hole alone got
-    // nothing. This is the wave engine's wave-2-then-wave-3 outcome exactly: the first pass covers
-    // everything around the hole (partial while the loop is still converging), the retry pass asks
-    // only for the hole, is refused, and reports the source failure.
+    // nothing: the first pass covers everything around the hole (partial while the loop is still
+    // converging), the next pass asks only for the hole, is refused, and reports the source failure.
     expect(h.state.discovery.v3.failed).toBe(true)
   })
 
@@ -841,75 +864,5 @@ describe('merged queries', () => {
       DEFAULT_REORG_OVERLAP_BLOCKS * BigInt(warm.length),
     )
     for (const s of warm) expect(s.from).toBeGreaterThanOrEqual(HEAD - DEFAULT_REORG_OVERLAP_BLOCKS + 1n)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// (g) TRANSITIONAL — deleted with `waves.ts` (Task 9).
-//
-// The wave engine still calls the four scan entry points this module keeps for
-// it, and the one property that is theirs alone rather than the worker's is the
-// handed-down fee-scan request budget: it bounds THE CALL, not each range. A
-// warm index's `uncovered` is routinely two ranges, so a per-range budget
-// quietly buys 2x — which on the warm Base run was the entire 60-second search.
-// ---------------------------------------------------------------------------
-
-describe('discoverFeeTiers — the handed-down request budget (transitional)', () => {
-  const CAP = 1_000n
-  const DEPLOY = 900_000n
-
-  function makeRun(client: SearchContext['client'], manifest: ChainManifest): Run {
-    const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: 1000n }
-    const ctx: SearchContext = {
-      client,
-      manifest,
-      modules: { v2: disabled('v2'), v3: v3Module, v4: v4Module },
-      index: new PoolIndex(WETH),
-      hookData: new Map(),
-    }
-    return { kind: 'quote', req, ctx, state: initialState(BLOCK, false) }
-  }
-
-  test('THE BUDGET SPANS THE CALL, NOT EACH RANGE, and the shortfall is reported as uncovered', async () => {
-    const BUDGET = 12
-    const { client, served } = stubClient({
-      answer: ({ from, to }) => {
-        if (to - from + 1n > CAP) throw new Error('query returned more than 10000 results')
-        return []
-      },
-    })
-    const run = makeRun(client, manifestWith({ deploymentBlock: DEPLOY }))
-    run.ctx.index.addCoverage('v3', V3_FACTORY, { fromBlock: 950_000n, toBlock: 960_000n })
-    const ranges = run.ctx.index.uncovered('v3', V3_FACTORY, DEPLOY, HEAD)
-    expect(ranges.length).toBeGreaterThan(1) // the premise: this really is a multi-range scan
-
-    await discoverFeeTiers(run, v3Module, { maxRequests: BUDGET })
-
-    // Every request that reached the wire counts, refused ones included — that is what makes the
-    // bound a bound rather than a bound on SUCCESSES.
-    expect(served.length).toBe(BUDGET)
-    expect(served.length).toBeLessThan(BUDGET * ranges.length)
-    // ...and the blocks it never asked about are still uncovered: a gap claimed here is a gap never
-    // scanned by anyone, ever.
-    const claimed = run.ctx.index.uncovered('v3', V3_FACTORY, DEPLOY, HEAD)
-    expect(blocksIn(claimed)).toBeGreaterThan(0n)
-    expect(blocksIn(claimed)).toBeLessThan(HEAD - DEPLOY + 1n)
-  })
-
-  test('COVERAGE IS EXACTLY WHAT WAS SERVED — never a block more', async () => {
-    const { client, served } = stubClient({
-      answer: ({ from, to }) => {
-        if (to - from + 1n > CAP) throw new Error('query returned more than 10000 results')
-        return []
-      },
-    })
-    const run = makeRun(client, manifestWith({ deploymentBlock: DEPLOY }))
-
-    await discoverFeeTiers(run, v3Module, { maxRequests: 20 })
-
-    const servedBlocks = served.filter((s) => !s.refused).reduce((sum, s) => sum + (s.to - s.from + 1n), 0n)
-    const coveredBlocks = HEAD - DEPLOY + 1n - blocksIn(run.ctx.index.uncovered('v3', V3_FACTORY, DEPLOY, HEAD))
-    expect(servedBlocks).toBeGreaterThanOrEqual(coveredBlocks)
-    expect(servedBlocks - coveredBlocks).toBeLessThanOrEqual(DEFAULT_REORG_OVERLAP_BLOCKS)
   })
 })

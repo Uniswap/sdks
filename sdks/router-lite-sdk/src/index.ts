@@ -7,7 +7,7 @@
 // configuration), the domain types requests and results are built from, and the two errors the
 // package ever throws.
 // Everything else (discovery, quoting, planning, encoding, verifying, the
-// wave engine itself) is internal — reachable only through the router, or,
+// solver loop itself) is internal — reachable only through the router, or,
 // for callers building their own search policy, through the `./experimental`
 // subpath.
 // ---------------------------------------------------------------------------
@@ -15,7 +15,7 @@
 import type { QuoteResult, SwapResult } from './types'
 
 export { createRouter } from './router'
-export type { CreateRouterOptions, IterateOptions, Router, RouterStats } from './router'
+export type { CreateRouterOptions, Router, RouterStats } from './router'
 
 export {
   manifestFor,
@@ -80,6 +80,7 @@ export type {
   RouteCandidate,
   RouteLeg,
   RouteQuote,
+  SearchEvent,
   SearchReport,
   SwapOperation,
   SwapRequest,

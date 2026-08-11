@@ -192,11 +192,10 @@ export function chainDisconnectedError(): Error {
 // ---------------------------------------------------------------------------
 // The shared `aggregate3` envelope stub.
 //
-// FOUR TEST FILES GREW THEIR OWN, AND THEY DRIFTED. `internal/multicall.test.ts`
-// asserted `allowFailure` and the block tag and was loud about an unscripted
-// inner call; `quote/quote.test.ts` asserted neither and served an unscripted
-// call as a clean revert; `search/waves.test.ts` asserted `allowFailure` only;
-// `router.test.ts` asserted nothing at all. Every one of those is the same
+// FOUR TEST FILES GREW THEIR OWN, AND THEY DRIFTED. Some asserted
+// `allowFailure` and the block tag and were loud about an unscripted inner
+// call; others asserted neither and served an unscripted call as a clean
+// revert, or asserted nothing at all. Every one of those is the same
 // four-line decode of the same Call3[], and each divergence is a class of bug
 // one file catches and the others wave through — which is the worst possible
 // place for a fixture to disagree with itself, because the thing they are all

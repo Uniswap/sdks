@@ -14,7 +14,7 @@ import {
   createRouter,
   manifestFor,
 } from './index'
-import type { CreateRouterOptions, IterateOptions, Protocol, ReasonCode } from './index'
+import type { CreateRouterOptions, Protocol, ReasonCode, SearchEvent, SearchReport } from './index'
 
 // ---------------------------------------------------------------------------
 // Compile-time + minimal-execution guard that every VALUE export of the package root
@@ -31,11 +31,11 @@ import type { CreateRouterOptions, IterateOptions, Protocol, ReasonCode } from '
 //
 // THE SPOT CHECKS BELOW ARE NOT A SURFACE PIN, WHICH IS WHY THE TWO EXHAUSTIVE ONES EXIST. A test
 // that names the exports it expects can only fail when one goes MISSING; an export that ARRIVES is
-// invisible to it, and the package shipped `PROTOCOLS` (a value) and `assumeChainId` /
-// `IterateOptions` (an option field and a type) with nothing failing and nothing documented. So
-// this file pins the full sorted export list, and — because `Object.keys` sees only value exports —
-// the option bag's keys are pinned at COMPILE time as well. Failing either is not a bug: it means
-// someone must consciously update the pin AND the README table it mirrors.
+// invisible to it, and the package once shipped `PROTOCOLS` (a value) and `assumeChainId` (an
+// option field) with nothing failing and nothing documented. So this file pins the full sorted
+// export list, and — because `Object.keys` sees only value exports — the option bag's keys are
+// pinned at COMPILE time as well. Failing either is not a bug: it means someone must consciously
+// update the pin AND the README table it mirrors.
 // ---------------------------------------------------------------------------
 
 /**
@@ -75,13 +75,17 @@ type PinnedCreateRouterOptions =
   | 'concurrency'
   | 'logChunkBlocks'
   | 'assumeChainId'
-type PinnedIterateOptions = 'onFirstRoute'
+/** The public streaming vocabulary (`Router.quotes`/`Router.swaps`): exactly three event kinds. */
+type PinnedSearchEventTypes = 'lead' | 'progress' | 'final'
 
 type _CreateRouterOptionsArePinned = AssertNever<Exact<keyof CreateRouterOptions & string, PinnedCreateRouterOptions>>
-type _IterateOptionsArePinned = AssertNever<Exact<keyof IterateOptions & string, PinnedIterateOptions>>
+type _SearchEventTypesArePinned = AssertNever<Exact<SearchEvent<unknown>['type'], PinnedSearchEventTypes>>
+// A `lead`/`final` carries the full interim result; a `progress` carries the report alone.
+type _ProgressCarriesReport = AssertNever<Exact<keyof Extract<SearchEvent<unknown>, { type: 'progress' }> & string, 'type' | 'search'>>
+type _ProgressSearchIsReport = AssertNever<Exact<'yes', Extract<SearchEvent<unknown>, { type: 'progress' }>['search'] extends SearchReport ? 'yes' : 'no'>>
 
-test('the two option bags carry exactly the documented fields', () => {
-  // The assertion is the two type aliases above (they fail `bun run typecheck:tests`, not this
+test('the option bag and the SearchEvent union carry exactly the documented fields', () => {
+  // The assertion is the type aliases above (they fail `bun run typecheck:tests`, not this
   // runtime test). This case exists so the aliases are referenced — an unused type alias is exactly
   // the thing a future cleanup deletes — and so the failure has a name in the test output too.
   const createKeys: PinnedCreateRouterOptions[] = [
@@ -93,9 +97,9 @@ test('the two option bags carry exactly the documented fields', () => {
     'logChunkBlocks',
     'assumeChainId',
   ]
-  const iterateKeys: PinnedIterateOptions[] = ['onFirstRoute']
+  const eventTypes: PinnedSearchEventTypes[] = ['lead', 'progress', 'final']
   expect(createKeys).toHaveLength(7)
-  expect(iterateKeys).toHaveLength(1)
+  expect(eventTypes).toHaveLength(3)
 })
 
 test('REASON_CODES is a real, importable, iterable value — not just the ReasonCode type', () => {

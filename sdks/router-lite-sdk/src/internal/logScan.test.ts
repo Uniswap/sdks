@@ -1088,10 +1088,9 @@ test('quicknode Base, live capture: the batched shape reaches the fast path thro
 // `opts.maxRequests` — a caller narrowing its own slice of the budget.
 //
 // The case it exists for is not an expensive scan; it is a scan in the WRONG
-// PLACE. `discoverFeeTiers` walks a factory's whole fee history from wave 1,
-// ahead of the adjacency waves that are what a search reports coverage for, and
-// on a 10,000-block-capped endpoint over 48M blocks that is 4,822 requests —
-// the entire `--budget 60s`, spent before wave 2 could start.
+// PLACE: one full-history walk starving everything else that shares its
+// latency budget. On a 10,000-block-capped endpoint over 48M blocks a fee
+// history is 4,822 requests — an entire `--budget 60s` on its own.
 // ---------------------------------------------------------------------------
 
 test('maxRequests stops the scan at the caller’s bound and reports the rest as uncovered', async () => {

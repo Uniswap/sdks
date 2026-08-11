@@ -38,7 +38,7 @@ import type { CurrencyRef, ExecutionRequirement, Permit2PermitSingle } from '../
 // requirements the trader may already satisfy — a *confident wrong*
 // `needs-action` that also short-circuits preflight, so nothing downstream ever
 // notices. Such a read contributes NO requirement; instead the whole result is
-// flagged `degraded`, and the caller (`search/waves.ts`) refuses to promise
+// flagged `degraded`, and the caller (`search/verifier.ts`) refuses to promise
 // `needs-action` from a requirement set it knows is incomplete.
 //
 // ONE PREDICATE DECIDES THAT, FOR BOTH BRANCHES ({@link isUnread}). The two used
@@ -59,7 +59,7 @@ type CheckReadinessArgs = {
   permit?: Permit2PermitSingle
   blockNumber: bigint
   blockTimestamp: bigint
-  /** The router's global request semaphore (C4-P6) — see `quote/quote.ts#QuoteCandidatesArgs.semaphore`. */
+  /** The router's global request semaphore (C4-P6) — see `internal/rpc.ts`'s gated set. */
   semaphore?: Semaphore | undefined
 }
 

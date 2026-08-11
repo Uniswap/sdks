@@ -157,7 +157,7 @@ test('(7) a geth-shaped nested revert (cause.data.data) surfaces its revertData'
 
 test("(8) a data-less revert omits `revertData` entirely — never the empty '0x'", async () => {
   // The other half of the old copy's damage, and the one that corrupts a downstream DECISION rather
-  // than merely losing information: `quote/quote.ts` treats "no revert data" as the amount-
+  // than merely losing information: `quote/measure.ts` treats "no revert data" as the amount-
   // independent, pool-absent shape that may be cached across requests. A literal '0x' reported as
   // data says "this revert named a reason" when it named none. The field must be ABSENT, so
   // `'revertData' in result` is false — not present-and-empty.

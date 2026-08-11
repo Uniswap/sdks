@@ -11,8 +11,8 @@ import type { PoolHint, PoolKey } from '../types'
 // hookData: request-scoped, keyed by lowercased poolId — the index itself
 // never stores it (it can depend on trader/amount/direction; see types.ts).
 // Shared between `router.ts` (building it from a request's own hints) and
-// `../experimental` callers building their own `SearchContext`-equivalent
-// wiring around `generateRoutes`.
+// `../experimental` callers building their own wiring around
+// `compileExecutionPlan`.
 //
 // This is also the hint FIELD-VALIDATION seam (C4-H4) — the one place a hint's
 // caller-supplied values are checked before anything derives an address, a

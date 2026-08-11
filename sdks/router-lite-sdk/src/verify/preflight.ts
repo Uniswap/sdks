@@ -16,7 +16,7 @@ import type { EncodedTx } from '../types'
 // on-chain answer ("this tx would fail"), while a 429/timeout/dropped socket
 // says nothing at all about the transaction. Collapsing the two into a single
 // `{ ok: false }` is what let a provider hiccup during verification be
-// reported as a confident `no-route`; the caller (`search/waves.ts`) needs
+// reported as a confident `no-route`; the caller (`search/verifier.ts`) needs
 // them apart to mark such a route `unverified` instead of `failed`. This is
 // still not revert-reason interpretation — the reason stays opaque.
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ export async function preflightTx(
     // never be laundered into the `reverted` branch below and read as revert-data-free rejection.
     if (classifyRpcError(err) !== 'execution') return { ok: false, kind: 'transport' }
     // Revert data comes out of `internal/rpcErrors.ts`'s ONE cause-chain walker — the same one
-    // `classifyRpcError` just used, and the same one `quote/quote.ts` reads for its
+    // `classifyRpcError` just used, and the same one `quote/measure.ts` reads for its
     // amount-independence rule. This file used to keep a third, weaker copy: it looked only one
     // level down the `cause` chain, never stepped into geth's nested `data.data`, and accepted a
     // zero-length `'0x'` as if it were payload. Against a real geth node — whose revert arrives as

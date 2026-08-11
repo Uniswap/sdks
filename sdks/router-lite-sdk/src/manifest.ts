@@ -7,7 +7,7 @@ import {
   WAVE0_RECENT_WINDOW_SECONDS,
 } from './constants'
 import { RouterConfigError } from './errors'
-import type { ChainManifest, UniversalRouterDeployment } from './types'
+import type { ChainManifest, Protocol, UniversalRouterDeployment } from './types'
 
 // ---------------------------------------------------------------------------
 // Chain manifest — atomic per-protocol deployment bundles.
@@ -471,14 +471,14 @@ export const ROBINHOOD_MANIFEST: ChainManifest = {
 //
 // EVERY ROW WAS `aborted: true` WITH `discovery: partial` ON ALL THREE
 // PROTOCOLS AT A 60s BUDGET, AND THAT IS THE EXPECTED SHAPE, NOT A DEFECT. The
-// leading route was priced in wave 0 in every case (10, 9 and 10 candidates
-// attempted; ALL succeeded; zero quote failures, zero transport failures), while
-// full log-scan discovery over these chains' wave-0 windows — 302,400 blocks on
-// Base, 604,800 on Unichain, 2,419,200 on Arbitrum, per `wave0PairScanBlocks` —
-// does not finish in 60 seconds. This is the same "first actionable latency is
-// stable, completion is not" finding the mainnet canary recorded, reproduced on
-// three L2s: quote quality came from wave 0, and the caller's `AbortSignal` is
-// what bounds the rest.
+// leading route was priced by the first measurement rounds in every case (10,
+// 9 and 10 candidates attempted; ALL succeeded; zero quote failures, zero
+// transport failures), while full log-scan discovery over these chains' eager
+// pair windows — 302,400 blocks on Base, 604,800 on Unichain, 2,419,200 on
+// Arbitrum, per `wave0PairScanBlocks` — does not finish in 60 seconds. This is
+// the same "first actionable latency is stable, completion is not" finding the
+// mainnet canary recorded, reproduced on three L2s: quote quality came from the
+// cheap path, and the caller's `AbortSignal` is what bounds the rest.
 //
 // NO MANIFEST DATA BUGS WERE FOUND BY THIS RUN. Each chain's USDC was confirmed
 // live by `symbol()`/`decimals()` ("USDC"/6) at the address `coreIntermediates`
@@ -772,14 +772,21 @@ export function reorgOverlapBlocksOf(m: ChainManifest): bigint {
   return m.chain?.reorgOverlapBlocks ?? DEFAULT_REORG_OVERLAP_BLOCKS
 }
 
+/** The block a protocol's factory/manager was deployed at — the floor of every scan against it. */
+export function deploymentBlockOf(m: ChainManifest, p: Protocol): bigint | undefined {
+  if (p === 'v2') return m.v2?.deploymentBlock
+  if (p === 'v3') return m.v3?.deploymentBlock
+  return m.v4?.deploymentBlock
+}
+
 /**
- * Wave 0's recent-launch scan window, in blocks: {@link WAVE0_RECENT_WINDOW_SECONDS} of wall-clock
+ * The eager exact-pair scan window, in blocks: {@link WAVE0_RECENT_WINDOW_SECONDS} of wall-clock
  * converted through this chain's block time and rounded UP (a short window is the failure that
  * matters — it is what makes a just-launched pool invisible to the fast path — so the rounding error
  * is spent on scanning a block too many, never a block too few).
  *
  * Mainnet: ceil(604800 / 12) = 50,400 blocks. Base at 2s: 302,400. Arbitrum at 0.25s: 2,419,200 —
- * which is also the honest cost of the policy on a fast chain, and the reason wave 0's scan is
+ * which is also the honest cost of the policy on a fast chain, and the reason the eager scan is
  * bounded by the index's coverage cache rather than re-walked from scratch each search.
  */
 export function wave0PairScanBlocks(m: ChainManifest): bigint {

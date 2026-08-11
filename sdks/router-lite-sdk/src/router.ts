@@ -17,25 +17,37 @@ import { RouterConfigError, RpcUnavailableError } from './errors'
 import { sameFamily } from './internal/currency'
 import { MULTICALL3_ADDRESS } from './internal/multicall'
 import { createSemaphore } from './internal/rpc'
-import { assertChainData, assertWrappedNativeConsistency, requireExecution, reorgOverlapBlocksOf, validateManifest } from './manifest'
+import {
+  assertChainData,
+  assertWrappedNativeConsistency,
+  deploymentBlockOf,
+  requireExecution,
+  reorgOverlapBlocksOf,
+  validateManifest,
+} from './manifest'
 import { PoolIndex } from './pools/poolIndex'
 import type { PoolIndexStats } from './pools/poolIndex'
-import { PROTOCOL_MODULES } from './protocols'
-import { deploymentBlockOf } from './search/context'
+import { PROTOCOL_MODULES, routeId } from './protocols'
 import { assertHintAddresses, buildHookData } from './search/hookData'
-import type { HeadWatermark, InternalResult, SearchContext } from './search/waves'
-import { fetchBlock, searchWaves } from './search/waves'
+import type { EngineEvent, HeadWatermark, SearchContext } from './search/loop'
+import { fetchBlock, search } from './search/loop'
+import type { SearchState } from './search/state'
 import type {
   BlockRef,
   ChainManifest,
+  CompiledLimits,
+  EncodedTx,
   EthCall,
+  ExecutionRequirement,
   PoolHint,
   PoolRecord,
   Protocol,
   QuoteRequest,
   QuoteResult,
   QuotedRoute,
+  RankedRoute,
   Reason,
+  SearchEvent,
   SearchReport,
   SwapRequest,
   SwapResult,
@@ -45,16 +57,19 @@ import { protocolRecord, PROTOCOLS, zeroQuoting, zeroReportEnumeration, zeroVeri
 
 // ---------------------------------------------------------------------------
 // The public router facade — the only layer callers touch. Its whole job is
-// three things the wave engine (Task 17) deliberately does not do:
+// three things the solver loop (`search/loop.ts`) deliberately does not do:
 //
 //  1. Reject malformed requests before any RPC (`RouterConfigError`), and
 //     validate the manifest against the connected client exactly once.
-//  2. Decide *when* a lazy `searchWaves` generator has said enough: a promise
-//     caller (`getQuote`/`getSwap`) stops at the first actionable event, an
-//     iterator caller (`quotes`/`swaps`) is handed every event.
-//  3. Map the engine's internal vocabulary (`InternalResult`, whose `best` is
-//     only ever a hint about *ranking*) onto the public result union, whose
-//     variants are promises about *what the caller may safely do*.
+//  2. Decide *when* a lazy `search` generator has said enough: a promise
+//     caller (`getQuote`/`getSwap`) stops at the first actionable lead, an
+//     iterator caller (`quotes`/`swaps`) is handed every event, folded.
+//  3. Map the engine's internal vocabulary (`EngineEvent`, whose ranked list
+//     is only ever a statement about *ranking*) onto the public result union,
+//     whose variants are promises about *what the caller may safely do*. The
+//     fold happens AT EVENT RECEIPT, never later: the event's `state` is the
+//     live search state, and an in-flight preflight settling after `final`
+//     may still write to it — so nothing here holds an event to read later.
 //
 // One `PoolIndex` is held per router instance — it is the thing that makes a
 // second search over the same pair cheap (cached pools, cached scan
@@ -125,11 +140,11 @@ export type CreateRouterOptions = {
    * `concurrency <= 0` (zero, negative, or `NaN`) would hang this router's very first RPC call
    * forever, with no escape, rather than fail with a named `RouterConfigError`.
    *
-   * THIS IS A GLOBAL BOUND, NOT A PER-BATCH ONE. Wave 0 fires hint validation, route/discovery
-   * probes, and (for swaps) the readiness reads all concurrently (see `search/waves.ts#wave0a`) — a
-   * router with no shared bound sees a real peak equal to the SUM of every concurrently-running
-   * batch's own limit, not any single one of them (measured at ~44 in-flight calls for a realistic
-   * wave 0 before this option existed). One semaphore, built once per router instance and threaded
+   * THIS IS A GLOBAL BOUND, NOT A PER-BATCH ONE. A search runs its measurement rounds, its log
+   * scans, and (for swaps) the readiness reads all concurrently (`search/loop.ts`) — a router with
+   * no shared bound sees a real peak equal to the SUM of every concurrently-running batch's own
+   * limit, not any single one of them (measured at ~44 in-flight calls for a realistic first cycle
+   * before this option existed). One semaphore, built once per router instance and threaded
    * into every function that actually issues a `client.request` — `ethCall`, `scanLogs`,
    * `preflightTx`, readiness's native-balance read, `ingestPool`'s hint validation, and the pinned-
    * block fetch (`requestHead`/`fetchBlock`) — see `internal/rpc.ts`'s header for the complete,
@@ -184,38 +199,18 @@ export type CreateRouterOptions = {
   logChunkBlocks?: bigint
 }
 
-/**
- * Per-search options for the two ITERATOR shapes (`quotes`/`swaps`) — the callbacks a streaming
- * consumer needs and a promise-shaped one cannot use.
- *
- * Deliberately not a field on `QuoteRequest`/`SwapRequest`: a request is a description of a trade
- * (serializable, loggable, comparable), and a function on it would make it none of those.
- * Deliberately not on `CreateRouterOptions` either: a router is long-lived and shared, while these
- * are about ONE search's progress.
- */
-export type IterateOptions = {
-  /**
-   * Fires once, with the leading route, as soon as the search has priced anything at all — up to a
-   * whole wave before the first yield carries it (see `search/waves.ts#SearchContext.onFirstRoute`
-   * for the measurements and for why this is a callback rather than an extra yielded event).
-   *
-   * FOR A QUOTE this route IS the leader of the `status: 'quote'` result that follows, arriving
-   * early. FOR A SWAP it is only a priced lead: nothing has been compiled, simulated, or checked
-   * against the trader's readiness yet, so it must never be treated as `ready`/`needs-action` — which
-   * is why this is named for the route and not for the verdict. Either way a later wave may improve
-   * on it; the yielded results stay the only authority.
-   *
-   * Only offered on the iterator shapes: `getQuote`/`getSwap` resolve with their answer at the same
-   * moment they would have called this, so there is nothing to learn earlier.
-   */
-  onFirstRoute?: (route: QuotedRoute) => void
-}
-
 export interface Router {
   getQuote(req: QuoteRequest): Promise<QuoteResult>
   getSwap(req: SwapRequest): Promise<SwapResult>
-  quotes(req: QuoteRequest, opts?: IterateOptions): AsyncIterable<QuoteResult>
-  swaps(req: SwapRequest, opts?: IterateOptions): AsyncIterable<SwapResult>
+  /** The streaming shape of `getQuote`: every improvement as a {@link SearchEvent} — a `lead` per
+   * new best (a full interim `QuoteResult`), coalesced `progress` when only the report moved, and
+   * one terminal `final`. A consumer that stops pulling stops the search from widening; abandoning
+   * the iterator aborts everything in flight. */
+  quotes(req: QuoteRequest): AsyncIterable<SearchEvent<QuoteResult>>
+  /** The streaming shape of `getSwap` — see {@link Router.quotes}. A `lead`'s interim result may be
+   * `inconclusive` (priced but not yet verified) before a later `lead` upgrades it to
+   * `ready`/`needs-action`; the yielded results are the only authority on what may be executed. */
+  swaps(req: SwapRequest): AsyncIterable<SearchEvent<SwapResult>>
   /** Validates `hint` (recomputing/looking up its identity) and upserts it into the router's index. */
   ingestPool(hint: PoolHint): Promise<void>
   /** Routes every log through every enabled module's `parsePoolLog`; non-matching and malformed logs
@@ -234,7 +229,7 @@ export interface Router {
    * survives.
    *
    * THE ONE THING THAT IS NOT INDEX STATE, AND SURVIVES: the router's cross-search head watermark
-   * (`HeadWatermark` — see its docstring in `search/waves.ts`) lives beside the index, not inside it,
+   * (`HeadWatermark` — see its docstring in `search/loop.ts`) lives beside the index, not inside it,
    * so `clearIndex` does not touch it. The next search still compares its pinned block against every
    * `latest` this router has ever seen, exactly as if the index had not been cleared — clearing memory
    * of *pools* is not the same claim as clearing memory of *how far the chain has moved*, and conflating
@@ -422,8 +417,8 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
     // And the NUMERIC half, for exactly the reason `slippageBps`/`deadlineSeconds` above are checked:
     // `expiration` and `nonce` are plain `number`s that reach `BigInt(...)` downstream
     // (`verify/readiness.ts#isPermitValid`), where a fractional or non-finite value is a bare
-    // `RangeError` thrown from the middle of wave 0 — inside a `Promise.all` neither `getSwap` nor
-    // `swaps` catches, out of a function documented never to throw for a business outcome. The
+    // `RangeError` thrown from the middle of the readiness source — out of a function documented
+    // never to throw for a business outcome, into `SourceSet.failures()`. The
     // ranges are Permit2's own: `expiration`/`nonce` are `uint48`, `amount` is `uint160`, and
     // `sigDeadline` is a `uint256` this package holds as a `bigint`. A value outside them cannot be
     // signed or encoded at all, so rejecting it here makes it a request error — which is what it is
@@ -447,14 +442,13 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
 }
 
 // ---------------------------------------------------------------------------
-// Classification — InternalResult -> public result. Every branch here mirrors
-// the wave engine's classification contract (see `search/waves.ts` header):
-// a completed search whose leader *reverted* in verification is `no-route` (its
-// failed candidates, including the nominal `best`, are returned as
-// `alternatives` so the caller can see what was tried); `inconclusive` is
-// reserved for the incompleteness axes the report tracks (aborted,
-// partial/failed discovery, unattempted quotes, transport-failed quotes,
-// degraded verification) so `assertResultCoherent` stays satisfiable.
+// Classification — one engine event, folded at receipt into a public result.
+// The contract: a completed search whose leader *reverted* in verification is
+// `no-route` (its failed candidates, including the nominal `best`, are
+// returned as `alternatives` so the caller can see what was tried);
+// `inconclusive` is reserved for the incompleteness axes the report tracks
+// (aborted, partial/failed discovery, unattempted quotes, transport-failed
+// quotes, degraded verification) so `assertResultCoherent` stays satisfiable.
 //
 // A DEGRADED VERDICT IS NOT A DISCARDED SEARCH. `inconclusive` says "this
 // could not be promised", never "nothing was learned": every branch below
@@ -474,15 +468,55 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
 // complete its discovery looks — see `isSearchComplete`.
 //
 // `ready`/`needs-action` additionally require `tx` to actually be present:
-// `verifyLeader` only ever marks a route `verified`/`needs-action` *after*
+// the verifier only ever marks a route `verified`/`needs-action` *after*
 // compiling+encoding it, so `tx` is present whenever those statuses hold in
 // practice — but "every candidate failed to compile" (a request whose
 // slippage/permit/recipient survived up-front validation yet still can't be
 // turned into an executable plan for anything the search found) is a real,
-// reachable shape of `InternalResult`, and it must fall through to the
-// terminal no-route/inconclusive classification rather than assert a `tx`
-// that was never produced.
+// reachable engine outcome, and it must fall through to the terminal
+// no-route/inconclusive classification rather than assert a `tx` that was
+// never produced.
 // ---------------------------------------------------------------------------
+
+/**
+ * What one engine event says, read AT RECEIPT — the classification functions' whole input.
+ *
+ * {@link foldEvent} is the only real producer; the type is exported alongside `classifyQuote`/
+ * `classifySwap` so their unit tests can construct outcomes directly. `best` is the engine's
+ * leader-first ranking (`pickLeader`'s verdict, applied in the loop), `tx`/`limits` are the
+ * leader's own compiled record — present or absent together, read out of one memo entry.
+ */
+export type EngineOutcome = {
+  best?: RankedRoute
+  alternatives: RankedRoute[]
+  requirements?: ExecutionRequirement[]
+  tx?: EncodedTx
+  limits?: CompiledLimits
+  /** Why no candidate could be compiled into an executable plan, when that is what went wrong. The
+   * facade appends it to a `no-route` reason so the caller sees the cause, not only the verdict. */
+  compileError?: string
+  report: SearchReport
+}
+
+/**
+ * Folds one `lead`/`final` event into the classification input, at the moment it arrives. This is
+ * the ONLY place event state is read (spec §5's carve-out): `ranked` was dressed with each route's
+ * execution status at emission, and the leader's compiled tx/limits, the readiness requirements,
+ * and the first compile error are copied out of the live state HERE — never held for later, because
+ * an in-flight preflight settling after `final` may still write through the state.
+ */
+function foldEvent(ranked: RankedRoute[], state: SearchState, report: SearchReport): EngineOutcome {
+  const best = ranked[0]
+  const compiled = best !== undefined ? state.compiledById.get(routeId(best.route)) : undefined
+  return {
+    ...(best !== undefined && { best }),
+    alternatives: ranked.slice(1),
+    ...(state.requirements !== undefined && { requirements: state.requirements }),
+    ...(compiled !== undefined && { tx: compiled.tx, limits: compiled.limits }),
+    ...(state.firstCompileError !== undefined && { compileError: state.firstCompileError }),
+    report,
+  }
+}
 
 /** Total outage: not even the pinned block could be fetched, so nothing was searched at all. */
 const RPC_UNAVAILABLE_DETAIL = 'not even the pinned block could be fetched for this search'
@@ -513,8 +547,8 @@ const NO_VIABLE_ROUTE_REASON: Reason = { code: 'no-viable-route', detail: 'searc
  * still on the table is NOT made `inconclusive` by that fact alone, and this is a considered decision,
  * not an oversight — three things point the same way:
  *
- *  1. A revert is real, on-chain evidence about the chain (`waves.ts`'s header: "a revert fails that
- *     candidate"), and the whole classification contract already treats "every attempted candidate
+ *  1. A revert is real, on-chain evidence about the chain (`search/verifier.ts`: a revert fails
+ *     that candidate), and the whole classification contract already treats "every attempted candidate
  *     reverted" as `no-route`, not `inconclusive` — a route that cannot execute is not a route,
  *     however many OTHER candidates were never simulated.
  *  2. `alternatives` already makes the exhaustion inferable: every attempted-and-failed candidate is
@@ -597,7 +631,7 @@ function toQuoted({ route, quote, promotedOverComplex }: QuotedRoute): QuotedRou
 /** Exported for direct unit testing of the quote-side classification mapping — the twin of
  * `classifySwap`'s export below, and the seam where `toQuoted` decides what a quote consumer is
  * allowed to see. Not part of the `Router` surface. */
-export function classifyQuote(e: InternalResult): QuoteResult {
+export function classifyQuote(e: EngineOutcome): QuoteResult {
   // Below the `quote` branch, `e.alternatives` is always empty — the engine ranks a non-empty set or
   // hands back nothing at all, and quoting has no verification step that could demote a leader into
   // the runners-up. The mapping runs on every path anyway because it is the same two lines, and
@@ -612,8 +646,8 @@ export function classifyQuote(e: InternalResult): QuoteResult {
 }
 
 /** Exported for direct unit testing of the classification mapping in isolation — not part of the
- * `Router` surface (mirrors `search/waves.ts` exporting `selectFocus` for the same reason). */
-export function classifySwap(e: InternalResult): SwapResult {
+ * `Router` surface. */
+export function classifySwap(e: EngineOutcome): SwapResult {
   // BOTH LEADING STATUSES GATE ON THE ROUTE'S OWN `execution` DISCRIMINANT, which is the fact each
   // one is a claim about: `verified` means the chain simulated this candidate at this block,
   // `needs-action` means the verifier short-circuited the simulation because the trader is not
@@ -760,7 +794,7 @@ function buildOutageReport(manifest: ChainManifest): SearchReport {
     // could have regressed.
     verificationDegraded: false,
     headRegressed: false,
-    // Nothing was ever simulated either — the outage stopped the search before wave 0's first quote.
+    // Nothing was ever simulated either — the outage stopped the search before its first measurement.
     verification: zeroVerification(),
   }
 }
@@ -851,7 +885,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
   // makes clearing safe mid-search — `buildContext` (below) reads this variable's CURRENT value into
   // a new `SearchContext` object every time it runs, so a context already handed to an in-flight
   // generator holds the OLD reference regardless of what this variable points to afterward; nothing
-  // in `search/waves.ts` ever re-reads `index` off the router closure once a search has started.
+  // in `search/loop.ts` ever re-reads `index` off the router closure once a search has started.
   let index: PoolIndex = opts.index ?? freshIndex()
   // The highest `latest` block any search on this router has pinned. Lives here, next to the index,
   // because both are the router instance's memory of the chain: the index caches per-block negative
@@ -1001,7 +1035,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
    * `ensureManifestValidated` rejects with a `RouterConfigError` never goes on to await this promise
    * at all — and an unawaited rejection is an unhandled-rejection warning waiting to fire, the same
    * reason `manifest.ts#validateManifest`'s own `codeRead` carries one. The ORIGINAL promise (not the
-   * caught one) is still what reaches `SearchContext.pinnedBlock`, so `searchWaves` sees the real
+   * caught one) is still what reaches `SearchContext.pinnedBlock`, so the engine sees the real
    * rejection — a transport failure here still becomes the `RpcUnavailableError` it always did,
    * `fetchBlock`'s head-regression self-heal still runs, and the watermark is still written exactly
    * once per resolved read. Nothing about the OUTCOME changes, only when the request goes out.
@@ -1014,7 +1048,6 @@ export function createRouter(opts: CreateRouterOptions): Router {
     req: QuoteRequest,
     multicall3: Address | null,
     pinnedBlock: Promise<{ block: BlockRef; regressed: boolean }>,
-    iterate?: IterateOptions,
   ): SearchContext {
     return {
       client,
@@ -1027,24 +1060,23 @@ export function createRouter(opts: CreateRouterOptions): Router {
       pinnedBlock,
       ...(multicall3 !== null && { multicall3 }),
       logChunkBlocks: opts.logChunkBlocks,
-      onFirstRoute: iterate?.onFirstRoute,
     }
   }
 
-  /** One of `searchWaves`'s own events, or the sentinel this function yields in its place when the
-   * search never reaches `searchWaves` at all (an outage during manifest validation) or is cut short
+  /** One of the engine's own events, or the sentinel this function yields in its place when the
+   * search never reaches the engine at all (an outage during manifest validation) or is cut short
    * by one mid-search (`RpcUnavailableError`) — both cases a caller answers with {@link rpcUnavailable}. */
-  type SearchEvent = { event: InternalResult } | { outage: true }
+  type EngineItem = { event: EngineEvent } | { outage: true }
 
   /**
    * The preamble shared by all four search entry points below — everything between "a validated
-   * request" and "a stream of `searchWaves` events" — parameterized by the two things that differ
-   * per pair (quote/swap): which synchronous `validate*Request` runs, and which `searchWaves` `kind`
-   * to search as. Classifying an event into the public result union, and deciding when to stop
-   * consuming them, stays with each of the four callers below: `getQuote`/`getSwap` stop at the
-   * first actionable status (a different one each) or the final event, while `quotes`/`swaps` simply
-   * forward every event — that difference was always going to need call-site-specific code, so this
-   * helper does not try to abstract it away.
+   * request" and "a stream of engine events" — parameterized by the two things that differ per pair
+   * (quote/swap): which synchronous `validate*Request` runs, and which engine `kind` to search as.
+   * Folding an event into the public vocabulary, and deciding when to stop consuming, stays with
+   * each of the four callers below: `getQuote`/`getSwap` stop at the first actionable lead (a
+   * different one each) or the final event, while `quotes`/`swaps` forward every event — that
+   * difference was always going to need call-site-specific code, so this helper does not try to
+   * abstract it away.
    *
    * NOT an `async function`/`async function*` ITSELF UP TO THE `validate` CALL — that call has to
    * run synchronously, on the caller's own stack, the instant `startSearch` is invoked, because
@@ -1061,21 +1093,19 @@ export function createRouter(opts: CreateRouterOptions): Router {
    * shape before this helper existed. Anything else from `ensureManifestValidated`, and any
    * `RpcUnavailableError` from the search loop itself, becomes one final `{ outage: true }` yield — a
    * promise-shaped caller's loop returns `rpcUnavailable(manifest)` immediately on seeing it, a
-   * generator-shaped caller yields that same value and stops, matching the `return`/`yield`-then-
-   * `return` split each used to spell out individually.
+   * generator-shaped caller yields that same value as its `final` and stops.
    */
   function startSearch<Req extends QuoteRequest>(
     req: Req,
     validate: (req: Req, manifest: ChainManifest) => void,
     kind: 'quote' | 'swap',
-    iterate?: IterateOptions,
-  ): AsyncGenerator<SearchEvent> {
+  ): AsyncGenerator<EngineItem> {
     validate(req, manifest)
     return (async function* () {
       // All three dispatched BEFORE the validation await so their round trips overlap (C5-A):
       // `resolveMulticall3` and `ensureManifestValidated` are once-cells and never reject uncaught by
-      // themselves; `pinnedBlock`'s no-op `.catch` is what keeps a search that never reaches
-      // `searchWaves` (a `RouterConfigError` below) from logging an unhandled rejection for it.
+      // themselves; `pinnedBlock`'s no-op `.catch` is what keeps a search that never reaches the
+      // engine (a `RouterConfigError` below) from logging an unhandled rejection for it.
       const multicallProbe = resolveMulticall3()
       const pinnedBlock = dispatchPinnedBlock()
       pinnedBlock.catch(() => {})
@@ -1086,9 +1116,9 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield { outage: true }
         return
       }
-      const ctx = buildContext(req, await multicallProbe, pinnedBlock, iterate)
+      const ctx = buildContext(req, await multicallProbe, pinnedBlock)
       try {
-        for await (const e of searchWaves(ctx, req, kind)) yield { event: e }
+        for await (const e of search(ctx, req, kind)) yield { event: e }
       } catch (err) {
         if (!(err instanceof RpcUnavailableError)) throw err
         yield { outage: true }
@@ -1096,38 +1126,59 @@ export function createRouter(opts: CreateRouterOptions): Router {
     })()
   }
 
+  /** Folds a `lead`/`final` event into its public result, at receipt — see {@link foldEvent}. */
+  function resultOf<R>(e: Extract<EngineEvent, { type: 'lead' | 'final' }>, classify: (o: EngineOutcome) => R): R {
+    return classify(foldEvent(e.ranked, e.state, e.report))
+  }
+
   async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
     for await (const item of startSearch(req, validateQuoteRequest, 'quote')) {
       if ('outage' in item) return rpcUnavailable(manifest)
-      const result = classifyQuote(item.event)
-      if (result.status === 'quote' || item.event.done) return result
+      if (item.event.type === 'progress') continue
+      const result = resultOf(item.event, classifyQuote)
+      // The first actionable lead — a priced best — or the final event, whichever comes first.
+      if (result.status === 'quote' || item.event.type === 'final') return result
     }
-    /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
-    throw new Error('unreachable: searchWaves completed without a done event')
+    /* istanbul ignore next -- the engine always yields a final event before returning */
+    throw new Error('unreachable: the search completed without a final event')
   }
 
   async function getSwap(req: SwapRequest): Promise<SwapResult> {
     for await (const item of startSearch(req, validateSwapRequest, 'swap')) {
       if ('outage' in item) return rpcUnavailable(manifest)
-      const result = classifySwap(item.event)
-      if (result.status === 'ready' || result.status === 'needs-action' || item.event.done) return result
+      if (item.event.type === 'progress') continue
+      const result = resultOf(item.event, classifySwap)
+      if (result.status === 'ready' || result.status === 'needs-action' || item.event.type === 'final') return result
     }
-    /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
-    throw new Error('unreachable: searchWaves completed without a done event')
+    /* istanbul ignore next -- the engine always yields a final event before returning */
+    throw new Error('unreachable: the search completed without a final event')
   }
 
-  function quotes(req: QuoteRequest, iterate?: IterateOptions): AsyncIterable<QuoteResult> {
-    const search = startSearch(req, validateQuoteRequest, 'quote', iterate)
-    return (async function* () {
-      for await (const item of search) yield 'outage' in item ? rpcUnavailable(manifest) : classifyQuote(item.event)
-    })()
+  /** The event-shaping shared by `quotes`/`swaps`: each engine event folded at receipt into the
+   * public {@link SearchEvent} vocabulary; an outage becomes the stream's one `final`, carrying the
+   * same result the promise surface answers with. */
+  async function* streamEvents<R extends QuoteResult | SwapResult>(
+    items: AsyncGenerator<EngineItem>,
+    classify: (o: EngineOutcome) => R,
+    outage: () => R,
+  ): AsyncGenerator<SearchEvent<R>> {
+    for await (const item of items) {
+      if ('outage' in item) {
+        yield { type: 'final', result: outage() }
+        return
+      }
+      const e = item.event
+      if (e.type === 'progress') yield { type: 'progress', search: e.report }
+      else yield { type: e.type, result: resultOf(e, classify) }
+    }
   }
 
-  function swaps(req: SwapRequest, iterate?: IterateOptions): AsyncIterable<SwapResult> {
-    const search = startSearch(req, validateSwapRequest, 'swap', iterate)
-    return (async function* () {
-      for await (const item of search) yield 'outage' in item ? rpcUnavailable(manifest) : classifySwap(item.event)
-    })()
+  function quotes(req: QuoteRequest): AsyncIterable<SearchEvent<QuoteResult>> {
+    return streamEvents(startSearch(req, validateQuoteRequest, 'quote'), classifyQuote, () => rpcUnavailable(manifest))
+  }
+
+  function swaps(req: SwapRequest): AsyncIterable<SearchEvent<SwapResult>> {
+    return streamEvents(startSearch(req, validateSwapRequest, 'swap'), classifySwap, () => rpcUnavailable(manifest))
   }
 
   /** Raw `eth_call` at the chain tip, for hint validation only — ingestion has no pinned search

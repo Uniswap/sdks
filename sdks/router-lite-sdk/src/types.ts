@@ -128,13 +128,12 @@ export type RouteQuote = {
    *  - v2 routes NEVER carry one. A v2 quote is local constant-product math over `getReserves()`
    *    (`protocols/v2.ts#getAmountOut`); no swap is simulated anywhere, so there is no measurement
    *    to report and inventing one would be a guess dressed as a reading.
-   *  - A route quoted in two rounds (a protocol boundary, or two solo v2 legs — see
-   *    `quote/quote.ts`'s segmentation header) carries the SUM of its segments' estimates, and only
-   *    when EVERY segment reported one. One v2 segment anywhere therefore makes the whole route's
+   *  - A two-hop route carries the SUM of its two legs' estimates (`search/pump.ts#composeRoutes`),
+   *    and only when BOTH legs reported one. One v2 leg anywhere therefore makes the whole route's
    *    estimate absent, rather than reporting a partial sum that silently under-counts a leg. The
-   *    sum is defensible because the segments really are separate on-chain swaps under the
-   *    Universal Router too — what it omits is the same thing a single-segment estimate omits (see
-   *    below), plus the router's own hop-to-hop custody, not a whole leg's swap cost.
+   *    sum is defensible because the legs really are separate on-chain swaps under the Universal
+   *    Router too — what it omits is the same thing a single-leg estimate omits (see below), plus
+   *    the router's own hop-to-hop custody, not a whole leg's swap cost.
    *  - A route the quoter priced but whose response predates this field (an old recorded session,
    *    a hand-built `QuotedRoute`) simply has no key.
    *
@@ -161,7 +160,7 @@ export type RouteQuote = {
    * priced in the same round and for display (the CLI prints `~90k gas`), with a few percent of
    * envelope noise — never as an absolute cost, and never as a number to send a transaction with.
    *
-   * NOTHING IN THIS PACKAGE RANKS ON IT. `rankRoutes` (`quote/quote.ts`) orders by `amountOut` and
+   * NOTHING IN THIS PACKAGE RANKS ON IT. `rankRoutes` (`quote/rank.ts`) orders by `amountOut` and
    * its tie-breakers alone; a route with no estimate is never disadvantaged, and a cheaper-gas route
    * is never promoted. Gas-aware ranking would need a gas PRICE and an output-token price to be
    * meaningful, both of which are the caller's to know.
@@ -173,7 +172,7 @@ export type QuotedRoute = {
   route: RouteCandidate
   quote: RouteQuote
   /**
-   * Set (to `true`; absent otherwise) when `rankRoutes` (`quote/quote.ts`) promoted this route ahead
+   * Set (to `true`; absent otherwise) when `rankRoutes` (`quote/rank.ts`) promoted this route ahead
    * of a higher-`amountOut` but "complex" (mixed-protocol or hooked) leader under the simplicity
    * margin (`SIMPLICITY_MARGIN_BPS`) — the one ranking decision that overrides the
    * amountOut-descending order, made observable here rather than only inferable by a caller
@@ -233,7 +232,7 @@ export type EthCall = { to: Address; data: Hex; value?: bigint; from?: Address }
  * the protocol's quoter reports one (v3/v4 do; v2's local reserve math does not — see
  * {@link RouteQuote.gasEstimate}). A `decode` that cannot produce an amount THROWS, exactly as
  * before this shape carried two fields — a failed decode is the pool-absent/reverted signal
- * `quote/quote.ts` accounts for, never a `{ amountOut: 0n }`.
+ * `quote/measure.ts` accounts for, never a `{ amountOut: 0n }`.
  */
 export type DecodedQuote = { amountOut: bigint; gasEstimate?: bigint }
 
@@ -266,7 +265,6 @@ export type QuoteRequest = {
   tokenIn: CurrencyRef
   tokenOut: CurrencyRef
   amountIn: bigint
-  focusToken?: CurrencyRef
   hints?: PoolHint[]
   signal?: AbortSignal // e.g. AbortSignal.timeout(900) for latency SLAs
 }
@@ -278,6 +276,26 @@ export type SwapRequest = QuoteRequest & {
   deadlineSeconds?: number // default 300, from pinned block timestamp
   permit?: Permit2PermitSingle
 }
+
+/**
+ * One event of a streaming search (`Router.quotes`/`Router.swaps`) — the anytime algorithm's
+ * improving answer, shaped for a consumer that needs no delta logic:
+ *
+ *  - `lead`: the best route's observable identity changed (routeId, amountOut, execution status, or
+ *    tx presence) — carries a FULL interim result, exactly what `getQuote`/`getSwap` would have
+ *    resolved with had the search stopped here.
+ *  - `progress`: a report axis moved without a new lead — coalesced to at most one per engine wake
+ *    cycle, carrying the report alone.
+ *  - `final`: exactly once, always last — the settled result, identical in shape to the promise
+ *    surface's answer.
+ *
+ * `getQuote`/`getSwap` are consumers of this same stream: each stops at the first actionable `lead`
+ * (`quote` for quotes; `ready`/`needs-action` for swaps) or at `final`, whichever comes first.
+ */
+export type SearchEvent<R> =
+  | { type: 'lead'; result: R }
+  | { type: 'progress'; search: SearchReport }
+  | { type: 'final'; result: R }
 
 // ---------------------------------------------------------------------------
 // Results
@@ -543,29 +561,29 @@ export type SearchReport = {
   headRegressed: boolean
   /**
    * Preflight-simulation budget, reported rather than silently absorbed (C4-P7) — the one cap that
-   * otherwise converts to an authoritative verdict with no visible trace: `verifyLeader`
-   * (`search/verifier.ts`) falls through at most `PREFLIGHT_TOP_K` reverting/uncompilable candidates
-   * per wave before giving up on that wave's leader, and without this a search that reverted through
-   * exactly its budget's worth of candidates is indistinguishable, from the report alone, from one
-   * that tried every candidate there was.
+   * otherwise converts to an authoritative verdict with no visible trace: the verifier
+   * (`search/verifier.ts#Verifier`) spends at most `PREFLIGHT_TOP_K` real simulations PER SEARCH
+   * falling through reverting leaders, and without this a search that reverted through exactly its
+   * budget's worth of candidates is indistinguishable, from the report alone, from one that tried
+   * every candidate there was.
    *
    * `preflightAttempted`: the running total of real preflight simulations (`preflightTx` calls) this
-   * search has issued, across every wave — never candidates that were skipped for free (a known
-   * `'verified'`/`'failed'` route, or one that failed to compile at all, which `verifyLeader`
-   * explicitly does not charge against the budget).
+   * search has issued — never candidates that were settled for free (a known `'verified'`/`'failed'`
+   * route, a readiness-gated `'needs-action'`, or one that failed to compile at all, none of which
+   * the verifier charges against the budget).
    *
-   * `preflightBudgetExhausted`: true when the MOST RECENT wave's `verifyLeader` call stopped because
-   * it hit `PREFLIGHT_TOP_K` attempts while candidates it had not yet tried — and that are not
-   * already known `'failed'` OR `'verified'` from an earlier wave — remained on the table (a
-   * `'verified'` candidate needs nothing more from the budget; excluding only `'failed'` would report
-   * exhaustion on a search whose leader is already `ready`). Recomputed every wave (like
-   * `enumeration`'s pruning counters, the last call wins), so a later wave that resolves a leader
-   * before exhausting the budget clears it back to `false` — and an ABORTED search always reports
-   * `false` here too, by construction: the abort short-circuits `verifyLeader` before it ever reaches
-   * the cap check, so this field never conflates "the caller stopped us" with "the budget stopped
-   * us". Deliberately does NOT change `no-route`'s classification (see `router.ts#isSearchComplete`'s
-   * comment): alternatives already make a reverted route's contribution inferable, and a route the
-   * chain authoritatively rejected is real evidence whatever else the search left untried.
+   * `preflightBudgetExhausted`: true when the verifier's MOST RECENT walk down the ranked list
+   * stopped because `preflightAttempted` had reached `PREFLIGHT_TOP_K` while a candidate it had not
+   * yet tried — one not already known `'failed'` OR `'verified'` — remained on the table (a
+   * `'verified'` candidate needs nothing more from the budget; excluding only `'failed'` would
+   * report exhaustion on a search whose leader is already `ready`). Recomputed on every walk (the
+   * last look wins), so a walk that settles on a leader without reaching the cap clears it back to
+   * `false` — and an ABORTED search always reports `false` here, by construction: the abort hands
+   * back the current leader before the walk ever consults the cap, so this field never conflates
+   * "the caller stopped us" with "the budget stopped us". Deliberately does NOT change `no-route`'s
+   * classification (see `router.ts#isSearchComplete`'s comment): alternatives already make a
+   * reverted route's contribution inferable, and a route the chain authoritatively rejected is real
+   * evidence whatever else the search left untried.
    */
   verification: { preflightAttempted: number; preflightBudgetExhausted: boolean }
 }
@@ -574,7 +592,7 @@ export type SearchReport = {
 // The all-zero counter blocks, spelled once.
 //
 // Three places need a `SearchReport`'s counters at their starting values — the
-// engine's `initialState` (`search/waves.ts`), the RPC-outage report
+// engine's `createState` (`search/state.ts`), the RPC-outage report
 // (`router.ts#buildOutageReport`), and the test-fixture report
 // (`internal/testing.ts#emptyReport`) — and each used to restate the object
 // literal in full. A counter added to one of these blocks is then a compile
@@ -698,7 +716,7 @@ export type UniversalRouterDeployment = {
 export type ChainData = {
   /**
    * Seconds per block, used to convert this package's TIME-shaped policies into block counts — today
-   * only wave 0's recent-launch scan window (`WAVE0_RECENT_WINDOW_SECONDS`). Must be finite and
+   * only the eager exact-pair scan window (`WAVE0_RECENT_WINDOW_SECONDS`). Must be finite and
    * greater than zero; sub-second chains use a fraction (Arbitrum ≈ `0.25`). Default: 12 (mainnet).
    */
   blockTimeSeconds?: number | undefined

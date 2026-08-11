@@ -60,7 +60,7 @@ describe('ethCall', () => {
   })
 
   test('wraps a node-state failure in NodeStateError — a TransportError subclass, so every counting site catches it', async () => {
-    // The whole point of the subclass: `quote.ts`, `readiness.ts` and `waves.ts` all discriminate
+    // The whole point of the subclass: `measure.ts`, `readiness.ts` and the engine all discriminate
     // with `instanceof TransportError`, and this must count on the same axis as a 429 while still
     // being distinguishable in a log.
     const original = headerNotFoundError()

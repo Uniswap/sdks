@@ -1,7 +1,6 @@
 import { zeroHash } from 'viem'
 
 import { PREFLIGHT_TOP_K } from '../constants'
-import { WAVE_COUNT } from '../search/waves'
 import type { BlockRef, Protocol, QuoteResult, ReasonCode, SearchReport, SwapResult } from '../types'
 import { protocolRecord, zeroQuoting, zeroReportEnumeration, zeroVerification } from '../types'
 
@@ -84,7 +83,7 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
   // downstream started synthesizing a number, which is precisely the failure the absence rule exists
   // to prevent (a synthesized figure is indistinguishable from a measured one once it is on the
   // object). Nothing here checks the VALUE against ranking, because ranking never reads it —
-  // `rankRoutes` orders on `amountOut` alone (`quote/quote.ts`, and its own test asserts the
+  // `rankRoutes` orders on `amountOut` alone (`quote/rank.ts`, and its own test asserts the
   // indifference directly).
   const leader = 'best' in r ? r.best : undefined
   for (const route of [...(leader ? [leader] : []), ...r.alternatives]) {
@@ -116,7 +115,7 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     // suite produces has to be honest about it.
     //
     // Only the QUOTE union is checked. A swap's leader may legitimately price below an alternative
-    // with no promotion involved at all — `verifyLeader` walks the ranked list and stops at the
+    // with no promotion involved at all — the verifier walks the ranked list and settles on the
     // first candidate that SIMULATES, so any higher-priced candidate it passed over is sitting in
     // `alternatives` as `'failed'`/`'unverified'`, which is verification demoting a route rather
     // than ranking mis-ordering one.
@@ -131,7 +130,7 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     // marker is not decorative — it is the licence the check above grants, and the CLI prints it as
     // the reason a caller is not looking at the highest number found — so one that outlived its
     // promotion is a false explanation, and it is exactly what a re-rank produces if `rankRoutes` is
-    // ever allowed to carry an input marker through to its output (`quote/quote.ts` strips it for
+    // ever allowed to carry an input marker through to its output (`quote/rank.ts` strips it for
     // this reason).
     //
     // THE BOUND IS `>=`, NOT `>`, AND THAT IS NOT SLOPPINESS. A promotion needs the simpler candidate
@@ -251,28 +250,12 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
   const q = r.search.quoting
   if (q.attempted !== q.succeeded + q.failed + q.transportFailed) throw new Error('quoting stats do not add up')
 
-  // THE CONSERVATION INVARIANT — a leg that settled was a leg that was dispatched.
-  //
-  // A BOUND, NOT AN EQUALITY, and the gap is the transport-retry rule: `attempted` counts DISPATCHES
-  // and `legsMeasured` counts KEYS that reached a terminal state, so a leg lost in the transport and
-  // re-dispatched once is two attempts against one settled key (`search/state.ts#applyMeasurement`).
-  // The bound is what catches the leak in the other direction — a settled key nothing ever asked for,
-  // which is what a counter incremented outside the single `apply*` switch would look like from here.
-  const legs = r.search.enumeration.legsMeasured
-  if (legs > q.attempted) {
-    throw new Error(`legsMeasured (${legs}) exceeds attempted (${q.attempted}) — a leg cannot settle without being dispatched`)
-  }
-
-  // C4-P7: `verifyLeader` spends at most `PREFLIGHT_TOP_K` real simulations per evaluated STAGE, and
-  // the engine runs at most `WAVE_COUNT` stages (five since C5-B split wave 0 into 0a/0b, which is
-  // why this reads stages rather than waves) — so a per-search cumulative total above that product
-  // is not a report of legitimate work, it is a bug in how `preflightAttempted` is accumulated (e.g.
-  // double counting across stages, or a stray increment outside `verifyLeader`'s own budgeted loop).
+  // C4-P7: the preflight budget is PER SEARCH — the verifier dispatches a simulation only while
+  // `preflightAttempted < PREFLIGHT_TOP_K` (`search/verifier.ts`), so a report above the budget is
+  // not legitimate work, it is a stray increment outside `applyPreflight`'s own accounting.
   const v = r.search.verification
-  if (v.preflightAttempted > PREFLIGHT_TOP_K * WAVE_COUNT) {
-    throw new Error(
-      `preflightAttempted (${v.preflightAttempted}) exceeds PREFLIGHT_TOP_K * WAVE_COUNT (${PREFLIGHT_TOP_K * WAVE_COUNT})`,
-    )
+  if (v.preflightAttempted > PREFLIGHT_TOP_K) {
+    throw new Error(`preflightAttempted (${v.preflightAttempted}) exceeds the per-search budget PREFLIGHT_TOP_K (${PREFLIGHT_TOP_K})`)
   }
   if (v.preflightAttempted < 0) throw new Error('preflightAttempted must not be negative')
 }

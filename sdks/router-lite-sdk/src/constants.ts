@@ -48,36 +48,6 @@ export function isUnusableCustodyAddress(address: Address): boolean {
   return isAddressEqual(address, zeroAddress) || isUrSentinel(address)
 }
 
-/**
- * Max direct (tokenIn <-> tokenOut) pools considered per pair, across all protocols (C4-P7).
- *
- * Split from a single `MAX_POOLS_PER_PAIR` because the two selections this package makes are
- * different cost classes: a direct-pair selection costs O(cap) — one candidate per pool kept — while
- * a two-hop LEG selection costs O(cap²) per intermediate (every kept in-leg pool is crossed with
- * every kept out-leg pool; see {@link MAX_POOLS_PER_LEG}). A single shared constant forces one number
- * to serve both cost shapes, which is either too small for the linear case or too expensive for the
- * quadratic one.
- *
- * 6 IS THE COMMON SHAPE, NOT EVERY SHAPE. It covers one v2 pool + the four standard v3 fee tiers +
- * one v4 pool exactly (1 + 4 + 1 = 6, no spare slot) — the pool set an ordinary major pair actually
- * has today. A pair that ALSO carries all four standard v4 tiers (v2 + 4 v3 + 4 v4 = 9) exceeds this
- * cap by 3, and the reserved-newest-slot logic (`search/candidates.ts#selectPools`) is exactly the
- * mechanism that keeps that overflow from silently starving out a pool that was just deployed —
- * see the "6th direct pool" test in `candidates.test.ts` for the exact-fit case, and the fork test's
- * 7-pools-cap-of-6 case for what happens one pool past it.
- */
-export const MAX_POOLS_DIRECT = 6
-
-/**
- * Max pools considered per LEG (tokenIn <-> intermediate, or intermediate <-> tokenOut) when
- * enumerating two-hop candidates (C4-P7) — the quadratic half of the split described on
- * {@link MAX_POOLS_DIRECT}. Kept at the historical `MAX_POOLS_PER_PAIR` value (3) deliberately:
- * doubling it to match the direct cap would roughly QUADRUPLE the two-hop candidate count per
- * intermediate (from `MAX_POOLS_PER_LEG²` = 9 to 36), which is the cost {@link MAX_QUOTE_CANDIDATES}
- * has to absorb for every one of {@link MAX_INTERMEDIATES} intermediates at once.
- */
-export const MAX_POOLS_PER_LEG = 3
-
 // ---------------------------------------------------------------------------
 // Hostile-input bounds (C4-H4).
 //
@@ -133,7 +103,7 @@ export const MAX_DEADLINE_SECONDS = 86_400
  * `types.ts#Permit2PermitSingle`) — so both carry the same hazard `MAX_DEADLINE_SECONDS` documents,
  * one layer deeper: `verify/readiness.ts#isPermitValid` does `BigInt(details.expiration)`, and
  * `BigInt(1.5)` is a `RangeError` thrown from a function whose contract is that it never throws for
- * a business outcome, reached from inside wave 0's `Promise.all`. The integer check is therefore the
+ * a business outcome, reached from inside the readiness source. The integer check is therefore the
  * point of this bound as much as the ceiling is: a value at or above 2^48 cannot be signed into a
  * Permit2 permit at all, and a fractional one cannot be encoded at all.
  */
@@ -195,42 +165,6 @@ export const MEASUREMENT_PAIR_CEILING = 128
  * ~8 aggregate3 chunks (`MULTICALL_CHUNK` = 50); leftover due legs stay due for the next cycle. */
 export const PUMP_ROUND_CAP = 400
 
-/**
- * Max route candidates quoted in a single search (C4-P7) — DERIVED, never a bare literal, so it can
- * never silently drift out of sync with the caps that actually generate candidates.
- *
- * `search/candidates.ts#generateRoutes` produces at most `MAX_POOLS_DIRECT` direct candidates, plus
- * at most `MAX_POOLS_PER_LEG²` two-hop candidates for each of up to `MAX_INTERMEDIATES` selected
- * intermediates (every kept in-leg pool crossed with every kept out-leg pool) — so the formula below
- * is a true upper bound on what enumeration can ever produce, not an independently-chosen ceiling that
- * happens to usually be big enough.
- *
- * THIS USED TO DRIFT. Before this constant was derived, it was a bare `48` against an enumeration
- * whose real worst case (at the historical shared `MAX_POOLS_PER_PAIR = 3`) was `3 + 8 * 3² = 75`:
- * intermediates 6, 7, and 8 could enumerate a full `3×3` cross product each and still see every one of
- * their candidates silently trimmed by the total-candidate cap, while `intermediatesSelected` kept
- * reporting all 8 as selected — a report that overstated what the search actually quoted. Deriving the
- * ceiling from the same constants that drive enumeration makes that class of drift a compile-time
- * impossibility: raise `MAX_INTERMEDIATES` or either pool cap and this grows with it.
- *
- * At today's values (`MAX_POOLS_DIRECT = 6`, `MAX_INTERMEDIATES = 8`, `MAX_POOLS_PER_LEG = 3`) this is
- * `6 + 8 * 9 = 78`.
- *
- * WHAT 78 COSTS ON THE WIRE IS NO LONGER 78 REQUESTS. On a chain with a probed Multicall3 deployment
- * a quoting round travels as `ceil(78 / MULTICALL_CHUNK)` = 2 `aggregate3` calls, each holding ONE
- * semaphore permit and drawing ONE rate-limit charge (`internal/multicall.ts`, which explains why 50
- * and why the chunk count only has to be small rather than 1). That is what keeps this ceiling
- * affordable on the burst-limited public endpoints the zero-config path meets — and it is also why
- * the ceiling has a second, subtler cost: an outer failure is replicated across a whole chunk, so one
- * 429 can transport-fail up to 50 candidates at once (`search/waves.ts#retryTransportFailures` is
- * what stops that from removing them from the search).
- *
- * Where no Multicall3 is deployed it is 78 individual `eth_call`s under the router-wide semaphore
- * (`DEFAULT_CONCURRENCY = 20`) — batched, not simultaneous (see `internal/rpc.ts#mapConcurrent`) —
- * which is what a realistic wave 0 already issued before aggregation existed.
- */
-export const MAX_QUOTE_CANDIDATES = MAX_POOLS_DIRECT + MAX_INTERMEDIATES * MAX_POOLS_PER_LEG ** 2
-
 /** Max leader candidates preflighted (simulated) before falling through on genuine reverts. */
 export const PREFLIGHT_TOP_K = 3
 
@@ -247,10 +181,10 @@ export const DEFAULT_DEADLINE_SECONDS = 300
  * Default for `createRouter`'s `concurrency` option (C4-P6): the size of the router-WIDE semaphore
  * (`internal/rpc.ts#createSemaphore`) bounding how many `client.request` calls (`eth_call` /
  * `eth_getLogs`) may be in flight AT ONCE, across every operation sharing this router instance —
- * NOT a per-batch limit, whatever this constant's name used to suggest. Wave 0 fires hint
- * validation, route probes, and (for swaps) the readiness reads all concurrently
- * (`search/waves.ts#wave0a`), so without a shared bound the real peak is the SUM of each operation's
- * own batch size, not any one of them — measured at ~44 in-flight calls for a realistic wave 0
+ * NOT a per-batch limit, whatever this constant's name used to suggest. A search runs its
+ * measurement rounds, its log scans, and (for swaps) the readiness reads all concurrently
+ * (`search/loop.ts`), so without a shared bound the real peak is the SUM of each operation's own
+ * batch size, not any one of them — measured at ~44 in-flight calls for a realistic first cycle
  * before this option existed, more than double what a reader of the old per-batch doc comment would
  * have expected. 20 is a conservative default comfortably under the connection-pool ceilings of
  * every major public endpoint; a caller fronting a stricter provider (or wanting a wider one) passes
@@ -328,7 +262,7 @@ export const NEGATIVE_CACHE_BLOCKS = 2n
  * every real lag/reorg lands inside it, shallow enough that a bogus recorded head (a provider glitch
  * answering an absurd block number, which would otherwise poison the watermark permanently) lands
  * outside. Two consecutive answers further below than this reset the watermark instead of being
- * reported as a regression — see `search/waves.ts#fetchBlock`.
+ * reported as a regression — see `search/loop.ts#fetchBlock`.
  *
  * A FUNCTION, not a constant, because the multiplicand is per-chain (C4-P1): the multiple of 4 is
  * the policy — "no honest lag runs four reorg depths deep" — and `reorgOverlapBlocks` is the chain
@@ -518,13 +452,14 @@ export const CHUNK_REGROWTH_SUCCESSES = 4
  * 4M-block delta is 4-20 sequential round trips) plus every post-descent walk.
  *
  * 4, NOT 20, AND DELIBERATELY MODEST. This multiplies with the fan-out ABOVE it rather than
- * replacing it: a realistic adjacency wave runs ~8 scans concurrently, so 8 x 4 = 32 chunk requests
- * competing for 20 permits — already saturation, with a queue. At 20 it would be 160 contending for
- * 20, which does not scan any faster (the semaphore admits 20 either way) and does starve the
- * `eth_call` quoting that shares the same permits, since `createSemaphore` is FIFO and a scan that
- * queues 160 acquires puts every subsequent quote behind them. 4 fills the measured 13-permit gap
- * without letting log scanning crowd the wave engine out of its own concurrency budget. A caller who
- * wants a different total still has one knob — `createRouter({ concurrency })` — and it still binds.
+ * replacing it: a realistic post-gate coverage pass runs ~8 scans concurrently, so 8 x 4 = 32 chunk
+ * requests competing for 20 permits — already saturation, with a queue. At 20 it would be 160
+ * contending for 20, which does not scan any faster (the semaphore admits 20 either way) and does
+ * starve the `eth_call` measurements that share the same permits, since `createSemaphore` is FIFO
+ * and a scan that queues 160 acquires puts every subsequent measurement behind them. 4 fills the
+ * measured 13-permit gap without letting log scanning crowd the pump out of its own concurrency
+ * budget. A caller who wants a different total still has one knob — `createRouter({ concurrency })`
+ * — and it still binds.
  *
  * WHAT IT NEVER DOES. The first chunk of any width goes out ALONE: a batch is only planned after a
  * chunk at the current width has actually been served, so the bisection descent (which is a
@@ -561,71 +496,6 @@ export const SCAN_CHUNK_CONCURRENCY = 4
 export const MAX_REQUESTS_PER_SCAN = 4_000
 
 /**
- * Requests one fee-tier discovery scan (`search/coverage.ts#discoverFeeTiers`) may spend per search
- * — {@link MAX_REQUESTS_PER_SCAN}'s ceiling narrowed for the one scan that had no business having a
- * ceiling that generous.
- *
- * WHAT THIS FIXES, MEASURED. `discoverFeeTiers` walks a factory's ENTIRE `FeeAmountEnabled` history,
- * and it sits in wave 1 — ahead of the adjacency scans in waves 2 and 3, which are what the search
- * actually reports coverage for. On a provider that serves wide windows the whole history is a
- * handful of requests and nobody notices. On Base through quicknode, which caps `eth_getLogs` at
- * 10,000 blocks over 48.2M blocks of v3 history, it is 4,822 requests and 62 seconds — so a
- * `--budget 60s` quote spent its ENTIRE remaining budget in wave 1 on this one scan, reached neither
- * adjacency wave, and reported `partial — nothing covered yet` for all three protocols. Which was
- * true: no adjacency scan had been started. Bounding it here is what lets waves 2-3 run at all.
- *
- * WHY A REQUEST BUDGET RATHER THAN A BLOCK WINDOW. Wave 0's exact-pair scan solves the same problem
- * with a recent window (`WAVE0_RECENT_WINDOW_SECONDS`) because the pools it hunts are new by
- * definition. Fee enablements are not: Base's three governance-added tiers (400/300/200) were
- * enabled 689 days and 29.8M blocks before this was written, and its four genesis tiers at the
- * deployment block itself. There is no window that is both small and where the answers live, so the
- * bound has to be on COST, and the scan converges across searches instead — the coverage cache is
- * keyed by factory, so each search resumes where the last one stopped rather than re-walking.
- *
- * 128 IS PROPORTION, NOT PRECISION, and it is priced off a measured rate rather than a guess. ONE
- * scan is ~15 requests/second against the 10k-capped endpoint — a scan dispatches
- * {@link SCAN_CHUNK_CONCURRENCY} chunks per round trip and a round trip there is ~250ms — so this is
- * ~8s, or roughly an eighth of a 60s budget. The first cut at 512 was measured too: ~34s, more than
- * half the budget, which starved the adjacency waves nearly as thoroughly as no bound at all.
- *
- * It is unreachable on a wide-window provider (mainnet's whole v3 fee history is ~4 requests), so
- * nothing changes there at all. On the capped case it is ~1.3M blocks per search and it CONVERGES
- * rather than completing: coverage is keyed by factory, so each search resumes where the last
- * stopped. The tiers not yet reached cost nothing a caller can see — `speculativeDirect` probes v3's
- * four standard tiers on every search regardless, and this scan only ever ADDS to that set — whereas
- * every second spent here is a second the adjacency waves, which are what a two-hop route and the
- * whole `discovery` report depend on, do not get.
- */
-export const FEE_DISCOVERY_MAX_REQUESTS = 128
-
-/**
- * How often a scan-bound wave stops to quote what its scans have discovered so far
- * (`search/waves.ts#quoteWhileDiscovering`).
- *
- * THE STAGE DOWNSTREAM OF THE ONE ABOVE, AND THE SAME BUG. Bounding fee discovery let waves 2-3
- * *start*; it did not make them *pay*. A wave was strictly "scan everything, then enumerate, then
- * quote", so on the capped Base endpoint wave 2 spent its whole remaining ~56s inside
- * `scanAdjacency` and reached `quoteEnumerated` only after the caller's `--budget` had already
- * fired — at which point `quoteCandidates` correctly refuses to issue calls for an aborted search.
- * Measured live: 49 candidates enumerated, `10 attempted · 39 never attempted`. Every second of that
- * wave bought pools, and not one of them bought a price. The anytime-search contract is "an
- * improving best per wave", and a wave that cannot quote cannot improve anything.
- *
- * 5s, AND THE UNITS ARE THE POINT: this bounds the DISCOVERY THAT CAN BE STRANDED by an abort, which
- * is wall-clock, not requests. Whatever the endpoint's shape, at most the last ~5s of a wave's scans
- * go unquoted. It is also the floor on the overhead: each pass costs one `generateRoutes` over the
- * whole index (tens of ms on a warm Base index) plus whatever genuinely-new candidates it found, so
- * ~11 passes across a 60s wave is under 2% of the budget spent on re-enumeration — and passes that
- * find nothing new stop at `quoteNew`'s dedup without issuing a single call. Shorter would spend
- * real CPU re-deriving an unchanged candidate set; longer would strand more of exactly what this
- * exists to rescue.
- *
- * It does not fire at all on a fast search: a warm index finishes wave 2 in well under one interval,
- * so the pass count is zero and the code path is invisible.
- */
-export const QUOTE_INTERLEAVE_MS = 5_000
-
-/**
  * First backoff delay before retrying a failed chunk at {@link MIN_CHUNK}, doubled per consecutive
  * failure and capped at {@link BACKOFF_MAX_MS}. Retrying a throttling endpoint immediately is how a
  * rate limit becomes a tight loop; 250ms is short enough that a one-off blip barely registers, and
@@ -655,13 +525,13 @@ export const BACKOFF_MAX_MS = 2_000
 export const MAX_BACKOFF_TOTAL_MS = 60_000
 
 /**
- * How far back wave 0's exact-pair log scan reaches from the pinned head, IN SECONDS: one week.
+ * How far back the EAGER exact-pair log scan reaches from the pinned head, IN SECONDS: one week.
  *
- * Wave 0 is a latency budget, not a completeness budget: it exists for the brand-new-asset case,
- * where the pool was created minutes ago and the caller is waiting. Scanning the full history there
- * would cost hundreds of sequential `eth_getLogs` before the first result could be yielded. The
- * remaining history is completed in the scan-bound waves, and discovery is only ever reported
- * `complete` once it has been.
+ * The eager slice is a latency budget, not a completeness budget: it exists for the brand-new-asset
+ * case, where the pool was created minutes ago and the caller is waiting. Scanning the full history
+ * there would cost hundreds of sequential `eth_getLogs` before the first result could be yielded.
+ * The remaining history is opened by the coverage gate (`search/coverage.ts#demandFull`) once cheap
+ * information is exhausted, and discovery is only ever reported `complete` once it has been walked.
  *
  * SECONDS, NOT BLOCKS, IS THE UNIT THE POLICY IS ACTUALLY IN (C4-P1). "Recently launched" is a claim
  * about wall-clock — a token deployed in the last few days — and a block count only expresses it on
@@ -673,37 +543,3 @@ export const MAX_BACKOFF_TOTAL_MS = 60_000
  * 12s yields 50,400 blocks (the old constant, to within 1% — the window was always approximate).
  */
 export const WAVE0_RECENT_WINDOW_SECONDS = 604_800
-
-/**
- * How long wave 0a will WAIT for the recent-window pair scan it dispatched before closing without
- * it (C5-B). Not a timeout on the scan — it keeps running and wave 0b still awaits it in full; this
- * is only how much of it the FIRST evaluated stage is willing to include.
- *
- * WHY A GRACE AND NOT ONE OF THE TWO EXTREMES, both of which this package has now shipped and
- * measured:
- *
- *  - Waiting UNBOUNDED (the pre-C5-B shape, a single `Promise.all`) makes the first-actionable
- *    answer hostage to a log query. On a timeout-shaped endpoint the scan spends its whole budgeted
- *    retry ladder — ~40s measured — while a hinted or direct-pair price sits finished in
- *    `state.quoted`, which is the launcher/fallback case wave 0 exists for, defeated exactly when
- *    the provider degrades.
- *  - Waiting ZERO excludes the scan from the first evaluated stage far more often than "a slow
- *    provider" suggests, because SPAN-CAPPED is the common case, not the exceptional one: any
- *    endpoint that caps `eth_getLogs` turns this window into many chunked requests, so an actionable
- *    wave 0a resolves without the scan's pools essentially always. Measured on the hermetic Base
- *    ETH->USDC replay corpus: 23 of the session's 32 recorded log queries went unrequested.
- *
- * 500ms IS DERIVED FROM THE HEALTHY CASE, NOT PICKED FOR ROUNDNESS. Measured 2026-08-05 against a
- * keyed mainnet endpoint, the entire wave-0 window resolves in ONE `eth_getLogs` at ~0.3-0.9s
- * (README, "Log scanning is budgeted"), so a half second covers the single-request case that a
- * well-behaved provider actually produces. A degraded provider costs the grace and no more: wave 0a
- * proceeds, the caller gets its answer, and the scan is folded in by wave 0b for anyone still
- * pulling. Both directions are therefore strictly better than the extreme they replace — bounded
- * where the old shape was unbounded, and inclusive where a bare split was not.
- *
- * It is milliseconds of WALL CLOCK, so it joins {@link QUOTE_INTERLEAVE_MS} and the backoff ladder
- * as one of the handful of time-shaped constants here; like them it is never a correctness
- * boundary, only a scheduling one — nothing observable changes if it elapses, and nothing is
- * dropped when it does.
- */
-export const WAVE0_PAIR_SCAN_GRACE_MS = 500

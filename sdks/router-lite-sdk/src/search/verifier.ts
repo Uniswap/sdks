@@ -8,7 +8,6 @@ import { requireExecution } from '../manifest'
 import { compileExecutionPlan } from '../plan/compile'
 import { routeId } from '../protocols'
 import type { ProtocolModule } from '../protocols/types'
-import { rankRoutes } from '../quote/quote'
 import type {
   BlockRef,
   ChainManifest,
@@ -22,10 +21,8 @@ import type {
 import { preflightTx } from '../verify/preflight'
 
 import type { Notifier } from './notify'
-import { buildReport, engineReportState } from './report'
 import { applyPreflight } from './state'
 import type { SearchState } from './state'
-import type { InternalResult, Run } from './waves'
 
 // ---------------------------------------------------------------------------
 // THE VERIFIER (spec §3.4) — the step that turns "the best quote we found" into
@@ -35,9 +32,9 @@ import type { InternalResult, Run } from './waves'
 // (`verified` / `needs-action` / `failed` / `unverified`) the facade classifies
 // off.
 //
-// Semantics are the wave engine's, verbatim. What changed is the SHAPE: a
-// concurrent activity driven by leader changes instead of a per-wave blocking
-// call.
+// A concurrent activity driven by leader changes: the loop hands it each
+// recompose's ranked list, and it decides — without blocking the loop — what
+// (if anything) deserves the next simulation round trip.
 //
 //   * AT MOST ONE PREFLIGHT IS IN FLIGHT. A leader change during flight queues
 //     the NEW leader — the current one, not a backlog of every leader the pump
@@ -50,8 +47,8 @@ import type { InternalResult, Run } from './waves'
 //     asserts it, and a violation THROWS — it is a bug in the loop, not a
 //     business outcome, and every business outcome here is data.
 //   * THE BUDGET IS PER SEARCH. `PREFLIGHT_TOP_K` simulations for the whole
-//     search (spec §7.3), counted by `state.verification.preflightAttempted`,
-//     which `applyPreflight` owns. `preflightBudgetExhausted` is recomputed on
+//     search, counted by `state.verification.preflightAttempted`, which
+//     `applyPreflight` owns. `preflightBudgetExhausted` is recomputed on
 //     every walk, never accumulated.
 //
 // TWO ORDERING INVARIANTS INSIDE `advance()` ARE LOAD-BEARING for the facade's
@@ -81,10 +78,6 @@ import type { InternalResult, Run } from './waves'
 // the candidate (with its revert data verbatim, never interpreted), a lost
 // `eth_call` leaves it `unverified` and sets `verificationDegraded` so the search
 // is reported `inconclusive` instead of ruling the route out.
-//
-// The `evaluate`/`verifyLeader` pair at the bottom is TRANSITIONAL — the wave
-// engine's per-wave entry point into the same rules, deleted with `waves.ts` in
-// Task 9.
 // ---------------------------------------------------------------------------
 
 export type VerifierCtx = {
@@ -95,8 +88,8 @@ export type VerifierCtx = {
 }
 
 /** The two state fields compile+encode touches: the pinned block (whose timestamp the deadline is
- * measured from) and the per-routeId memo. Structural rather than `SearchState` so the transitional
- * wave-engine path can hand its own `EngineState` to exactly the same function. */
+ * measured from) and the per-routeId memo. Structural rather than `SearchState` so a test can hand
+ * exactly these two fields to the memo without building a whole search. */
 type CompileMemo = { block: BlockRef; compiledById: Map<string, { tx: EncodedTx; limits: CompiledLimits }> }
 
 /** Either the calldata, or the reason this candidate can never be executed — both are answers about
@@ -267,18 +260,17 @@ export class Verifier {
    * One walk down the ranked list. Skips what is already settled, compiles what is not, and stops
    * at the first candidate that needs a round trip — dispatching exactly one preflight.
    *
-   * See the module header for why the requirements check precedes the simulation, and why an
-   * `unverified` entry (a transport loss, or a revert with the trader's funding state partly unread)
-   * is passed OVER rather than re-asked: that is the wave engine's fall-through — "only this
-   * candidate's call was lost; the next one may well answer" — made durable in a loop that has no
-   * waves to reset it. Such an entry can only have been written by `applyPreflight`'s inconclusive
-   * arms; a candidate nobody has simulated has no entry at all.
+   * See the module header for why the requirements check precedes the simulation. An `unverified`
+   * entry (a transport loss, or a revert with the trader's funding state partly unread) is passed
+   * OVER rather than re-asked — only this candidate's call was lost; the next one may well answer —
+   * and the fall-through is durable for the whole search. Such an entry can only have been written
+   * by `applyPreflight`'s inconclusive arms; a candidate nobody has simulated has no entry at all.
    */
   private advance(ranked: QuotedRoute[]): void {
     const { state } = this
     const requirements = state.requirements ?? []
-    // Recomputed by every walk — `exhausted` describes THIS look at the field, exactly as the wave
-    // engine recomputed it per wave. Only the cap branch below may set it true.
+    // Recomputed by every walk — `exhausted` describes THIS look at the field. Only the cap branch
+    // below may set it true.
     state.verification.preflightBudgetExhausted = false
 
     for (const quoted of ranked) {
@@ -376,119 +368,4 @@ export class Verifier {
     if (queued !== undefined) this.advance(queued)
     this.wake.poke()
   }
-}
-
-// ---------------------------------------------------------------------------
-// TRANSITIONAL: the wave engine's evaluation stage.
-//
-// `waves.ts` still verifies its leader synchronously, once per wave, against its
-// own `EngineState` — a per-WAVE fall-through budget, and status writes that
-// predate `search/state.ts`'s single-writer `apply*`. These two functions are
-// that stage, unchanged except for `compileAndEncode`'s result shape. They are
-// deleted with `waves.ts` in Task 9.
-// ---------------------------------------------------------------------------
-
-/**
- * Verifies the leader for a swap: compile, encode, then simulate as the real trader at the pinned
- * block, falling through to the next candidate on failure for at most `PREFLIGHT_TOP_K` attempts
- * per wave. Returns the routeId that should lead the result, if one was established this wave.
- */
-async function verifyLeader(
-  run: Extract<Run, { kind: 'swap' }>,
-  ranked: QuotedRoute[],
-  allowPreflight: boolean,
-): Promise<string | undefined> {
-  const { state } = run
-  const requirements = state.requirements ?? []
-  let attempts = 0
-  // Reset for THIS wave's call — `exhausted` reflects only what this call did, mirroring
-  // `enumeration`'s pruning counters ("last wave wins"). THE ABORT PATH ALWAYS LEAVES IT `false`:
-  // `allowPreflight` is `!state.aborted`, and `if (!allowPreflight) return id` fires for the first
-  // eligible candidate, before the loop can reach the cap-check branch.
-  state.verification.preflightBudgetExhausted = false
-
-  for (let i = 0; i < ranked.length; i++) {
-    if (attempts >= PREFLIGHT_TOP_K) {
-      // The cap stopped us with candidates still on the table (`ranked.slice(i)`). Whether that is a
-      // real exhaustion depends on whether any of them might still have gone somewhere: one already
-      // `'failed'` OR `'verified'` contributes nothing new no matter how much budget it got.
-      state.verification.preflightBudgetExhausted = ranked.slice(i).some((r) => {
-        const status = state.execution.get(routeId(r.route))?.status
-        return status !== 'failed' && status !== 'verified'
-      })
-      break
-    }
-    const quoted = ranked[i]!
-    const id = routeId(quoted.route)
-    const known = state.execution.get(id)
-    if (known?.status === 'failed') continue
-    if (known?.status === 'verified') return id
-
-    const compiled = compileAndEncode(state, run.ctx, run.req, quoted)
-    if ('error' in compiled) {
-      state.firstCompileError ??= compiled.error
-      state.execution.set(id, { status: 'failed' })
-      continue
-    }
-
-    if (requirements.length > 0) {
-      if (state.readinessDegraded) return id
-      state.execution.set(id, { status: 'needs-action' })
-      return id
-    }
-    if (!allowPreflight) return id
-
-    attempts++
-    state.verification.preflightAttempted++
-    const result = await preflightTx(run.ctx.client, compiled.tx, run.req.trader, state.block.number, run.ctx.semaphore)
-    if (result.ok) {
-      state.execution.set(id, { status: 'verified' })
-      return id
-    }
-    if (result.kind === 'transport') {
-      state.verificationDegraded = true
-      state.execution.set(id, { status: 'unverified' })
-      continue
-    }
-    if (state.readinessDegraded) {
-      state.execution.set(id, { status: 'unverified' })
-      continue
-    }
-    state.execution.set(id, { status: 'failed', ...(result.revertData !== undefined && { revertData: result.revertData }) })
-  }
-
-  return undefined
-}
-
-export async function evaluate(run: Run, done: boolean): Promise<InternalResult> {
-  const { state } = run
-  const ranked = rankRoutes([...state.quoted.values()])
-
-  // VERIFICATION RUNS BEFORE THE REPORT IS BUILT (C4-P7). `verifyLeader` mutates
-  // `state.verification` (attempts/exhaustion), and `buildReport` reads it — building the report
-  // first would snapshot last wave's verification counts under this wave's report, exactly the kind
-  // of stale-report bug `SearchReport` exists to never produce (see `report.ts`'s header).
-  const leaderId = ranked.length > 0 && run.kind === 'swap' ? await verifyLeader(run, ranked, !state.aborted) : undefined
-
-  const report = buildReport(engineReportState(state), run.ctx, run.req)
-  const base = {
-    report,
-    done,
-    ...(state.requirements !== undefined && { requirements: state.requirements }),
-    ...(state.firstCompileError !== undefined && { compileError: state.firstCompileError }),
-  }
-
-  if (ranked.length === 0) return { alternatives: [], ...base }
-
-  if (run.kind === 'quote') {
-    const evaluated = ranked.map((q) => withExecution(state, q))
-    return { best: evaluated[0]!, alternatives: evaluated.slice(1), ...base }
-  }
-
-  const evaluated = ranked.map((q) => withExecution(state, q))
-  const best = pickLeader(evaluated, leaderId)
-  const alternatives = evaluated.filter((e) => e !== best)
-  const compiled = state.compiledById.get(routeId(best.route))
-
-  return { best, alternatives, ...base, ...(compiled !== undefined && { tx: compiled.tx, limits: compiled.limits }) }
 }
