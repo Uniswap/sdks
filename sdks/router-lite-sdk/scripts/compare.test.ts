@@ -4,12 +4,18 @@ import { UsageError } from '../cli/args'
 
 import {
   buildTradingApiBody,
+  classifyMiss,
+  defaultTheBudgetFlag,
   deltaBps,
+  findMisses,
+  liteEvidence,
+  MISS_DELTA_BPS,
   parsePairSpec,
   parseTradingApiResponse,
   summarize,
   TRADING_API_SWAPPER,
   type ComparisonRow,
+  type LiteEvidence,
 } from './compare'
 
 // ---------------------------------------------------------------------------
@@ -48,6 +54,21 @@ describe('parsePairSpec', () => {
 
   it('rejects an empty amount after a trailing colon', () => {
     expect(() => parsePairSpec('USDC/WETH:')).toThrow(UsageError)
+  })
+})
+
+describe('defaultTheBudgetFlag', () => {
+  it('writes the default when --budget was not given', () => {
+    const strings = new Map<string, string>()
+    defaultTheBudgetFlag(strings)
+    // The default must be in `--budget`'s OWN syntax, so `parseBudget` accepts it downstream.
+    expect(strings.get('budget')).toBe('10000ms')
+  })
+
+  it('never overrides a caller-supplied --budget', () => {
+    const strings = new Map([['budget', '45s']])
+    defaultTheBudgetFlag(strings)
+    expect(strings.get('budget')).toBe('45s')
   })
 })
 
@@ -171,26 +192,149 @@ describe('deltaBps', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Shared fixtures for the row-shaped tests below.
+// ---------------------------------------------------------------------------
+
+const EVIDENCE: LiteEvidence = {
+  discovery: 'v2:complete v3:complete v4:complete',
+  legsMeasured: 4,
+  pairCeilingHit: false,
+  exhaustive: true,
+  intermediatesSelected: 2,
+  intermediatesDiscovered: 2,
+  quoting: { attempted: 4, succeeded: 4, failed: 0, transportFailed: 0, unattempted: 0 },
+  aborted: false,
+}
+
+const pair = (label: string) => ({
+  label,
+  pairLabel: label,
+  amountHuman: '1',
+  tokenIn: { ref: 'native' as const, symbol: 'ETH', decimals: 18 },
+  tokenOut: { ref: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const, symbol: 'USDC', decimals: 6 },
+  amountIn: 1_000_000_000_000_000_000n,
+  notes: '',
+})
+
+// The QUOTE arm specifically, not the whole union: a test that spreads this fixture to vary one flag
+// needs the arm's own shape back, and a union-typed helper widens it away.
+const okLite = (amountOut: bigint): Extract<ComparisonRow['lite'], { kind: 'quote' }> => ({
+  kind: 'quote',
+  amountOut,
+  route: 'ETH -> USDC',
+  finalMs: 500,
+  firstActionableMs: 200,
+  flags: { aborted: false, headRegressed: false, verificationDegraded: false, transportFailed: 0, hardStopped: false },
+  evidence: EVIDENCE,
+})
+
+const noRouteLite = (kind: 'no-route' | 'inconclusive' = 'no-route'): ComparisonRow['lite'] => ({
+  kind,
+  reasonCode: 'no-route-found',
+  reasonDetail: 'nothing priced',
+  finalMs: 10_000,
+  flags: { aborted: true, headRegressed: false, verificationDegraded: false, transportFailed: 0, hardStopped: false },
+  evidence: { ...EVIDENCE, discovery: 'v2:partial v3:partial v4:partial', exhaustive: false, aborted: true },
+})
+
+const okApi = (amountOut: bigint): ComparisonRow['api'] => ({ kind: 'ok', amountOut, latencyMs: 300, raw: {} })
+
+describe('liteEvidence', () => {
+  it('renders one status word per protocol, in PROTOCOLS order, and folds the counters through', () => {
+    const evidence = liteEvidence({
+      block: { number: 1n, hash: '0x00', timestamp: 0n },
+      discovery: {
+        v2: { status: 'complete', coveredRanges: [], demandFloor: 0n },
+        v3: { status: 'partial', coveredRanges: [], demandFloor: 0n },
+        v4: { status: 'disabled', coveredRanges: [], demandFloor: 0n },
+      },
+      enumeration: {
+        exhaustiveWithinMaxHops: false,
+        intermediatesDiscovered: 7,
+        intermediatesSelected: 3,
+        intermediatesPruned: 4,
+        legsMeasured: 11,
+        pairCeilingHit: true,
+      },
+      quoting: { attempted: 12, succeeded: 10, failed: 1, transportFailed: 1, unattempted: 2 },
+      aborted: true,
+      verificationDegraded: false,
+      headRegressed: false,
+      verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
+    })
+    expect(evidence.discovery).toBe('v2:complete v3:partial v4:disabled')
+    expect(evidence.legsMeasured).toBe(11)
+    expect(evidence.pairCeilingHit).toBe(true)
+    expect(evidence.exhaustive).toBe(false)
+    expect(evidence.intermediatesSelected).toBe(3)
+    expect(evidence.intermediatesDiscovered).toBe(7)
+    expect(evidence.quoting.transportFailed).toBe(1)
+    expect(evidence.aborted).toBe(true)
+  })
+})
+
+describe('classifyMiss', () => {
+  it('is undefined when both sides quoted within the threshold', () => {
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(100n), api: okApi(100n) })).toBeUndefined()
+  })
+
+  it('calls a lite no-route/inconclusive against an API quote a no-route miss', () => {
+    expect(classifyMiss({ pair: pair('a'), lite: noRouteLite('no-route'), api: okApi(100n) })).toBe('no-route')
+    expect(classifyMiss({ pair: pair('a'), lite: noRouteLite('inconclusive'), api: okApi(100n) })).toBe('no-route')
+  })
+
+  it('calls a thrown lite side an error miss, separately from no-route', () => {
+    const lite: ComparisonRow['lite'] = { kind: 'error', message: 'boom', finalMs: 5 }
+    expect(classifyMiss({ pair: pair('a'), lite, api: okApi(100n) })).toBe('error')
+  })
+
+  it('calls a delta worse than the threshold a delta miss, in either direction, exclusive at the bound', () => {
+    // 100 bps exactly is NOT a miss (the threshold is exclusive); 101 bps is, and so is +101.
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(9_900n), api: okApi(10_000n) })).toBeUndefined()
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(9_800n), api: okApi(10_000n) })).toBe('delta')
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(10_200n), api: okApi(10_000n) })).toBe('delta')
+    expect(MISS_DELTA_BPS).toBe(100)
+  })
+
+  it('calls an API failure against a lite quote a reverse miss', () => {
+    const api: ComparisonRow['api'] = { kind: 'error', latencyMs: 40, httpStatus: 404, message: 'no route' }
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(100n), api })).toBe('reverse')
+  })
+
+  it('treats a 200 with no readable amountOut as the API having no quote', () => {
+    const api: ComparisonRow['api'] = { kind: 'ok', latencyMs: 40, raw: {} }
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(100n), api })).toBe('reverse')
+    expect(classifyMiss({ pair: pair('a'), lite: noRouteLite(), api })).toBeUndefined()
+  })
+
+  it('is never a miss when the API side was skipped — nothing to be missing from', () => {
+    const api: ComparisonRow['api'] = { kind: 'skipped' }
+    expect(classifyMiss({ pair: pair('a'), lite: okLite(100n), api })).toBeUndefined()
+    expect(classifyMiss({ pair: pair('a'), lite: noRouteLite(), api })).toBeUndefined()
+  })
+
+  it('reports both sides failing as no miss at all (no coverage claim either way)', () => {
+    const api: ComparisonRow['api'] = { kind: 'error', latencyMs: 40, message: 'timeout' }
+    expect(classifyMiss({ pair: pair('a'), lite: noRouteLite(), api })).toBeUndefined()
+  })
+})
+
+describe('findMisses', () => {
+  it('returns misses in row order, skipping non-misses', () => {
+    const rows: ComparisonRow[] = [
+      { pair: pair('fine'), lite: okLite(100n), api: okApi(100n) },
+      { pair: pair('missing'), lite: noRouteLite(), api: okApi(100n) },
+      { pair: pair('off'), lite: okLite(1n), api: okApi(100n) },
+    ]
+    expect(findMisses(rows).map((m) => [m.row.pair.label, m.missClass])).toEqual([
+      ['missing', 'no-route'],
+      ['off', 'delta'],
+    ])
+  })
+})
+
 describe('summarize', () => {
-  const pair = (label: string) => ({
-    label,
-    tokenIn: { ref: 'native' as const, symbol: 'ETH', decimals: 18 },
-    tokenOut: { ref: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const, symbol: 'USDC', decimals: 6 },
-    amountIn: 1_000_000_000_000_000_000n,
-    notes: '',
-  })
-
-  const okLite = (amountOut: bigint): ComparisonRow['lite'] => ({
-    kind: 'quote',
-    amountOut,
-    route: 'ETH -> USDC',
-    finalMs: 500,
-    firstActionableMs: 200,
-    flags: { aborted: false, headRegressed: false, verificationDegraded: false, transportFailed: 0 },
-  })
-
-  const okApi = (amountOut: bigint): ComparisonRow['api'] => ({ kind: 'ok', amountOut, latencyMs: 300, raw: {} })
-
   it('counts wins/ties/losses and reports median/worst delta, signed', () => {
     const rows: ComparisonRow[] = [
       { pair: pair('win'), lite: okLite(101n), api: okApi(100n) }, // +100bps: win
@@ -206,17 +350,17 @@ describe('summarize', () => {
     expect(summary.medianDeltaBps).toBe(0)
     expect(summary.worstDeltaBps).toBeCloseTo(-1000, 5)
     expect(summary.note.length).toBeGreaterThan(0)
+    // The -1000bps row is BOTH a loss and a delta miss: the win/loss record and the miss counts are
+    // separate readings of the same row, not a partition of the rows.
+    expect(summary.missCounts).toEqual({ 'no-route': 0, delta: 1, error: 0, reverse: 0 })
+    expect(summary.missesTotal).toBe(1)
   })
 
   it('excludes skipped/error/no-route sides from the comparison count without throwing', () => {
     const rows: ComparisonRow[] = [
       { pair: pair('skipped'), lite: okLite(100n), api: { kind: 'skipped' } },
       { pair: pair('api-error'), lite: okLite(100n), api: { kind: 'error', latencyMs: 50, message: 'boom' } },
-      {
-        pair: pair('no-route'),
-        lite: { kind: 'no-route', reasonCode: 'x', reasonDetail: 'y', finalMs: 10, flags: { aborted: false, headRegressed: false, verificationDegraded: false, transportFailed: 0 } },
-        api: okApi(100n),
-      },
+      { pair: pair('no-route'), lite: noRouteLite(), api: okApi(100n) },
       { pair: pair('lite-error'), lite: { kind: 'error', message: 'timeout', finalMs: 999 }, api: okApi(100n) },
     ]
     const summary = summarize(rows)
@@ -224,6 +368,9 @@ describe('summarize', () => {
     expect(summary.pairsCompared).toBe(0)
     expect(summary.medianDeltaBps).toBeUndefined()
     expect(summary.worstDeltaBps).toBeUndefined()
+    // Every class a row that never produced a delta can still land in.
+    expect(summary.missCounts).toEqual({ 'no-route': 1, delta: 0, error: 1, reverse: 1 })
+    expect(summary.missesTotal).toBe(3)
   })
 
   it('reports latency medians independently of whether a delta could be computed', () => {
@@ -235,6 +382,23 @@ describe('summarize', () => {
     expect(summary.liteFinalMedianMs).toBe(500)
     expect(summary.liteFirstActionableMedianMs).toBe(200)
     expect(summary.apiMedianMs).toBeUndefined()
+  })
+
+  it('counts hard-stopped rows separately from misses — a truncated search can still quote well', () => {
+    const clean = okLite(100n)
+    const stopped: ComparisonRow['lite'] = {
+      ...okLite(100n),
+      flags: { aborted: true, headRegressed: false, verificationDegraded: false, transportFailed: 0, hardStopped: true },
+    }
+    const rows: ComparisonRow[] = [
+      { pair: pair('stopped'), lite: stopped, api: okApi(100n) },
+      { pair: pair('clean'), lite: clean, api: okApi(100n) },
+      { pair: pair('threw'), lite: { kind: 'error', message: 'boom', finalMs: 1 }, api: okApi(100n) },
+    ]
+    const summary = summarize(rows)
+    expect(summary.hardStopped).toBe(1)
+    expect(summary.ties).toBe(2)
+    expect(summary.missesTotal).toBe(1) // the thrown row only
   })
 
   it('handles an empty row set', () => {
