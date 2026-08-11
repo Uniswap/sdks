@@ -161,6 +161,9 @@ function stubModule(id: 'v2' | 'v3'): ProtocolModule {
       return [{ candidate: { legs }, quote: stubQuote(legs, amountIn) }]
     },
 
+    // Not exercised by the wave engine — `hypotheses` exists only to satisfy the interface here.
+    hypotheses: () => [],
+
     // Topics 1/2, like both real factories — which is what makes the v2 and v3 stubs MERGE into one
     // `eth_getLogs` here exactly as the real modules do (`protocols/adjacency.ts`).
     adjacencyShape(m) {
@@ -222,6 +225,7 @@ const v4StubModule: ProtocolModule = {
   id: 'v4',
   enabled: (m) => !!m.v4,
   speculativeDirect: () => [],
+  hypotheses: () => [],
 
   adjacencyShape(m) {
     if (!m.v4) return undefined

@@ -6,7 +6,7 @@ import { V2_FACTORY_ABI, V2_PAIR_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, RouteLeg } from '../types'
 
-import { v2PoolRef } from './poolRef'
+import { v2PoolRef, type V2PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
 
 // ---------------------------------------------------------------------------
@@ -98,6 +98,17 @@ function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigi
   }
 }
 
+/** v2's one derivable identity for (a, b): the CREATE2 pair address. Pure — no RPC. */
+function v2Hypothesis(a: CurrencyRef, b: CurrencyRef, m: ChainManifest): V2PoolRef | undefined {
+  if (!m.v2) return undefined
+  const wrappedNative = m.wrappedNative
+  const aAddr = resolveAddress(a, wrappedNative)
+  const bAddr = resolveAddress(b, wrappedNative)
+  const [token0, token1] = sortAddresses(aAddr, bAddr)
+  const address = computeV2PairAddress(m.v2.factory, aAddr, bAddr, m.v2.initCodeHash)
+  return v2PoolRef(address, token0, token1)
+}
+
 export const v2Module = {
   id: 'v2',
 
@@ -105,17 +116,18 @@ export const v2Module = {
     return !!m.v2
   },
 
+  hypotheses(a, b, m) {
+    const pool = v2Hypothesis(a, b, m)
+    return pool ? [pool] : []
+  },
+
   speculativeDirect(a, b, amountIn, m) {
-    if (!m.v2) return []
-    const wrappedNative = m.wrappedNative
-    const aAddr = resolveAddress(a, wrappedNative)
-    const bAddr = resolveAddress(b, wrappedNative)
-    const [token0, token1] = sortAddresses(aAddr, bAddr)
-    const zeroForOne = isAddressEqual(aAddr, token0)
-    const address = computeV2PairAddress(m.v2.factory, aAddr, bAddr, m.v2.initCodeHash)
-    const pool = v2PoolRef(address, token0, token1)
+    const pool = v2Hypothesis(a, b, m)
+    if (!pool) return []
+    const aAddr = resolveAddress(a, m.wrappedNative)
+    const zeroForOne = isAddressEqual(aAddr, pool.token0)
     const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-    const probe: QuoteProbe = { candidate: { legs: [leg] }, quote: reservesQuote(address, zeroForOne, amountIn) }
+    const probe: QuoteProbe = { candidate: { legs: [leg] }, quote: reservesQuote(pool.address, zeroForOne, amountIn) }
     return [probe]
   },
 

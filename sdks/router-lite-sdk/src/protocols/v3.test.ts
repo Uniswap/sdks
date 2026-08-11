@@ -121,6 +121,21 @@ test('speculativeDirect emits one probe per standard fee', () => {
   expect(probes.map((p) => (p.candidate.legs[0]!.pool as Extract<PoolRef, { protocol: 'v3' }>).fee)).toEqual([100, 500, 3000, 10000])
 })
 
+test('hypotheses returns the same 4 standard-tier pool ids speculativeDirect probes today', () => {
+  const probes = v3Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+  const hypotheses = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
+  expect(new Set(hypotheses.map((h) => h.id))).toEqual(new Set(probes.map((p) => p.candidate.legs[0]!.pool.id)))
+  expect(hypotheses).toHaveLength(4)
+})
+
+test('hypotheses adds exactly one more pool per extraFees entry', () => {
+  const standard = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
+  const withExtra = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST, [123])
+  expect(withExtra).toHaveLength(standard.length + 1)
+  const extraPool = withExtra.find((h) => !standard.some((s) => s.id === h.id))!
+  expect(extraPool.protocol === 'v3' && extraPool.fee).toBe(123)
+})
+
 test('decode extracts amountOut from QuoterV2 return', () => {
   const legs: RouteLeg[] = [
     {

@@ -143,6 +143,13 @@ test('compileOperation maps custody', () => {
   expect(op).toMatchObject({ kind: 'v2-swap', payer: 'router', recipient: 'final' })
 })
 
+test('hypotheses returns exactly the one pool speculativeDirect probes today', () => {
+  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+  const hypotheses = v2Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
+  expect(hypotheses).toHaveLength(1)
+  expect(hypotheses[0]!.id).toBe(probe!.candidate.legs[0]!.pool.id)
+})
+
 test('parsePoolLog returns null when log address does not match v2 factory', () => {
   const badAddress = '0x0000000000000000000000000000000000000bad' as const
   const pair = computeV2PairAddress(V2_FACTORY, USDC, WETH)

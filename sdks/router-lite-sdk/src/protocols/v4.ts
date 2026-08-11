@@ -7,7 +7,7 @@ import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
 import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, PoolKey, RouteLeg } from '../types'
 
-import { v4PoolRef } from './poolRef'
+import { v4PoolRef, type V4PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
 
 // ---------------------------------------------------------------------------
@@ -119,6 +119,14 @@ function quoterQuote(quoter: Address, legs: RouteLeg[], amountIn: bigint): Quote
   }
 }
 
+/** v4's standard no-hook configs for (a, b): the fee/tickSpacing pairs the PoolManager singleton
+ * carries at genesis. `extraFees` doesn't apply — v4's fee lives in the PoolKey the caller already
+ * holds, not a factory-scanned tier like v3's. Pure — no RPC. */
+function v4Hypotheses(a: CurrencyRef, b: CurrencyRef, m: ChainManifest): V4PoolRef[] {
+  if (!m.v4) return []
+  return STANDARD_V4_CONFIGS.map(({ fee, tickSpacing }) => v4PoolRef(buildPoolKey(a, b, fee, tickSpacing)))
+}
+
 export const v4Module = {
   id: 'v4',
 
@@ -126,11 +134,14 @@ export const v4Module = {
     return !!m.v4
   },
 
+  hypotheses(a, b, m, _extraFees?) {
+    return v4Hypotheses(a, b, m)
+  },
+
   speculativeDirect(a, b, amountIn, m) {
     if (!m.v4) return []
     const { quoter } = m.v4
-    return STANDARD_V4_CONFIGS.map(({ fee, tickSpacing }) => {
-      const pool = v4PoolRef(buildPoolKey(a, b, fee, tickSpacing))
+    return v4Hypotheses(a, b, m).map((pool) => {
       const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
       const quote = quoterQuote(quoter, [leg], amountIn)
       return { candidate: { legs: [leg] }, quote }

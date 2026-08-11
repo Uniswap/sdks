@@ -9,6 +9,7 @@ import type {
   LogQuery,
   PoolHint,
   PoolRecord,
+  PoolRef,
   Protocol,
   QuoteCall,
   RouteCandidate,
@@ -47,6 +48,10 @@ export interface ProtocolModule {
   readonly id: Protocol
   enabled(m: ChainManifest): boolean
   speculativeDirect(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest): QuoteProbe[]
+  /** Pool identities derivable for (a, b) without discovery: v2's pair address,
+   *  v3's CREATE2 address per standard + `extraFees` tier, v4's standard configs.
+   *  Pure — no RPC, no index. Existence is the pump's job to prove by measurement. */
+  hypotheses(a: CurrencyRef, b: CurrencyRef, manifest: ChainManifest, extraFees?: number[]): PoolRef[]
   /**
    * Where this protocol's pool-creation events live and how they index the pool's currencies —
    * enough for `protocols/adjacency.ts` to BUILD the "every pool touching X" filters, rather than

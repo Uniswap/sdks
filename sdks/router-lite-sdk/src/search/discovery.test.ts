@@ -85,6 +85,7 @@ function manifestWith(opts: { deploymentBlock: bigint; v4?: boolean; v2Block?: b
 /** Nothing in this file quotes, compiles or hints — those members exist only to satisfy the interface. */
 const unused = {
   speculativeDirect: () => [],
+  hypotheses: () => [],
   validateHint: async () => null,
   encodeQuote: () => {
     throw new Error('not used')
@@ -92,7 +93,7 @@ const unused = {
   compileOperation: () => {
     throw new Error('not used')
   },
-} as unknown as Pick<ProtocolModule, 'speculativeDirect' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
+} as unknown as Pick<ProtocolModule, 'speculativeDirect' | 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
 
 /**
  * A v3-shaped module. Its SHAPE (topics 1/2, identity endpoint mapping) is what `adjacencyQueries`

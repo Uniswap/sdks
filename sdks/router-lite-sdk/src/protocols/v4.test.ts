@@ -70,6 +70,19 @@ test('speculativeDirect probes standard no-hook configs', () => {
   for (const p of probes) expect((p.candidate.legs[0]!.pool as any).poolKey.hooks).toBe(zeroAddress)
 })
 
+test('hypotheses returns the same standard-config pool ids speculativeDirect probes today', () => {
+  const probes = v4Module.speculativeDirect('native', USDC, 10n ** 18n, MAINNET_MANIFEST)
+  const hypotheses = v4Module.hypotheses('native', USDC, MAINNET_MANIFEST)
+  expect(new Set(hypotheses.map((h) => h.id))).toEqual(new Set(probes.map((p) => p.candidate.legs[0]!.pool.id)))
+  expect(hypotheses).toHaveLength(4)
+})
+
+test('hypotheses ignores extraFees (v4 carries fee in the PoolKey, not a scan)', () => {
+  const withExtra = v4Module.hypotheses('native', USDC, MAINNET_MANIFEST, [123])
+  const without = v4Module.hypotheses('native', USDC, MAINNET_MANIFEST)
+  expect(withExtra).toEqual(without)
+})
+
 const legsWithHookData: RouteLeg[] = [
   {
     pool: v4Ref(ethUsdcKey),

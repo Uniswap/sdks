@@ -18,7 +18,7 @@ import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
 import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, RouteLeg } from '../types'
 
-import { v3PoolRef } from './poolRef'
+import { v3PoolRef, type V3PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
 
 // ---------------------------------------------------------------------------
@@ -143,23 +143,23 @@ function quoterQuote(quoter: Address, path: Hex, amountIn: bigint): QuoteProbe['
   }
 }
 
-/** One direct-pair probe per fee tier: the QuoterV2 call at the CREATE2 address *is* the existence check. */
-function directProbesForFees(
-  a: CurrencyRef,
-  b: CurrencyRef,
-  amountIn: bigint,
-  fees: readonly number[],
-  v3: { factory: Address; v3QuoterV2: Address; poolInitCodeHash?: Hex | undefined },
-  wrappedNative: Address,
-): QuoteProbe[] {
-  const aAddr = resolveAddress(a, wrappedNative)
-  const bAddr = resolveAddress(b, wrappedNative)
+/** v3's per-fee derivable identities for (a, b): the CREATE2 address at each tier. Pure — no RPC. */
+function v3Hypotheses(a: CurrencyRef, b: CurrencyRef, m: ChainManifest, fees: readonly number[]): V3PoolRef[] {
+  const { v3 } = m
+  if (!v3) return []
+  const aAddr = resolveAddress(a, m.wrappedNative)
+  const bAddr = resolveAddress(b, m.wrappedNative)
   const [token0, token1] = sortAddresses(aAddr, bAddr)
-  return fees.map((fee) => {
-    const address = computeV3PoolAddress(v3.factory, aAddr, bAddr, fee, v3.poolInitCodeHash)
-    const pool = v3PoolRef(address, token0, token1, fee)
+  return fees.map((fee) => v3PoolRef(computeV3PoolAddress(v3.factory, aAddr, bAddr, fee, v3.poolInitCodeHash), token0, token1, fee))
+}
+
+/** One direct-pair probe per fee tier: the QuoterV2 call at the CREATE2 address *is* the existence check. */
+function directProbesForFees(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, fees: readonly number[], m: ChainManifest): QuoteProbe[] {
+  const { v3 } = m
+  if (!v3) return []
+  return v3Hypotheses(a, b, m, fees).map((pool) => {
     const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-    const path = encodeV3Path([leg], wrappedNative)
+    const path = encodeV3Path([leg], m.wrappedNative)
     return { candidate: { legs: [leg] }, quote: quoterQuote(v3.v3QuoterV2, path, amountIn) }
   })
 }
@@ -171,9 +171,12 @@ export const v3Module = {
     return !!m.v3
   },
 
+  hypotheses(a, b, m, extraFees = []) {
+    return v3Hypotheses(a, b, m, [...STANDARD_V3_FEES, ...extraFees])
+  },
+
   speculativeDirect(a, b, amountIn, m) {
-    if (!m.v3) return []
-    return directProbesForFees(a, b, amountIn, STANDARD_V3_FEES, m.v3, m.wrappedNative)
+    return directProbesForFees(a, b, amountIn, STANDARD_V3_FEES, m)
   },
 
   adjacencyShape(m) {
@@ -201,8 +204,7 @@ export const v3Module = {
     },
 
     probes(a, b, amountIn, fees, m) {
-      if (!m.v3) return []
-      return directProbesForFees(a, b, amountIn, fees, m.v3, m.wrappedNative)
+      return directProbesForFees(a, b, amountIn, fees, m)
     },
   },
 
