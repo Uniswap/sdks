@@ -366,6 +366,17 @@ export async function* search(
   const state = createState(block, regressed, ctx.recording)
   const wake = createNotifier()
   const sources = new SourceSet(wake)
+  // The pump's dispatch signal: aborted by the CALLER'S abort (`onAbort` below) and by the loop's
+  // teardown (`finally`) alike — a loop-owned composition of `req.signal` and the SourceSet's
+  // lifetime, built by hand rather than `AbortSignal.any` only because `engines` still admits a
+  // runtime without it. It used to be `sources.signal` bare, which aborts only in `finally` — so the
+  // measurement round in flight when `req.signal` fired ran to completion, and the termination
+  // check's drain (`state.aborted && inFlightKeys.size === 0`) waited on a full uncancelled round:
+  // observed live as `--budget` overshooting by 12+ seconds on a dense pair while a 50-leg envelope
+  // settled. With the caller's abort on the dispatch signal, every queued call dies unsent
+  // (`AbortedCallError` → 'unattempted' → its key settles), so the drain costs at most the HTTP
+  // requests already on the wire — whose answers are exactly the prices the abort contract keeps.
+  const dispatch = new AbortController()
   const pumpCtx: PumpCtx = {
     index: ctx.index,
     modules: ctx.modules,
@@ -375,7 +386,7 @@ export async function* search(
     client: ctx.client,
     semaphore: ctx.semaphore,
     multicall3: ctx.multicall3,
-    signal: sources.signal,
+    signal: dispatch.signal,
     // The waker turns each measurement round detached and envelope-granular (see `pump.ts`): a
     // 250-leg round's first envelope recomposes — and can lead — while the other envelopes are
     // still in flight. `pumpDry` counts in-flight keys, so the gate and the termination check
@@ -422,9 +433,15 @@ export async function* search(
 
   let lastLead: string | undefined
   let lastReport = reportSignature(buildReport(state, ctx, req))
-  // The caller's abort must reach a loop parked on `wake.next()`; observed at the loop top as today.
-  const onAbort = (): void => wake.poke()
+  // The caller's abort must do two things: cancel the dispatch signal (so queued measurement calls
+  // die unsent — see the `dispatch` controller above) and reach a loop parked on `wake.next()`.
+  const onAbort = (): void => {
+    dispatch.abort()
+    wake.poke()
+  }
   req.signal?.addEventListener('abort', onAbort, { once: true })
+  // A signal that was ALREADY aborted never fires its listener — cover the born-aborted request too.
+  if (req.signal?.aborted === true) dispatch.abort()
   wake.poke() // the first cycle needs no external event: the hints and the index are already here
 
   try {
@@ -458,9 +475,10 @@ export async function* search(
       // mid-application when the abort's poke wakes this loop; terminating on `aborted` alone
       // would emit a final missing prices the wire already paid for — the exact best-so-far the
       // abort contract promises to keep (and what the awaited round delivered structurally, by
-      // blocking this check until it had applied everything). Draining costs what the old await
-      // cost: the round was never cancelled by `req.signal` either way (`sources` abort only in
-      // `finally`), so the batches keep applying and poking until `inFlightKeys` empties.
+      // blocking this check until it had applied everything). The drain is BOUNDED by the abort
+      // itself: `onAbort` cancelled the dispatch signal, so every call still queued for the wire
+      // settles 'unattempted' without being sent, and the only thing this check waits on is the
+      // HTTP requests already in flight — each applying and poking until `inFlightKeys` empties.
       if (
         (state.aborted && state.inFlightKeys.size === 0) ||
         (sources.settled() &&
@@ -510,6 +528,14 @@ export async function* search(
     // into 'unattempted' outcomes, applied through `applyMeasurement` into a state nobody reads
     // again — see `pump.ts`); on a caller's abort or normal termination it cannot, because the
     // termination check above drained `inFlightKeys` first.
+    //
+    // THE COVERAGE WORKER'S SCANS end here too, and only here — `worker.run` deliberately gets
+    // `sources.signal`, not the caller-composed `dispatch` signal, so a caller's abort does not
+    // cancel a scan chunk mid-flight. That is bounded, not a hole: the abort empties the pump's
+    // queue (see `dispatch` above), the drain finishes in the in-flight requests, the loop emits
+    // `final` and returns, and THIS abort stops the scans — at most one chunk per scope outlives
+    // the caller's signal, and its logs still land in the shared index for the next search.
+    dispatch.abort()
     sources.abortAll()
   }
 }

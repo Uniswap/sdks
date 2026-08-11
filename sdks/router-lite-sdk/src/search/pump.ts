@@ -472,12 +472,15 @@ export function inLegIntermediate(leg: LegDirection, wrappedNative: Address, inN
  *
  * ON THE CALLER'S ABORT the loop DRAINS the round before its `final` (its termination check holds
  * while `inFlightKeys` is non-empty) — the same harvest the awaited round provided structurally, so
- * an abort still keeps every price the wire already paid for. Only iterator ABANDONMENT leaves the
- * round to settle after the fact: `sources.abortAll()` turns its unsent calls into 'unattempted'
- * outcomes whose application writes through `applyMeasurement` into a state nobody reads again,
- * poking a notifier nobody awaits — the same inertness argument as spec §5's preflight carve-out,
- * documented alongside it in the loop's `finally`. An aborted search never dispatches a NEW round,
- * so the same planned key can still never settle 'unattempted' twice.
+ * an abort still keeps every price the wire already paid for. The drain is BOUNDED because the
+ * loop's dispatch signal (`ctx.signal`) aborts WITH the caller's signal: every call still queued
+ * for the wire settles 'unattempted' unsent (`AbortedCallError`), and only the requests already in
+ * flight are waited on. Iterator ABANDONMENT settles the same way after the fact — the loop's
+ * `finally` aborts the dispatch signal, its unsent calls become 'unattempted' outcomes whose
+ * application writes through `applyMeasurement` into a state nobody reads again, poking a notifier
+ * nobody awaits — the same inertness argument as spec §5's preflight carve-out, documented
+ * alongside it in the loop's `finally`. An aborted search never dispatches a NEW round, so the
+ * same planned key can still never settle 'unattempted' twice.
  *
  * A rejected round is a bug — `measureLegs` is total by contract — but a bug must not park the
  * search: `inFlightKeys` would never drain and the loop could never go dry. Mirroring

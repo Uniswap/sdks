@@ -3,7 +3,7 @@ import fc from 'fast-check'
 import type { Address, Hex, Log, PublicClient } from 'viem'
 import { encodeAbiParameters } from 'viem'
 
-import { MAX_INTERMEDIATES, PUMP_VANGUARD_LEGS } from '../constants'
+import { DEFAULT_CONCURRENCY, MAX_INTERMEDIATES, PUMP_VANGUARD_LEGS } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
@@ -897,6 +897,75 @@ test('an abort mid-scan keeps the prices the landed chunks bought', async () => 
   // …and the scan really was cut short rather than run to completion first.
   const total = Number(wave0PairScanBlocks(manifest) / 64n)
   expect(served.filter((s) => s.scope === 'adjacency').length).toBeLessThan(total)
+})
+
+test('an abort mid-detached-round cancels the queued legs — the drain waits only on the requests already in flight', async () => {
+  // THE LIVE DEFECT (`--budget 60s` on a dense mainnet token overshooting by 12+ seconds): the
+  // pump's dispatch signal used to be the SourceSet's, which aborts only in the loop's `finally` —
+  // so the round in flight when the caller's signal fired ran to completion, envelope after
+  // envelope, and the termination check's drain waited on all of it. The dispatch signal now
+  // aborts WITH the caller's: every leg still queued for the wire dies unsent ('unattempted'),
+  // and the drain waits only on the HTTP requests already dispatched.
+  //
+  // Choreography: 60 direct pools -> one 60-leg round (a 12-leg vanguard envelope answering
+  // immediately, then 48 legs of which DEFAULT_CONCURRENCY dispatch and PARK on the wire while the
+  // rest queue behind the concurrency bound). The abort lands with the vanguard priced and the
+  // parked calls in flight. Only calls already parked at release time are ever released — a call
+  // reaching the wire AFTER the abort would park forever and hang the drain, so "no new envelope
+  // goes out" is enforced by the choreography, not merely counted.
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const index = new PoolIndex(WETH)
+  const pools: PoolRef[] = []
+  for (let i = 0; i < 60; i++) {
+    pools.push(newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n + BigInt(60 - i) * 10n ** 6n }))
+  }
+  const vanguardIds = new Set(pools.slice(0, PUMP_VANGUARD_LEGS).map((p) => p.id))
+
+  const controller = new AbortController()
+  const parked: (() => void)[] = []
+  let onWire = 0
+  const { client } = makeClient({
+    onQuote: async (key) => {
+      onWire++
+      if (vanguardIds.has(key.split('|')[0]!)) return // the vanguard answers immediately
+      await new Promise<void>((resolve) => parked.push(resolve))
+    },
+  })
+  const ctx = ctxOf(client, manifest, world, { index })
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n, signal: controller.signal }
+
+  const gen = search(ctx, req, 'quote')
+  let first = await gen.next()
+  while (!first.done && first.value.type !== 'lead') first = await gen.next()
+  expect(first.value!.type).toBe('lead') // the vanguard's prices applied before the abort
+  await ticks(2) // let the post-vanguard dispatch reach its concurrency bound and park
+  expect(parked.length).toBe(DEFAULT_CONCURRENCY) // in flight; the remaining legs queue behind them
+
+  controller.abort()
+  const wireAtAbort = onWire
+  for (const release of parked.splice(0)) release() // the in-flight requests answer; nothing else may follow
+
+  // The drain must finish in bounded ticks — not after the round's remaining 28 legs.
+  const outcome = await Promise.race([collectAll(gen), ticks(100).then(() => 'hung' as const)])
+  expect(outcome).not.toBe('hung')
+  if (outcome === 'hung') throw new Error('unreachable')
+  const final = outcome[outcome.length - 1]!
+  expect(final.type).toBe('final')
+  if (final.type !== 'final') throw new Error('unreachable')
+
+  // (a) no NEW envelope reached the wire after the abort settled…
+  expect(onWire).toBe(wireAtAbort)
+  expect(parked).toHaveLength(0)
+  // (b) …the queued legs died unsent, counted on the report's unattempted axis…
+  expect(final.report.quoting.unattempted).toBe(60 - PUMP_VANGUARD_LEGS - DEFAULT_CONCURRENCY)
+  expect(final.report.aborted).toBe(true)
+  expect(final.state.aborted).toBe(true)
+  // (d) …and every price the wire already paid for — the vanguard's AND the released in-flight
+  // requests' — survives into the final, with the pre-abort leader still leading.
+  expect(final.state.quoting.succeeded).toBe(PUMP_VANGUARD_LEGS + DEFAULT_CONCURRENCY)
+  expect(final.ranked.length).toBe(PUMP_VANGUARD_LEGS + DEFAULT_CONCURRENCY)
+  expect(final.ranked[0]!.route.legs[0]!.pool.id).toBe(pools[0]!.id)
 })
 
 // ---------------------------------------------------------------------------
