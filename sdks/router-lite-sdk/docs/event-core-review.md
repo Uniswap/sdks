@@ -135,9 +135,9 @@ convergence-comparable mode.
 
 | command | before: total / lead / confirmed | after: total / lead / confirmed | routes priced (before → after) |
 |---|---|---|---|
-| 2a warm quote (Base eth/usdc) | 867 / 129 / 698 ms | **1,900 / 1,900 / n·a ms** | 30 of 67 → 32 routes (49 of 252 legs; pair ceiling hit) |
+| 2a warm quote (Base eth/usdc) | 867 / 129 / 698 ms | **1,300 / 1,300 / n·a ms** (was 1,900 before the chunk-cadence + vanguard fixes below) | 30 of 67 → 12-route vanguard lead (12/12 legs priced; the full 250-leg round keeps measuring behind it) |
 | 2b cold quote `--no-cache` (mainnet) | 595 / 92 / 595 ms | **152 / 152 / n·a ms** | 9 of 9 → 9 routes (33 of 36 legs) |
-| 2c swap (mainnet, 0.5 eth) | 474 / 93 / 416 ms | **464 / 248 / 368 ms** | 122 of 130 → 54 routes (105 of 160 legs) |
+| 2c swap (mainnet, 0.5 eth) | 474 / 93 / 416 ms | **204 / 158 / 204 ms** (was 464/248/368 pre-fix) | 122 of 130 → 9-route verified lead (21 legs settled at answer) |
 | 2d long-tail BRETT→usdc (Base) | 601 / 128 / 601 ms | **799 / 799 / n·a ms** (converged: two-hop lead by 2.1 s, best by 5.2 s under `--watch`) | 20 of 42 → 6 routes at lead (12 of 48 legs); 183 routes / 285 of 2,607 legs converged |
 | compare.ts (eth/usdc, usdc/wbtc) | failed at arg parsing | **runs**: first-actionable median 267 ms, final = 10 s budget | parity column skipped — no `UNISWAP_API_KEY` in this environment |
 
@@ -145,33 +145,51 @@ Transport health: **0 legs lost to RPC in every run** (24 searches' reports all 
 `0 lost to RPC`) — the 50-transport-loss Base run flagged in Task 12 did not reproduce; watch it
 in CI/canary rather than holding the branch.
 
-### Regressions > 20%, investigated
+### Regressions > 20%, investigated — and the two that were FIXED on this branch
 
-All three latency regressions share one cause, and it is the spec's central, deliberate trade
-(**measure, don't select** — §2.2, behavior change §7.2, risk §10.1), not a defect:
+The initial evaluation measured the warm dense pair at ~1.9 s total/lead (vs 867/129 ms) and the
+swap lead at 248 ms (vs 93 ms). Root cause: the spec's **measure, don't select** trade (§2.2,
+§7.2, §10.1) executed at the wrong *granularity* — the pump held a whole round's outcomes until
+its last `aggregate3` envelope settled, so the first lead paid a full 250-leg round even though
+the design's own principle (§3) delivers coverage knowledge at chunk arrival. Fixed in two
+commits rather than filed:
 
-- **2a warm dense pair: 867 ms → ~1.9 s.** The wave engine's warm path hand-picked 3-of-N pools
-  per pair (30 legs); the pump's first round measures *everything derivable* on the pair — 252
-  legs (128-capped direct pair + hypotheses + 8 intermediates' in-legs), i.e. ~6 concurrent
-  50-call `aggregate3` envelopes whose inner calls are dominated by v4 hooked-quoter simulations.
-  The first lead can only follow the first round, so it pays the whole round (~1.7–2.0 s on
-  Base's public endpoint). What that buys: the 5.6x warm-index mis-route class is structurally
-  gone (its compensation complex — `quoteEvidence`, `probeContendedCoreLegs`, the
-  reserved-newest-slot rule — is deleted), and the warm answer is the cold answer by
-  construction. RPC volume: ~6 envelopes vs ~67 per-call quotes — fewer round trips, more inner
-  compute, exactly the §7.2 shift. **Future-work item filed** (residual list): split round one
-  into index-known legs (fast, small) and hypothesis probes (slow, large) to restore a
-  ~100–300 ms warm first lead without reintroducing selection.
-- **2c swap lead: 93 → 248 ms** (same cause, milder — mainnet's direct pair is thinner). The
-  numbers that matter both **improved**: verified-confirmed 416 → 368 ms and total 474 → 464 ms,
-  and the cached lead now *holds* through verification in all three runs where the baseline's
-  lead was overtaken every run.
+- **`3521e4b1` — chunk-granular measurement application.** `measureLegs` gained an `onOutcomes`
+  seam (one delivery per settled `MULTICALL_CHUNK` group — the same envelopes the undivided round
+  produced); given a waker, the pump dispatches the round detached, applies each envelope's
+  outcomes through the ordinary `apply` path (in-legs folded per batch via the shared
+  `foldRoundInLegs`), and pokes the wake — the loop recomposes and can lead after envelope one.
+  `pumpDry` now also requires an empty `inFlightKeys`, so the gate and termination still wait out
+  the round; the loop's abort path drains in-flight keys first, preserving the best-so-far
+  harvest. Live, this alone was NOT enough: equal-size envelopes race and settle together, and —
+  worse — `getQuote` (which stops at the first actionable lead) returned whichever envelope won
+  the race (observed live: a 1,846 USDC lead while 1,884 sat two envelopes later).
+- **`cca95cf1` — evidence-first planning + the vanguard envelope.** `measurablePools` orders
+  index pools by most recent proven quote, then newest creation (hints still first, hypotheses
+  last) — so the ceiling's tail-slice also drops the least-evidenced pools; and a detached round
+  leads with a `PUMP_VANGUARD_LEGS` (12) envelope carrying that evidence-ordered head, concurrent
+  with the 50-wide rest. A dozen light, proven calls settle well before the heavy envelopes, so
+  the first lead is both fast and drawn from last search's winners. An ordering-and-batching
+  decision, never a selection — every leg still measures; only WHEN moves.
+
+Post-fix live numbers (3 runs each): **warm Base eth/usdc first lead 1.3 s** (1.3/1.3/1.3 s,
+12/12 vanguard legs priced, true best-of-known leading every run), **mainnet swap 204 ms total /
+158 ms lead / 204 ms verified**. What remains of the warm gap vs the baseline's 129 ms is not
+round-holding: a Base `--no-cache` run leads in **139 ms** on the same endpoint, so ~1.1 s of the
+warm case is planning CPU over the ~900k-pool warm index (`orderedIntermediates`' neighbor walks
+across ~7,700 eligible intermediates, per cycle) — filed in the residual list as its own
+optimization (memoize the discovered ordering against `indexVersion`).
+
+The remaining >20% delta, explained and accepted:
+
 - **2d long-tail total: 601 → 799 ms** at the new first-lead semantics (direct-only lead, 0.9%
   below the converged best); the baseline's 601 ms bought a search that was *finished* — capped
   forever at 8 intermediates and 42 candidate routes. The new engine at the same ~600 ms mark has
   the same-quality direct lead; by 2.1 s it has the two-hop; given its budget it explored **123
   of 123 intermediates and 2,607 legs** — a search space the old engine could not reach at any
   budget. This is the anytime contract working as specced, not a slowdown of equivalent work.
+  With the answer-quality caveat now bounded by the vanguard: an early lead is the best of the
+  *evidenced* head, not an arbitrary envelope.
 
 ### Correctness parity
 
@@ -238,9 +256,12 @@ live/fork-gated suites without their environment.
 1. **`maxPools` eviction → authoritative `no-route`** — filed with the eviction-epoch design
    (Part 1, item 1). Until then: hosts setting `maxPools` under concurrent search load should
    treat `no-route` on scan-only pool classes as retryable. *Owner: next engine task.*
-2. **Warm dense-pair first-lead latency (~1.9 s on Base eth/usdc)** — the measure-don't-select
-   round-one cost; optimization filed (split index-known legs from hypothesis probes in round
-   one). *Not a defect; spec risk §10.1 accepted and now quantified.*
+2. **Warm large-index planning CPU (~1.1 s on Base's ~900k-pool cache)** — the round-holding half
+   of the warm first-lead regression was FIXED (`3521e4b1` + `cca95cf1`: envelope-cadence
+   application, evidence-first order, vanguard envelope; lead now 1.3 s warm / 139 ms cold on the
+   same endpoint). The residual is CPU: `orderedIntermediates` re-walks both endpoints' neighbor
+   maps (~7,700 eligible intermediates) every planning pass. Optimization filed: memoize the
+   discovered ordering against `indexVersion`.
 3. **Trading-API parity unexercised on this branch** — run
    `UNISWAP_API_KEY=… chainz exec 1 -- bun scripts/compare.ts --pair eth/usdc --pair usdc/wbtc`
    before release; the harness itself is verified working.
