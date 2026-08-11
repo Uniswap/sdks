@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url'
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
+import { PoolIndex } from '../../src/experimental/index'
 import { manifestFor } from '../../src/index'
 import { UsageError, type ParsedArgs } from '../args'
-import { flushCacheSave } from '../cache'
+import { flushCacheSave, saveCache } from '../cache'
 import { buildEnvelope, parsePoolList, PoolListError, serializeEnvelope } from '../poolList'
 import { redactHeaderValues, resetRpcHeaders } from '../redact'
 import { MAINNET, publishedListText, USDC, WETH } from '../testing'
@@ -500,6 +501,27 @@ describe('--pool-list, wired into the run', () => {
 
     const saved = JSON.parse(await readFile(join(dir, 'router-lite', '1.json'), 'utf8')) as { pools: unknown[] }
     expect(saved.pools).toHaveLength(4)
+  })
+
+  test('the save-skip baseline is captured BEFORE the list is applied — adopted coverage is never skipped away', async () => {
+    // The `--trust-coverage` durability regression guard. The cache file already holds every POOL
+    // the list carries but none of its coverage, so the run's only material delta is the list's
+    // adopted coverage scopes — precisely the thing the flag promises "outlives this flag via your
+    // cache". A baseline captured AFTER `applyPoolList` would contain that coverage, read the exit
+    // save as a no-op, skip it, and quietly break the promise; captured before (as `context.ts`
+    // does), the save must fire and the file must gain the scopes.
+    process.env.XDG_CACHE_HOME = dir
+    const preSeeded = new PoolIndex(MAINNET.wrappedNative)
+    for (const rec of parsePoolList(publishedListText()).body.pools) preSeeded.upsert(rec)
+    await saveCache(1, preSeeded)
+
+    stubFetch(chainIdThen('0x1'))
+    await buildChainContext(withList(await listAt('1.poollist.json', publishedListText()), { trust: true, cache: true }))
+    await flushCacheSave()
+
+    const saved = JSON.parse(await readFile(join(dir, 'router-lite', '1.json'), 'utf8')) as { pools: unknown[]; coverage: unknown[] }
+    expect(saved.pools).toHaveLength(4) // unchanged — the pools were already there
+    expect(saved.coverage.length).toBeGreaterThan(0) // the adopted scopes were SAVED, not skipped
   })
 })
 

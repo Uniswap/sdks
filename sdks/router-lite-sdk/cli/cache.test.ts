@@ -19,7 +19,7 @@ import {
   SPAN_DIRTY_BLOCKS,
   summarizeCacheCoverage,
 } from './cache'
-import { DAI, LONGTAIL, POOL_USDC_DAI, sourceIndex, USDC, WARM_DELTA, warmIndex, WETH } from './testing'
+import { DAI, LONGTAIL, POOL_USDC_DAI, POOL_WETH_USDC, sourceIndex, USDC, WARM_DELTA, warmIndex, WETH } from './testing'
 
 /**
  * Every test below points `$XDG_CACHE_HOME` at a fresh temp dir, so nothing here can read, write, or
@@ -39,6 +39,17 @@ afterEach(async () => {
   else process.env.XDG_CACHE_HOME = savedXdg
   await rm(dir, { recursive: true, force: true })
 })
+
+/** Swaps `console.error` for a recorder — the CLI's whole non-machine channel, captured the same
+ * way `context.test.ts` captures it. Callers restore in a `finally`. */
+function captureStderr(): { lines: string[]; restore: () => void } {
+  const real = console.error
+  const lines: string[] = []
+  console.error = (...parts: unknown[]): void => {
+    lines.push(parts.map(String).join(' '))
+  }
+  return { lines, restore: () => (console.error = real) }
+}
 
 describe('cache location', () => {
   it('honors $XDG_CACHE_HOME and keys by chain id, not by endpoint', () => {
@@ -152,6 +163,29 @@ describe('the no-op save skip', () => {
     expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
   })
 
+  it('a learned scan width alone saves — the width hint exists to cross the process boundary', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.scanWidth().learnedScanWidth = 250_000n // by-reference, exactly how the scanner writes it
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
+  })
+
+  it('a source upgrade alone saves — hint outranks event (SOURCE_PRIORITY) and must survive the restart', async () => {
+    const { index, sinceLoad } = await warmLoaded() // holds the pool at source 'event'
+    // Same pool, same createdAtBlock — the ONLY material change is the source rank upgrading to
+    // 'hint', the top of SOURCE_PRIORITY. The per-source counts move (event:1 → hint:1) while
+    // count and createdAt sums stay put, which is exactly the axis this fingerprint field guards.
+    index.upsert({ pool: v2PoolRef(POOL_WETH_USDC, USDC, WETH), source: 'hint', createdAtBlock: 10_008_355n })
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
+  })
+
+  it('a shrinking span — impossible today — hits the backstop and saves rather than skips', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    // Forge a baseline claiming MORE coverage than the index holds: whatever unexplained mutation
+    // could produce that in the future must never be answered with a skipped save.
+    const inflated = { ...sinceLoad, coverageSpan: sinceLoad.coverageSpan + 1n }
+    expect(await saveCache(1, index, { sinceLoad: inflated })).toMatch(/saved 1 pools/)
+  })
+
   it('a cold run that learned nothing writes no file at all', async () => {
     const fresh = warmIndex()
     const note = await saveCache(7777, fresh, { sinceLoad: cacheBaseline(fresh) })
@@ -165,10 +199,25 @@ describe('the no-op save skip', () => {
 })
 
 describe('starting fresh', () => {
-  it('reports a cold start when there is no file at all', async () => {
+  it('reports a cold start when there is no file at all — and does NOT flag it discarded', async () => {
     const loaded = await loadCache(999, warmIndex())
     expect(loaded.index).toBeUndefined()
     expect(loaded.note).toMatch(/none at .*999\.json.*cold start/)
+    expect(loaded.discarded).toBe(false) // nothing on disk to replace: the save-skip baseline applies
+  })
+
+  it('flags every discard so the save replaces the file — unreadable bytes must not persist forever', async () => {
+    // Without this flag, a clean run after a discard skips its save (empty baseline, nothing
+    // learned) and the corrupt file survives to be re-read and re-discarded by every future run.
+    await mkdir(join(dir, 'router-lite'), { recursive: true })
+    await writeFile(join(dir, 'router-lite', '1.json'), 'not json at all', 'utf8')
+    expect((await loadCache(1, warmIndex())).discarded).toBe(true)
+
+    await saveCache(2, warmIndex()) // a fine file on a config that then changes underneath it
+    expect((await loadCache(2, { wrappedNative: USDC, reorgOverlapBlocks: 32n })).discarded).toBe(true)
+
+    await saveCache(3, warmIndex())
+    expect((await loadCache(3, warmIndex())).discarded).toBe(false) // loaded fine: baseline applies
   })
 
   it('discards a corrupt file rather than failing the command', async () => {
@@ -238,15 +287,53 @@ describe('bounds and failure containment', () => {
     expect(note).not.toMatch(/pruned/)
   })
 
-  it('pruneColdest: never-touched records sort coldest, and a within-bound array is returned as-is', () => {
-    const hot = { pool: v2PoolRef(USDC, USDC, WETH), source: 'event' as const, createdAtBlock: 100n }
-    const warm = { pool: v2PoolRef(DAI, DAI, WETH), source: 'event' as const, lastQuoteSuccessBlock: 50n }
+  it('pruneColdest: usage outranks creation, never-touched records sort coldest, within-bound is returned as-is', () => {
+    // The Important review finding, distilled: `quoted` is an ANCIENT pool (created at block 1)
+    // that searches still price — canonical WETH/USDC's shape — while `fresh` is newly created and
+    // never once quoted. A creation-recency key prunes `quoted` first, permanently (its coverage
+    // stays, so nothing ever re-scans its creation range). Usage evidence must win.
+    const quoted = { pool: v2PoolRef(USDC, USDC, WETH), source: 'event' as const, createdAtBlock: 1n, lastQuoteSuccessBlock: 50n }
+    const fresh = { pool: v2PoolRef(DAI, DAI, WETH), source: 'event' as const, createdAtBlock: 1_000n }
     const never = { pool: v2PoolRef(LONGTAIL, LONGTAIL, WETH), source: 'hint' as const } // no blocks at all
-    const pools = [never, hot, warm]
+    const pools = [never, quoted, fresh]
 
     expect(pruneColdest(pools, 3)).toBe(pools) // within bound: the same array, not a copy
-    expect(pruneColdest(pools, 2)).toEqual([hot, warm]) // the -1n sentinel goes first
-    expect(pruneColdest(pools, 1)).toEqual([hot])
+    expect(pruneColdest(pools, 2)).toEqual([quoted, fresh]) // the no-blocks sentinel goes first
+    expect(pruneColdest(pools, 1)).toEqual([quoted]) // a recently-quoted old pool beats a never-quoted new one
+  })
+
+  it('pruneColdest: within the usage tier, the latest of success/failure ranks; failures are usage too', () => {
+    const failedRecently = { pool: v2PoolRef(USDC, USDC, WETH), source: 'event' as const, createdAtBlock: 900n, lastQuoteFailureBlock: 80n }
+    const succeededEarlier = { pool: v2PoolRef(DAI, DAI, WETH), source: 'event' as const, createdAtBlock: 1n, lastQuoteSuccessBlock: 40n, lastQuoteFailureBlock: 20n }
+    expect(pruneColdest([succeededEarlier, failedRecently], 1)).toEqual([failedRecently])
+  })
+
+  it('the prune warning prints exactly once, on stderr, without --verbose', async () => {
+    // The `--verbose`-gated note is `context.ts`'s; the warn is `saveCache`'s own `console.error`,
+    // which is what makes it unconditional. Exactly one line per affected save — not one per pool,
+    // not zero. Same console-swap seam `context.test.ts` uses; `spyOn` fights the checker here.
+    const stderr = captureStderr()
+    try {
+      await saveCache(1, sourceIndex(), { maxPools: 3 })
+      expect(stderr.lines.filter((line) => line.includes('pruned'))).toEqual(['cache: at bound — pruned 2 coldest pools'])
+    } finally {
+      stderr.restore()
+    }
+  })
+
+  it('a clean run skips even past the bound — the skip is decided first and the prune never runs', async () => {
+    await saveCache(1, sourceIndex())
+    const loaded = await loadCache(1, warmIndex())
+    const sinceLoad = cacheBaseline(loaded.index!)
+
+    const stderr = captureStderr()
+    try {
+      const note = await saveCache(1, loaded.index!, { sinceLoad, maxPools: 3 })
+      expect(note).toMatch(/save skipped/)
+      expect(stderr.lines.filter((line) => line.includes('pruned'))).toEqual([])
+    } finally {
+      stderr.restore()
+    }
   })
 
   it('never throws when the cache location is unwritable — the answer was already computed', async () => {

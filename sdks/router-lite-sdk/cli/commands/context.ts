@@ -234,11 +234,13 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
 
   let index = fresh
   const cacheOn = cacheEnabled(parsed.booleans)
+  let cacheDiscarded = false
   if (cacheOn) {
     const started = Date.now()
     const loaded = await loadCache(chain.chainId, fresh)
     const loadMs = Date.now() - started
     if (loaded.index) index = loaded.index
+    cacheDiscarded = loaded.discarded
 
     // ONE UNCONDITIONAL LINE, not gated on --verbose. A cache that reads and writes a file the user
     // never named, silently, is one they cannot reason about: the only way to notice it had resolved
@@ -286,11 +288,19 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   }
 
   // The save-skip baseline (see `cache.ts`'s no-op-save section): what the index materially holds
-  // RIGHT NOW, i.e. exactly what the on-disk snapshot holds (or an empty fingerprint on a cold
-  // start). Taken here — after the load, BEFORE `--pool-list` merges — so a list's contribution
-  // always reads as a change worth saving, keeping `--trust-coverage`'s documented "adopted
-  // coverage outlives this flag via your cache" true.
-  const sinceLoad = cacheOn ? cacheBaseline(index) : undefined
+  // RIGHT NOW — exactly what a successfully-loaded snapshot holds, or an empty fingerprint on a
+  // cold start. Taken here — after the load, BEFORE `--pool-list` merges — so a list's
+  // contribution reads as a change worth saving: its pools do unconditionally (the pool
+  // fingerprint is exact), and its adopted `--trust-coverage` ranges do too UNLESS the list's
+  // entire contribution is ≤SPAN_DIRTY_BLOCKS of tip drift on scopes the cache already tracks —
+  // the one corner where "adopted coverage outlives this flag via your cache" is deferred to
+  // whichever later run crosses the drift bound, at the price of re-scanning that small tail.
+  //
+  // NO BASELINE AT ALL when the load DISCARDED a present file (corrupt, schema-bumped, built for
+  // a different chain config): the save must then run unconditionally so the unreadable file is
+  // REPLACED — with a baseline, a run that learned nothing would skip the save and leave the
+  // garbage in place to be re-read and re-discarded on every future run, forever.
+  const sinceLoad = cacheOn && !cacheDiscarded ? cacheBaseline(index) : undefined
 
   // `--pool-list` (phase 1): a published snapshot from somewhere else, merged INTO whatever the
   // cache just restored. It runs after the cache load, and deliberately not instead of it — both are
@@ -313,7 +323,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // after the last writer makes "the save sees everything the run assembled" true by position rather
   // than by that coincidence — and it means a `--pool-list` that fails its checks (exit 4) never
   // registers a save at all.
-  if (sinceLoad !== undefined) scheduleCacheSave(async () => note(await saveCache(chain.chainId, index, { sinceLoad })))
+  if (cacheOn) scheduleCacheSave(async () => note(await saveCache(chain.chainId, index, sinceLoad !== undefined ? { sinceLoad } : undefined)))
 
   const router = createRouter({
     client,

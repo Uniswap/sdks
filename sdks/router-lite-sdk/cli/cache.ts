@@ -158,9 +158,10 @@ export const CACHE_FLAGS: FlagSpec = {
  * silently stopped learning FOREVER once the heaviest chain crossed the line (Base was measured at
  * 974,723 of the bound), with the only symptom a `--verbose` note nobody reads. So the save now
  * prunes to 90% of the bound (UNDER it, so one heavy discover doesn't re-prune on every following
- * run) by the same touch order the SDK's restore-time eviction uses, warns on stderr, and writes —
- * the coldest tenth of the index is the least valuable knowledge in it, and losing it beats losing
- * everything the future would have learned.
+ * run) by usage recency first — a recently-quoted pool survives however ancient its creation
+ * block — then creation recency among the never-quoted rest (see `pruneRank`), warns on stderr,
+ * and writes. What gets dropped is the tenth of the index nothing has demonstrated a use for, and
+ * losing that beats losing everything the future would have learned.
  */
 export const CACHE_MAX_POOLS = 1_000_000
 
@@ -188,6 +189,15 @@ export type CacheLoad = {
   index: PoolIndex | undefined
   /** One line for `--verbose`, always present — "why is this run cold?" must never be a mystery. */
   note: string
+  /**
+   * True when a file was PRESENT but unusable — corrupt bytes, a bumped schemaVersion, a failed
+   * shape check, a wrappedNative/reorg-overlap mismatch. The caller must then treat the run as
+   * unconditionally dirty (no save-skip baseline), so the exit-time save REPLACES the file:
+   * otherwise a run that learned nothing skips its save and the garbage persists indefinitely,
+   * re-read and re-discarded by every future run. False both when there was no file at all and
+   * when the file loaded fine.
+   */
+  discarded: boolean
 }
 
 /**
@@ -220,7 +230,7 @@ export async function loadCache(
   try {
     raw = await readFile(path, 'utf8')
   } catch {
-    return { index: undefined, note: `cache: none at ${path} — cold start` }
+    return { index: undefined, note: `cache: none at ${path} — cold start`, discarded: false }
   }
 
   // EVERYTHING that touches the file's contents lives inside this `try`, including the two
@@ -236,20 +246,20 @@ export async function loadCache(
     index = PoolIndex.fromSnapshot(snap)
 
     if (index.wrappedNative.toLowerCase() !== expected.wrappedNative.toLowerCase()) {
-      return { index: undefined, note: `cache: ${path} was built for a different wrappedNative — starting fresh` }
+      return { index: undefined, note: `cache: ${path} was built for a different wrappedNative — starting fresh`, discarded: true }
     }
     if (index.reorgOverlapBlocks !== expected.reorgOverlapBlocks) {
-      return { index: undefined, note: `cache: ${path} was maintained under a different reorg overlap — starting fresh` }
+      return { index: undefined, note: `cache: ${path} was maintained under a different reorg overlap — starting fresh`, discarded: true }
     }
   } catch (err) {
     // Malformed JSON, a bumped schemaVersion, a failed shape check, anything at all: the content is
     // re-derivable from the chain, so there is no failure here worth more than a note.
     const why = err instanceof Error ? err.message.split('\n')[0]! : String(err)
-    return { index: undefined, note: `cache: discarded ${path} (${why}) — starting fresh` }
+    return { index: undefined, note: `cache: discarded ${path} (${why}) — starting fresh`, discarded: true }
   }
 
   const stats = index.stats()
-  return { index, note: `cache: loaded ${stats.pools} pools · ${stats.coverageScopes} coverage scopes from ${path}` }
+  return { index, note: `cache: loaded ${stats.pools} pools · ${stats.coverageScopes} coverage scopes from ${path}`, discarded: false }
 }
 
 /** A `.tmp` older than this cannot belong to a live write, so it is an orphan from a killed run. */
@@ -324,8 +334,9 @@ async function sweepStaleTmp(): Promise<void> {
 // dirty would make this guard fire never, and skipping it is nearly free:
 // `uncovered()` re-opens the last `reorgOverlapBlocks` behind the tip on every
 // search anyway, and an un-saved tip delta merely widens that one tail range —
-// the SAME single `eth_getLogs` request either way until the delta approaches a
-// scan-chunk width (thousands of blocks at minimum). The skip is also
+// the SAME single `eth_getLogs` request either way against a wide-window
+// provider (see {@link SPAN_DIRTY_BLOCKS} for the narrow-cap worst case, which
+// is small and bounded rather than zero). The skip is also
 // self-correcting rather than compounding: the baseline is what's ON DISK, so
 // consecutive skipped runs measure a GROWING delta against the same file and
 // the save fires once the accumulated drift crosses {@link SPAN_DIRTY_BLOCKS}.
@@ -336,9 +347,15 @@ async function sweepStaleTmp(): Promise<void> {
 
 /**
  * How far the total covered span may drift past the on-disk snapshot before a coverage-only change
- * forces a save. ~5.5h of Base blocks / ~33h of mainnet blocks; re-scanning it costs the next run
- * zero extra `eth_getLogs` in the warm steady state (it rides in the reorg-overlap re-scan's own
- * tail request). Deliberately far under any scan-chunk width, and bounded — see the section header.
+ * forces a save. ~5.5h of Base blocks / ~33h of mainnet blocks.
+ *
+ * WHAT RE-SCANNING THE DRIFT COSTS, honestly: zero extra `eth_getLogs` against a wide-window
+ * provider — the warm steady state, where learned scan widths run thousands to millions of blocks
+ * and the drift rides inside the reorg-overlap re-scan's own tail request — but NOT zero in
+ * general. A provider capped near the scanner's floor pays up to `drift / cap` extra small
+ * requests per affected scope: ~3 at Ankr's ~3k-block cap, ~78 at the 128-block `MIN_CHUNK` floor,
+ * worst case. Bounded either way, and self-correcting: the save fires the moment accumulated
+ * drift crosses this line, so the cost can never grow past it — see the section header.
  */
 export const SPAN_DIRTY_BLOCKS = 10_000n
 
@@ -404,24 +421,46 @@ function materiallyChanged(now: CacheBaseline, since: CacheBaseline): boolean {
   return now.coverageSpan - since.coverageSpan > SPAN_DIRTY_BLOCKS
 }
 
-/** The restore-time LRU clock, spelled once: the exact coalesce `PoolIndex.fromSnapshot` rebuilds
- * `lastTouched` from (via `upsert`), with the same "never touched sorts first" `-1n` sentinel its
- * `evictIfNeeded` uses. Keeping the spelling identical is what makes {@link pruneColdest} "the
- * index's own eviction order, computed without paying for a 1M-pool rebuild". */
-function touchEquivalent(rec: PoolRecord): bigint {
-  return rec.createdAtBlock ?? rec.lastQuoteSuccessBlock ?? rec.lastQuoteFailureBlock ?? -1n
+/**
+ * Prune ranking, in two tiers that are never compared against each other — a quote block and a
+ * creation block measure different things, so no comparator mixes them:
+ *
+ *   tier 1 — pools with quote USAGE evidence (`lastQuoteSuccessBlock` / `lastQuoteFailureBlock`),
+ *            ranked by the latest such block. This is what protects the canonical pools: mainnet
+ *            WETH/USDC has an ANCIENT `createdAtBlock` but is priced by practically every search,
+ *            so any creation-recency ordering would prune exactly the pools the cache is most for.
+ *   tier 0 — never-quoted pools (the bulk of a discover-heavy index), ranked by `createdAtBlock`,
+ *            newest first; a record with no blocks at all sorts last — the same "nothing has
+ *            demonstrated it is worth keeping" default the SDK's `-1n` sentinel encodes.
+ *
+ * A first draft keyed on `createdAtBlock ?? lastQuoteSuccessBlock ?? …` (the coalesce
+ * `fromSnapshot`'s LRU reconstruction happens to use) — which sorts a discover-heavy index by
+ * creation block and prunes its OLDEST-CREATED pools, i.e. the canonical ones. And because pruning
+ * keeps coverage (see {@link pruneColdest}), that would have been permanent.
+ */
+function pruneRank(rec: PoolRecord): { tier: number; block: bigint } {
+  const success = rec.lastQuoteSuccessBlock
+  const failure = rec.lastQuoteFailureBlock
+  const used = success === undefined ? failure : failure === undefined ? success : success > failure ? success : failure
+  if (used !== undefined) return { tier: 1, block: used }
+  return { tier: 0, block: rec.createdAtBlock ?? -1n }
 }
 
 /**
- * The `keep` most-recently-touched records of `pools`, by {@link touchEquivalent} order — what
- * {@link saveCache} writes when the index has outgrown {@link CACHE_MAX_POOLS}. Returns the input
- * array untouched when it is already within `keep`. Ties beyond the cut fall wherever the sort
- * leaves them, exactly as the SDK's own restore-time eviction ties do.
+ * The `keep` hottest records of `pools`, by {@link pruneRank} order — what {@link saveCache}
+ * writes when the index has outgrown {@link CACHE_MAX_POOLS}. Returns the input array untouched
+ * when it is already within `keep`; ties beyond the cut fall wherever the sort leaves them.
+ *
+ * WHAT PRUNING COSTS, STATED PLAINLY: the pruned pools' COVERAGE STAYS, so `uncovered()` never
+ * re-scans the ranges that would rediscover them — a pruned pool is forgotten PERMANENTLY unless
+ * a search happens to re-probe it directly. That is the same bargain the SDK's own `maxPools`
+ * eviction strikes on a live index, and it is exactly why the ranking above keeps demonstrated
+ * usage over everything else: what gets forgotten must be what nothing has shown a use for.
  */
 export function pruneColdest(pools: PoolRecord[], keep: number): PoolRecord[] {
   if (pools.length <= keep) return pools
-  const keyed = pools.map((rec) => [touchEquivalent(rec), rec] as const)
-  keyed.sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)) // hottest first
+  const keyed = pools.map((rec) => [pruneRank(rec), rec] as const)
+  keyed.sort(([a], [b]) => (a.tier !== b.tier ? b.tier - a.tier : a.block < b.block ? 1 : a.block > b.block ? -1 : 0)) // hottest first
   return keyed.slice(0, keep).map(([, rec]) => rec)
 }
 
@@ -433,11 +472,11 @@ export function pruneColdest(pools: PoolRecord[], keep: number): PoolRecord[] {
  * counts. That is ~1s off every warm run that merely re-read what the cache already knew.
  *
  * PRUNES INSTEAD OF REFUSING AT THE BOUND. Past {@link CACHE_MAX_POOLS} pools the snapshot is cut
- * to its {@link CACHE_PRUNE_TARGET} most-recently-touched records before serializing — same order
- * the SDK's own restore-time eviction would use — with a one-line stderr warning. The previous
- * behaviour (skip the save entirely, note it under `--verbose` only) meant the heaviest chain's
- * cache silently stopped learning the day it crossed the bound. Pruning is applied to the SNAPSHOT,
- * never the live index: the running search keeps everything it has.
+ * to 90% of the bound before serializing, in {@link pruneColdest}'s usage-first order, with a
+ * one-line stderr warning. The previous behaviour (skip the save entirely, note it under
+ * `--verbose` only) meant the heaviest chain's cache silently stopped learning the day it crossed
+ * the bound. Pruning is applied to the SNAPSHOT, never the live index: the running search keeps
+ * everything it has.
  *
  * ATOMIC BECAUSE THE READER IS THE SAME TOOL. `rl` is run repeatedly and often concurrently (two
  * terminals, a `watch`, a script), and a plain `writeFile` truncates in place: a reader arriving

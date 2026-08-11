@@ -257,14 +257,18 @@ file.
   going badly permanently slow. But it is only *re*-written when the run **materially changed** the
   index (new pools, meaningfully extended coverage, new fee tiers): a warm run that merely re-read
   what the cache already knew skips the whole serialize+write (~1s on a maximal cache; `--verbose`
-  reports `cache: unchanged — save skipped`). Quote timestamps and a coverage tip a few blocks ahead
-  don't count — the next run's standing reorg-overlap re-scan re-covers that tail in the same
-  request it already issues.
+  reports `cache: unchanged — save skipped`). Quote timestamps don't count, and neither does a
+  coverage tip up to 10,000 blocks ahead of the file (~5.5h of Base, ~33h of mainnet — the drift is
+  measured against the on-disk snapshot, so it accumulates across skipped runs and forces a save
+  once crossed): against a typical wide-window provider the next run re-covers that tail in the
+  request its reorg-overlap re-scan already issues, and against a narrowly-capped one it costs a
+  handful of small extra requests, bounded by the same 10,000 blocks.
 - The cache is bounded at 1,000,000 pools per chain. At the bound the save **prunes** the snapshot
-  to its 900,000 most-recently-touched pools — warning on stderr: `cache: at bound — pruned N
-  coldest pools` — rather than refusing to write. (It used to silently stop saving instead, which
-  froze the heaviest chain's cache forever.) The live search keeps everything; only what's persisted
-  is trimmed, in the same least-recently-touched order the SDK's own `maxPools` eviction uses.
+  to its 900,000 hottest pools — warning on stderr: `cache: at bound — pruned N coldest pools` —
+  rather than refusing to write. (It used to silently stop saving instead, which froze the heaviest
+  chain's cache forever.) The live search keeps everything; only what's persisted is trimmed, by
+  **quote-usage recency first** (a pool searches actually price survives however ancient its
+  creation block), then creation recency among the never-quoted rest.
 - **Ctrl-C renders before it exits.** The first ^C stops the search *immediately* — no drain wait —
   and prints the result panel from the best route already found — labelled `interrupted` — then
   banks the cache and exits `130`; a second ^C exits at once, no flush, no panel. "Immediately"
