@@ -23,7 +23,7 @@ import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } 
 import { isSkipped, probeSimulateV1Support, simulateSwap } from '../simulate'
 import { consumeSearch } from '../stream'
 
-import { buildChainContext, hydrateLegSymbols, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
+import { buildChainContext, hydrateLegSymbols, interruptSignal, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
 
 
 const SWAP_FLAGS = {
@@ -104,7 +104,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
     // simulated yet) — the timeline's `(unverified)` suffix says so, and the later lead that turns
     // it into a `ready`/`needs-action` result is the one that reads "confirmed executable on-chain".
-    const { final, first, timeline } = await consumeSearch(ctx.router.swaps(request), {
+    const { final, first, timeline, interrupted, lastProgress } = await consumeSearch(ctx.router.swaps(request), {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
@@ -116,8 +116,20 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       classify,
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
       abortCause: budget.cause,
+      // ^C stops CONSUMING immediately — the panel renders the last lead's snapshot rather than
+      // waiting out the engine's drain (see `stream.ts#consumeSearch`). Budget expiry is not routed
+      // here and keeps the drained-final path.
+      interrupt: interruptSignal(),
     })
-    if (!final) return 2
+    if (!final) {
+      if (interrupted) {
+        // The interrupt beat the first lead: nothing to render but honesty. One line (rl.ts exits
+        // 130 on top of whatever is returned here), plus the last heartbeat when nothing streamed.
+        if (!stream && lastProgress !== undefined) console.error(dim(`  ${lastProgress}`))
+        console.error(yellow('interrupted before any route was found'))
+      }
+      return 2
+    }
     const cause = budget.cause() // settled by now — the search is over
 
     if (json) {
@@ -138,7 +150,10 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       )
     }
 
-    if (parsed.booleans.has('simulate')) {
+    // `--simulate` is skipped on an interrupted run: the user asked the process to stop, and a
+    // fresh round of simulation RPC after the panel is exactly the post-^C dawdling this path
+    // exists to end. The rendered result already says `interrupted`.
+    if (parsed.booleans.has('simulate') && !interrupted) {
       const verdict = await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
       // A simulation that DISPROVED the tx must not exit 0 — a script gating on "swap --simulate"
       // would otherwise treat a proven-broken transaction as a success. Dedicated code 5 (documented

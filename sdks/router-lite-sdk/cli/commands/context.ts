@@ -417,6 +417,14 @@ export function triggerInterrupt(): void {
   interrupt.abort()
 }
 
+/** The live interrupt signal ALONE — never the composed budget signal. `consumeSearch` races its
+ * pulls against this so a ^C renders the best-so-far immediately instead of waiting out the
+ * engine's drain; a budget expiry must NOT trip that race, which is why this is a separate export
+ * rather than something read off a {@link Budget}. */
+export function interruptSignal(): AbortSignal {
+  return interrupt.signal
+}
+
 /** Test seam: swaps in a fresh controller so one test's interrupt cannot leak into the next.
  * Budgets started BEFORE the reset keep the old (composed) signal, exactly like a real process
  * would if it could un-interrupt itself — which it cannot, hence the seam. */

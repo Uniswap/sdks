@@ -93,16 +93,32 @@ export type ConsumeOptions<R extends SearchResult> = {
    * one has. Read per printed line, because the answer changes mid-stream — every line before the
    * abort renders no note, and the line the search stops at must name the source that stopped it. */
   abortCause?: () => AbortCause | undefined
+  /** The process-wide INTERRUPT signal (`commands/context.ts#interruptSignal`) — the ^C half only,
+   * never the composed budget signal. When it fires, this consumer stops pulling IMMEDIATELY (the
+   * pending pull is raced against it, so a parked await cannot delay the break) and abandons the
+   * iterator, whose own teardown cancels everything in flight. A budget expiry is deliberately NOT
+   * routed here: it keeps the drain-then-`final` semantics, because nobody is sitting at a keyboard
+   * waiting on it. See {@link consumeSearch}'s docstring for the whole contract. */
+  interrupt?: AbortSignal
 }
 
 export type ConsumeResult<R extends SearchResult> = {
-  /** The last result the stream carried (`lead` or `final`), or `undefined` if it carried none. */
+  /** The last result the stream carried (`lead` or `final`), or `undefined` if it carried none. On
+   * an interrupted run this is the last LEAD's interim snapshot (a full result by the SDK's design),
+   * with `search.aborted` stamped true — the search WAS aborted, even though this snapshot predates
+   * the signal — so the abort note renders on it exactly as on a drained final. */
   final: R | undefined
   /** The first `lead`, classified — the timeline's opening line. */
   first: FirstLeadInfo | undefined
   /** Every event AFTER the first lead, in order, `progress` excluded — the "how it went" timeline's
    * raw material, always collected (this is what makes the timeline available outside `--watch`). */
   timeline: TimelineEvent[]
+  /** True when `opts.interrupt` cut the stream short — the immediate-render path. `final` is then
+   * the last lead's snapshot (or `undefined` if the interrupt beat the first lead). */
+  interrupted: boolean
+  /** The last progress line's body, for the interrupted-before-any-lead notice — the only thing a
+   * leadless interrupted run has to say about what the search was doing when it died. */
+  lastProgress?: string
 }
 
 function leaderOf(result: SearchResult): QuotedRoute | undefined {
@@ -116,9 +132,24 @@ function progressKey(search: SearchReport): string {
   return progressBody(search)
 }
 
+/** The token {@link consumeSearch}'s interrupt race resolves to, distinguishable from any
+ * `IteratorResult` by identity. */
+const INTERRUPTED = Symbol('interrupted')
+
 /**
  * Streams (or silently collects) one entry per search event; returns the last result the stream
  * carried, the classified first lead, and the event history after it — regardless of `stream`.
+ *
+ * THE INTERRUPT (`opts.interrupt`) STOPS CONSUMPTION NOW, NOT AT THE ENGINE'S `final`. A ^C user is
+ * standing at a keyboard — worse, often behind a wrapper (chainz exec) whose own process dies on
+ * the ^C instantly, handing the prompt back — so the seconds the engine's drain takes are seconds
+ * the panel prints OVER a fresh shell prompt. The pending pull is therefore RACED against the
+ * interrupt (a parked `it.next()` cannot delay the break), the loop exits with whatever the last
+ * `lead` carried (a full interim snapshot by the SDK's design, stamped `aborted` on the way out),
+ * and the iterator is ABANDONED — `it.return()`, fired without awaiting it, which runs the SDK
+ * generator's own teardown (`sources.abortAll()`): every in-flight call cancels, and the coverage
+ * learned so far is already in the shared index. A BUDGET expiry deliberately keeps the old
+ * drain-then-`final` semantics — it reaches this loop as ordinary events, never as `interrupt`.
  */
 export async function consumeSearch<R extends SearchResult>(
   events: AsyncIterable<SearchEvent<R>>,
@@ -129,46 +160,83 @@ export async function consumeSearch<R extends SearchResult>(
   let final: R | undefined
   let previousBest: bigint | undefined
   let lastProgress: string | undefined
+  let interrupted = false
 
-  for await (const event of events) {
-    const elapsedMs = Date.now() - opts.started
+  const it = events[Symbol.asyncIterator]()
+  const interrupt = opts.interrupt
+  const interruptRace: Promise<typeof INTERRUPTED> | undefined =
+    interrupt === undefined
+      ? undefined
+      : new Promise((resolve) => {
+          if (interrupt.aborted) resolve(INTERRUPTED)
+          else interrupt.addEventListener('abort', () => resolve(INTERRUPTED), { once: true })
+        })
 
-    if (event.type === 'progress') {
-      // A narrative progress line whose counters read exactly as the previous one's says nothing a
-      // reader can act on — the engine woke, an axis the LINE does not show moved. Suppressed for
-      // the narrative stream only: `--json` NDJSON mirrors the SDK's event stream one-for-one.
-      const key = progressKey(event.search)
-      const repeat = !opts.json && key === lastProgress
-      lastProgress = key
-      if (opts.stream && !repeat) print({ type: 'progress', elapsedMs, search: event.search }, previousBest, opts)
-      continue
-    }
-
-    final = event.result
-    const best = leaderOf(event.result)
-
-    // The first lead opens the timeline as its own (origin-labelled) line, so it is recorded rather
-    // than collected — `renderTimeline` prints it from `first` and folds the rest against it.
-    if (event.type === 'lead' && first === undefined && best) {
-      first = { elapsedMs, route: best, origin: opts.classify(best) }
-      if (opts.stream) {
-        console.log(
-          opts.json
-            ? jsonify({ event: 'lead', elapsedMs, origin: first.origin, result: event.result }, false)
-            : renderFirstLeadLine(first, opts.trade.tokenOut, opts.renderCtx),
-        )
+  try {
+    while (true) {
+      // Checked BEFORE each pull too: an interrupt landing while an event was being processed must
+      // not buy the engine one more pull.
+      if (interrupt?.aborted === true) {
+        interrupted = true
+        break
       }
-    } else {
-      const entry: TimelineEvent = { type: event.type, elapsedMs, result: event.result }
-      timeline.push(entry)
-      if (opts.stream) print(entry, previousBest, opts)
-    }
+      const step = interruptRace === undefined ? await it.next() : await Promise.race([it.next(), interruptRace])
+      if (step === INTERRUPTED) {
+        interrupted = true
+        break
+      }
+      if (step.done === true) break
+      const event = step.value
+      const elapsedMs = Date.now() - opts.started
 
-    if (best) previousBest = best.quote.amountOut
-    if (opts.stopAt(event.result)) break
+      if (event.type === 'progress') {
+        // A narrative progress line whose counters read exactly as the previous one's says nothing a
+        // reader can act on — the engine woke, an axis the LINE does not show moved. Suppressed for
+        // the narrative stream only: `--json` NDJSON mirrors the SDK's event stream one-for-one.
+        const key = progressKey(event.search)
+        const repeat = !opts.json && key === lastProgress
+        lastProgress = key
+        if (opts.stream && !repeat) print({ type: 'progress', elapsedMs, search: event.search }, previousBest, opts)
+        continue
+      }
+
+      final = event.result
+      const best = leaderOf(event.result)
+
+      // The first lead opens the timeline as its own (origin-labelled) line, so it is recorded rather
+      // than collected — `renderTimeline` prints it from `first` and folds the rest against it.
+      if (event.type === 'lead' && first === undefined && best) {
+        first = { elapsedMs, route: best, origin: opts.classify(best) }
+        if (opts.stream) {
+          console.log(
+            opts.json
+              ? jsonify({ event: 'lead', elapsedMs, origin: first.origin, result: event.result }, false)
+              : renderFirstLeadLine(first, opts.trade.tokenOut, opts.renderCtx),
+          )
+        }
+      } else {
+        const entry: TimelineEvent = { type: event.type, elapsedMs, result: event.result }
+        timeline.push(entry)
+        if (opts.stream) print(entry, previousBest, opts)
+      }
+
+      if (best) previousBest = best.quote.amountOut
+      if (opts.stopAt(event.result)) break
+    }
+  } finally {
+    // Every exit path abandons the iterator — what `for await`'s own break used to do, now explicit
+    // because the pull is manual. NOT awaited: on the interrupt path the generator may be parked
+    // deep in an engine await, and its wind-down must not delay the panel the user is waiting on.
+    // (After a normal `done` this resolves immediately as a no-op.)
+    if (it.return !== undefined) void it.return(undefined).catch(() => {})
   }
 
-  return { final, first, timeline }
+  // The interrupted snapshot predates the signal, so its report says `aborted: false` — but the RUN
+  // was aborted, and the abort note (rendered off `search.aborted` + `abortCause`) must say so.
+  if (interrupted && final !== undefined) {
+    final = { ...final, search: { ...final.search, aborted: true } }
+  }
+  return { final, first, timeline, interrupted, ...(lastProgress !== undefined ? { lastProgress } : {}) }
 }
 
 /** One event, as the stream shows it: an NDJSON object under `--json`, otherwise the same narrative

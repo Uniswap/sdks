@@ -16,11 +16,12 @@
 
 import { blockTimeSecondsOf } from '../../src/experimental/index'
 import type { QuoteRequest } from '../../src/index'
+import { dim, yellow } from '../ansi'
 import { parseArgs } from '../args'
 import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
 import { consumeSearch } from '../stream'
 
-import { buildChainContext, hydrateLegSymbols, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS } from './context'
+import { buildChainContext, hydrateLegSymbols, interruptSignal, makeLeadClassifier, resolveTrade, startBudget, TRADE_FLAGS } from './context'
 
 
 export async function cmdQuote(argv: string[]): Promise<number> {
@@ -57,7 +58,7 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
     const stream = watch || verbose
 
-    const { final, first, timeline } = await consumeSearch(ctx.router.quotes(request), {
+    const { final, first, timeline, interrupted, lastProgress } = await consumeSearch(ctx.router.quotes(request), {
       json,
       started,
       // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
@@ -69,8 +70,20 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       classify,
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
       abortCause: budget.cause,
+      // ^C stops CONSUMING immediately — the panel below renders the last lead's snapshot rather
+      // than waiting out the engine's drain (see `stream.ts#consumeSearch`). Budget expiry is not
+      // routed here and keeps the drained-final path.
+      interrupt: interruptSignal(),
     })
-    if (!final) return 2
+    if (!final) {
+      if (interrupted) {
+        // The interrupt beat the first lead: nothing to render but honesty. One line (rl.ts exits
+        // 130 on top of whatever is returned here), plus the last heartbeat when nothing streamed.
+        if (!stream && lastProgress !== undefined) console.error(dim(`  ${lastProgress}`))
+        console.error(yellow('interrupted before any route was found'))
+      }
+      return 2
+    }
     const cause = budget.cause() // settled by now — the search is over
 
     if (json) {

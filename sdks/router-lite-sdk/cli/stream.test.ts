@@ -224,3 +224,100 @@ describe('the search event stream', () => {
     expect(timeline).toHaveLength(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// The interrupt path: ^C stops CONSUMING immediately — the pending pull is
+// raced against the interrupt signal, the iterator is abandoned (its own
+// teardown cancels the engine), and the caller renders the last lead's
+// snapshot. Only the interactive interrupt takes this path; a budget expiry
+// arrives as ordinary events and keeps the drained-final semantics.
+// ---------------------------------------------------------------------------
+
+/** An iterator a test can park and observe: yields `list` one per pull, then PARKS forever — the
+ * shape of an engine mid-drain — recording every pull and whether the consumer abandoned it. */
+function parkedAfter(list: SearchEvent<QuoteResult>[]): {
+  iterable: AsyncIterable<SearchEvent<QuoteResult>>
+  pulls: () => number
+  wasReturned: () => boolean
+} {
+  let pulls = 0
+  let returned = false
+  const it: AsyncIterator<SearchEvent<QuoteResult>> = {
+    next: () => {
+      pulls++
+      if (pulls <= list.length) return Promise.resolve({ done: false, value: list[pulls - 1]! })
+      return new Promise(() => {}) // parked forever: the drain the consumer must NOT wait out
+    },
+    return: () => {
+      returned = true
+      return Promise.resolve({ done: true, value: undefined })
+    },
+  }
+  return { iterable: { [Symbol.asyncIterator]: () => it }, pulls: () => pulls, wasReturned: () => returned }
+}
+
+const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
+describe('the interrupt path', () => {
+  it('an interrupt mid-search returns the last lead IMMEDIATELY — stamped aborted, iterator abandoned, no further pulls', async () => {
+    captureStdout()
+    const interrupt = new AbortController()
+    const { iterable, pulls, wasReturned } = parkedAfter([lead(3_912_401_234n)])
+
+    const consuming = consumeSearch(iterable, { ...baseOpts(true), interrupt: interrupt.signal })
+    await tick() // the lead is consumed; the next pull is parked — the engine is "draining"
+    interrupt.abort()
+    const { final, first, interrupted } = await consuming // resolves off the race, not the parked pull
+
+    expect(interrupted).toBe(true)
+    expect(first).toBeDefined()
+    expect(final?.status === 'quote' && final.best.quote.amountOut).toBe(3_912_401_234n) // the last lead's snapshot
+    expect(final?.search.aborted).toBe(true) // stamped on the way out, so the abort note renders on it
+    expect(wasReturned()).toBe(true) // abandoned: the SDK generator's finally cancels everything in flight
+    expect(pulls()).toBe(2) // the lead + the parked pull it was already waiting on — and NOTHING after
+  })
+
+  it('an interrupt before any lead reports interrupted with no result — and carries the last heartbeat', async () => {
+    captureStdout()
+    const interrupt = new AbortController()
+    const { iterable, wasReturned } = parkedAfter([{ type: 'progress', search: REPORT }])
+
+    const consuming = consumeSearch(iterable, { ...baseOpts(false), interrupt: interrupt.signal })
+    await tick()
+    interrupt.abort()
+    const { final, first, interrupted, lastProgress } = await consuming
+
+    expect(interrupted).toBe(true)
+    expect(final).toBeUndefined() // nothing to render: the caller prints the one-line notice instead
+    expect(first).toBeUndefined()
+    expect(lastProgress).toContain('3 of 3 legs priced') // what the search was doing when it died
+    expect(wasReturned()).toBe(true)
+  })
+
+  it('an interrupt that already fired stops the stream before its FIRST pull', async () => {
+    captureStdout()
+    const interrupt = new AbortController()
+    interrupt.abort()
+    const { iterable, pulls, wasReturned } = parkedAfter([lead(3_912_401_234n)])
+
+    const { final, interrupted } = await consumeSearch(iterable, { ...baseOpts(false), interrupt: interrupt.signal })
+
+    expect(interrupted).toBe(true)
+    expect(final).toBeUndefined()
+    expect(pulls()).toBe(0) // the loop-top check: an interrupt never buys the engine one more pull
+    expect(wasReturned()).toBe(true)
+  })
+
+  it('a budget abort keeps the drained-final path: an unfired interrupt changes nothing', async () => {
+    captureStdout()
+    const interrupt = new AbortController() // present, never fired — every real command passes it
+    const abortedFinal: QuoteResult = { ...quoteAt(3_912_401_234n), search: { ...REPORT, aborted: true } }
+    const { final, interrupted } = await consumeSearch(events(lead(3_912_401_234n), { type: 'final', result: abortedFinal }), {
+      ...baseOpts(true),
+      interrupt: interrupt.signal,
+    })
+
+    expect(interrupted).toBe(false)
+    expect(final?.search.aborted).toBe(true) // the ENGINE's drained final, not a stamped snapshot
+  })
+})
