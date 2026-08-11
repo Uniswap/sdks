@@ -10,7 +10,6 @@ import {
   minAmountOut,
   readySwap,
   routeProtocols,
-  USDC,
   WETH,
 } from './e2e'
 import { createWorld, type World } from './worldBuilder'
@@ -34,21 +33,33 @@ import { createWorld, type World } from './worldBuilder'
 //   v2 only            the arithmetic oracle: `expectedV2Out` from the pool's
 //                      own reserves must equal the quote exactly
 //   v4 -> v4           NOT mixed, and that is the point: two same-protocol legs
-//                      merge into ONE whole-path segment, so there is no
-//                      boundary, no chained round, and no custody hand-off
+//                      merge into ONE whole-path EXECUTION segment, so there is
+//                      no custody hand-off — even though quoting measured them
+//                      separately, like every other pair of legs
 //   v4 -> v3           two protocols, one ERC-20 intermediate (WETH), the
 //                      composed quote executed
 //   v2 -> v4           the same, but the intermediate changes FORM: v2 hands
 //                      over wrapped native, v4 wants native, so an intermediate
 //                      unwrap has to appear and be funded correctly
 //
-// THE SEGMENT-BOUNDARY RULE, pinned by the v4->v4 case against the two mixed
-// ones: a route is split into segments of CONTIGUOUS same-protocol legs (v2
-// legs always solo), one segment per quoting round and per execution operation.
-// `quote.intermediateAmounts` records the realized amount at each boundary, so
-// its length is (segments - 1): two v4 legs are one segment and report `[]`,
-// while any of the mixed pairs below is two segments and reports exactly one
-// amount. If that ever inverts, quoting and custody have drifted apart.
+// THE SEGMENT-BOUNDARY RULE, AND WHERE IT NOW APPLIES (rewritten C4-T14).
+// Segments — maximal runs of CONTIGUOUS same-protocol legs, v2 legs always solo
+// — still exist, and still decide EXECUTION: one `ExecutionOperation` per
+// segment, so two v4 legs become a single whole-path `V4_SWAP` and the currency
+// between them never becomes a router balance at all.
+//
+// They no longer decide QUOTING. The measurement-first core measures one pool,
+// one direction, one amount at a time (`quote/measure.ts`) and composes routes
+// from legs it already measured, so a two-leg route is always chained through a
+// realized intermediate amount and `quote.intermediateAmounts` is always
+// `[m_X]`, whatever protocols the legs belong to. It is `legs.length - 1` now,
+// not `segments - 1`; under the deleted wave engine a whole-path v4 pair was
+// one quoter call and reported `[]`.
+//
+// So the v4->v4 case below is still the contrast, but it is a contrast in
+// CUSTODY rather than in arithmetic: same `intermediateAmounts` shape as the
+// mixed cases, zero router balance of the intermediate where they have a real
+// hand-off. If THAT ever inverts, quoting and custody have drifted apart.
 // ---------------------------------------------------------------------------
 
 const RUN = forkTestsEnabled()
@@ -143,25 +154,43 @@ describe.skipIf(!RUN)('mixed-protocol routes, executed (fork)', () => {
     expect(routeProtocols(ready.best.route)).toEqual(['v4', 'v4'])
     expect(ready.best.route.legs[0]!.currencyOut).toBe(middle)
     expect(ready.best.route.legs[1]!.currencyIn).toBe(middle)
-    // THE CONTRAST (see the segment-boundary rule at the top of this file): two contiguous v4 legs
-    // are ONE segment, so there is no boundary at which an intermediate amount could be realized.
-    // The mixed tests below cross a protocol boundary and therefore report exactly one.
-    expect(ready.best.quote.intermediateAmounts).toEqual([])
+    // Quoting measured the two legs separately and chained them, exactly as it does across a protocol
+    // boundary — so this reports one realized intermediate amount, not the `[]` the whole-path quoter
+    // call used to produce (see the rewritten segment-boundary rule at the top of this file).
+    expect(ready.best.quote.intermediateAmounts).toHaveLength(1)
+    expect(ready.best.quote.intermediateAmounts[0]).toBeGreaterThan(0n)
 
     const { receipt, delta } = await executeSwap(anvil, { trader: V4_ONLY_TRADER, tx: ready.tx, currencyOut: omega })
     expect(receipt.status).toBe('success')
     expect(delta).toBeGreaterThanOrEqual(minAmountOut(ready.best.quote.amountOut))
     expect(delta).toBe(ready.best.quote.amountOut)
-    // The middle currency never becomes a router balance at all in a whole-path swap: it lives and
-    // dies as a delta inside the PoolManager's unlock.
+    // ...AND THIS is where the two contiguous v4 legs differ from a mixed pair, now that
+    // `intermediateAmounts` no longer distinguishes them: the middle currency never becomes a router
+    // balance at all, because the two legs compiled to ONE whole-path operation and it lives and dies
+    // as a delta inside the PoolManager's unlock. A regression that split them into two operations
+    // would still quote identically and still execute successfully — this assertion is the only thing
+    // between here and that going unnoticed.
     expect(await balanceOf(anvil, middle, UNIVERSAL_ROUTER)).toBe(0n)
   }, 300_000)
 
   it('v4 -> v3 through WETH: the composed two-round quote is exactly what executes', async () => {
-    // Leg 1 is synthetic (a token that exists nowhere else, on a v4 pool we shaped); leg 2 is the
-    // real mainnet WETH/USDC 0.05% pool. So the route can only be found by chaining across a
-    // protocol boundary, and its quote can only be right if both rounds are.
+    // Leg 1 is a synthetic token on a v4 pool we shaped; leg 2 is a v3 pool we shaped against real
+    // WETH. So the only route from end to end crosses a protocol boundary, and its quote can only be
+    // right if both rounds are.
+    //
+    // WHY THE OUTPUT IS SYNTHETIC (C4-T14). This test used to end at real mainnet USDC on the real
+    // WETH/USDC 0.05% pool, and hint both legs — on the wave engine's assumption that hinting
+    // narrowed what got measured. It does not: hints supply provenance, and the pump measures the
+    // WHOLE pair either way (`search/pump.ts#measurablePools` unions the index, the modules'
+    // hypotheses and the hints). So the search also measured mainnet's deep v4 WETH/USDC pool, found
+    // an all-v4 route, and ranking preferred it — correctly, since `quote/rank.ts` breaks ties toward
+    // fewer protocol transitions and only promotes a boundary-crossing route past `SIMPLICITY_MARGIN_BPS`.
+    // The test was asserting a mixed `best` it no longer had any way to guarantee. A synthetic output
+    // token has no mainnet twin at any protocol, so the boundary is FORCED rather than assumed, and
+    // this suite goes back to testing chained quoting instead of racing mainnet's liquidity. Real
+    // mainnet pools are still exercised end to end by `swap.fork.test.ts`.
     const fresh = await world.deployToken('MixFresh')
+    const far = await world.deployToken('MixFar')
     const { ref } = await world.createV4Pool(fresh, WETH, {
       fee: 3000,
       tickSpacing: 60,
@@ -169,36 +198,32 @@ describe.skipIf(!RUN)('mixed-protocol routes, executed (fork)', () => {
       priceApprox: 0.001, // 1 FRESH = 0.001 WETH
     })
     if (ref.protocol !== 'v4') throw new Error('unreachable')
+    // The second leg, servable by v3 alone: nothing else on this chain has a (WETH, MixFar) pool,
+    // because MixFar was deployed seconds ago by this test.
+    await world.createV3Pool(WETH, far, 500, { liquidity: 10n ** 20n, priceApprox: 1 })
 
     const amountIn = 100n * 10n ** 18n
     await world.fundTrader(MIXED_TRADER, { eth: parseEther('10'), tokens: [[fresh, amountIn]] })
     await world.approvePermit2(MIXED_TRADER, fresh, { toRouter: true })
 
-    // Both pools are hinted. Finding them is discovery's job and is proven in `discovery.fork.test.ts`
-    // against synthetic worlds; hinting here keeps this suite on its own subject (chained quoting and
-    // mixed custody) and keeps it off the speculative fan-out over real mainnet majors, which turns a
-    // two-second search into a multi-minute one against a public archive endpoint.
+    // The v4 leg is still hinted: its fee tier is standard, so it would be found either way, but the
+    // hint spares the search a discovery round trip it is not the subject of. The v3 leg is left to
+    // be discovered, which it is — WETH is a core intermediate.
     const ready = readySwap(
       await router.getSwap({
         tokenIn: fresh,
-        tokenOut: USDC,
+        tokenOut: far,
         amountIn,
         trader: MIXED_TRADER,
-        hints: [
-          { protocol: 'v4', poolKey: ref.poolKey },
-          { protocol: 'v3', token0: WETH, token1: USDC, fee: 500 },
-        ],
+        hints: [{ protocol: 'v4', poolKey: ref.poolKey }],
       }),
     )
-    const protocols = routeProtocols(ready.best.route)
-    expect(protocols).toHaveLength(2)
-    expect(protocols[0]).toBe('v4')
-    expect(new Set(protocols).size).toBe(2) // a genuine protocol boundary, not two v4 legs
-    // Exactly one segment boundary, and the realized amount that crossed it is recorded.
+    expect(routeProtocols(ready.best.route)).toEqual(['v4', 'v3'])
+    // Exactly one leg boundary, and the realized amount that crossed it is recorded.
     expect(ready.best.quote.intermediateAmounts).toHaveLength(1)
     expect(ready.best.quote.intermediateAmounts[0]).toBeGreaterThan(0n)
 
-    const { receipt, delta } = await executeSwap(anvil, { trader: MIXED_TRADER, tx: ready.tx, currencyOut: USDC })
+    const { receipt, delta } = await executeSwap(anvil, { trader: MIXED_TRADER, tx: ready.tx, currencyOut: far })
     expect(receipt.status).toBe('success')
     expect(delta).toBeGreaterThanOrEqual(minAmountOut(ready.best.quote.amountOut))
     expect(delta).toBe(ready.best.quote.amountOut)

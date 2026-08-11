@@ -7,9 +7,17 @@ import {
   type NeedsActionSwap,
   type QuoteResult,
   type ReadySwap,
+  type Router,
   type SuccessfulQuote,
   type SwapResult,
 } from '@uniswap/router-lite-sdk'
+// `assertResultCoherent` is the SDK's own honesty checker, and it IS published — `/experimental`
+// re-exports it from `internal/resultCoherence` precisely so out-of-tree suites like this one can
+// hold their results to the same invariants the unit suites hold theirs to. Taking it through the
+// package surface (rather than the `../src/internal/testing` relative path this file used until
+// C4-T14) means this suite exercises what a consumer actually gets, so a break in the export path
+// fails here too instead of hiding behind a deep import.
+import { assertResultCoherent } from '@uniswap/router-lite-sdk/experimental'
 import {
   createPublicClient,
   custom,
@@ -24,12 +32,6 @@ import { mainnet } from 'viem/chains'
 
 import { ERC20_ABI } from './abis'
 import { FORK_BLOCK, type AnvilClient } from './anvil'
-// `assertResultCoherent` is the SDK's own honesty checker. It is deliberately NOT part of the
-// published surface (`src/internal/testing.ts` is reachable through neither export path), so it is
-// imported by relative path — the same escape hatch `worldBuilder.ts` already uses for `../src/types`.
-// Importing it is the point: every result this suite produces is held to the same invariants the
-// unit suites hold theirs to, so a classification bug fails a test that was checking something else.
-import { assertResultCoherent } from '../src/internal/testing'
 
 // ---------------------------------------------------------------------------
 // Shared machinery for the fork e2e suites (Task 19B).
@@ -44,6 +46,8 @@ import { assertResultCoherent } from '../src/internal/testing'
 //                    the output-balance delta the trade actually produced
 //   readySwap()      narrow a SwapResult to `ready` (through assertResultCoherent)
 //                    with a failure message that explains what the search saw
+//   convergedSwap()  run a search to its `final` event — for tests whose subject
+//                    is what the search CONSIDERED rather than what it returned
 // ---------------------------------------------------------------------------
 
 /**
@@ -290,6 +294,39 @@ export function describeResult(r: QuoteResult | SwapResult): string {
   // otherwise invisible — nothing failed, the node just answered about an older chain.
   const regressed = r.search.headRegressed ? ' headRegressed=true' : ''
   return `${r.status}${reason}${best} alts=${r.alternatives.length} discovery=${discovery} quoting=${q.attempted}/${q.succeeded}/${q.failed}~${q.transportFailed}+${q.unattempted} aborted=${r.search.aborted}${degraded}${regressed}`
+}
+
+/**
+ * Runs a search to CONVERGENCE and returns the `final` event's result.
+ *
+ * WHEN TO REACH FOR THIS INSTEAD OF `getSwap` (C4-T14 — four fork tests were rewritten onto it).
+ * `getSwap`/`getQuote` return at the first ACTIONABLE lead, which is the right promise-shaped
+ * behaviour and the wrong instrument for a test whose subject is what the search CONSIDERED. Any pool
+ * that only a log scan can find (an unguessable v4 fee tier, a hooked pool — neither is derivable by
+ * `hypotheses`) races against every pool that can be derived locally, and on a pair that holds both,
+ * the derivable ones are measured, ranked, preflighted and verified while the `eth_getLogs` is still
+ * in flight. `getSwap` then hands back a perfectly good route before the scan lands. Nothing is
+ * wrong; the search simply had an answer earlier than it had ALL the answers.
+ *
+ * The wave engine hid this behind a fixed pair-scan grace period, so ordering used to look
+ * deterministic; that constant was deleted with the waves. `final` is the honest replacement: the
+ * loop only emits it once every source has settled, the pump is dry, and the verifier is idle — so
+ * claims like "every pool on the pair was measured" or "that candidate failed its preflight" are
+ * statements about a converged search, and this is the only surface that has one.
+ */
+export async function convergedSwap(router: Router, req: Parameters<Router['swaps']>[0]): Promise<SwapResult> {
+  for await (const event of router.swaps(req)) {
+    if (event.type === 'final') return event.result
+  }
+  throw new Error('the swaps() stream ended without a final event')
+}
+
+/** {@link convergedSwap} for quotes — same reasoning, same guarantee. */
+export async function convergedQuote(router: Router, req: Parameters<Router['quotes']>[0]): Promise<QuoteResult> {
+  for await (const event of router.quotes(req)) {
+    if (event.type === 'final') return event.result
+  }
+  throw new Error('the quotes() stream ended without a final event')
 }
 
 /** Asserts coherence, then narrows to `ready` — throwing with the search summary when it is not. */

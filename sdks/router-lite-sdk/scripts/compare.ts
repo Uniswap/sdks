@@ -44,8 +44,6 @@ import { fileURLToPath } from 'node:url'
 
 import type { Address } from 'viem'
 
-import type { CurrencyRef, QuoteRequest, QuoteResult } from '../src/index'
-
 import { AmountError, parseAmount, parseBudget } from '../cli/amounts'
 import { bold, cyan, dim, green, red, setColorEnabled, yellow } from '../cli/ansi'
 import { parseArgs, UsageError, type FlagSpec } from '../cli/args'
@@ -54,6 +52,7 @@ import { buildChainContext, hydrateLegSymbols, startBudget, type ChainContext } 
 import { redact } from '../cli/redact'
 import { amountFor, jsonify, renderRoute, viewKey, type RenderCtx } from '../cli/report'
 import { fetchTokenMeta, resolveToken, RpcError, type ResolvedToken } from '../cli/tokens'
+import type { CurrencyRef, QuoteRequest, QuoteResult } from '../src/index'
 
 // ---------------------------------------------------------------------------
 // Built-in mainnet pair matrix

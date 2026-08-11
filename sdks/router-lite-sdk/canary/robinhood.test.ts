@@ -1,4 +1,11 @@
-import { createRouter, manifestFor, RouterConfigError, type QuoteResult, type Router } from '@uniswap/router-lite-sdk'
+import {
+  createRouter,
+  manifestFor,
+  RouterConfigError,
+  type QuoteResult,
+  type Router,
+  type SearchEvent,
+} from '@uniswap/router-lite-sdk'
 import { scanLogs, V4_POOL_MANAGER_ABI } from '@uniswap/router-lite-sdk/experimental'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { decodeEventLog, encodeEventTopics, parseAbi, parseEther, type Address, type Hex, type PublicClient } from 'viem'
@@ -200,7 +207,9 @@ type Row = {
   route: string | null
   firstQuoteMs: number | null
   totalMs: number
-  waves: { index: number; elapsedMs: number; status: string }[]
+  /** One entry per `quotes()` event. `status` is null on `progress` — a report axis moved without a
+   * new lead, so there is no result to take a status off. */
+  waves: { index: number; elapsedMs: number; event: SearchEvent<QuoteResult>['type']; status: string | null }[]
 }
 
 let client: PublicClient | undefined
@@ -244,11 +253,15 @@ async function quoteRow(
   let last: QuoteResult | undefined
   let index = 0
 
-  for await (const r of router.quotes({ tokenIn, tokenOut, amountIn, signal: AbortSignal.timeout(budgetMs) })) {
+  for await (const event of router.quotes({ tokenIn, tokenOut, amountIn, signal: AbortSignal.timeout(budgetMs) })) {
     const elapsedMs = Math.round(performance.now() - start)
-    waves.push({ index: index++, elapsedMs, status: r.status })
-    if (firstQuoteMs === null && r.status === 'quote') firstQuoteMs = elapsedMs
-    last = r
+    if (event.type === 'progress') {
+      waves.push({ index: index++, elapsedMs, event: 'progress', status: null })
+      continue
+    }
+    waves.push({ index: index++, elapsedMs, event: event.type, status: event.result.status })
+    if (firstQuoteMs === null && event.result.status === 'quote') firstQuoteMs = elapsedMs
+    last = event.result
   }
 
   const row: Row = {

@@ -1,10 +1,12 @@
 import { createRouter, MAINNET_MANIFEST, type PoolRef, type Router } from '@uniswap/router-lite-sdk'
+import { assertResultCoherent } from '@uniswap/router-lite-sdk/experimental'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parseEther, type Address, type TransactionReceipt } from 'viem'
 
 import { FORK_BLOCK, forkTestsEnabled, startAnvilFork, type AnvilClient } from './anvil'
 import {
   classifyLogQueries,
+  convergedSwap,
   countingClient,
   executeSwap,
   forkManifest,
@@ -13,7 +15,6 @@ import {
   routeProtocols,
 } from './e2e'
 import { createWorld, type World } from './worldBuilder'
-import { assertResultCoherent } from '../src/internal/testing'
 
 // ---------------------------------------------------------------------------
 // Discovery, on a chain where we know every pool that exists.
@@ -32,8 +33,10 @@ import { assertResultCoherent } from '../src/internal/testing'
 //   adjacency scan  a two-hop whose INTERMEDIATE is a token nothing has ever
 //                   heard of: the pair scan cannot reach it, so the search has
 //                   to scan an endpoint's adjacency and then probe outward.
-//   selection       five pools for one pair against a cap of three, where the
-//                   newest is the best: it survives only via the reserved slot.
+//   measurement     seven pools on one pair, the seventh reachable only via the
+//                   pair scan and by far the deepest: every one of them is
+//                   measured (there is no per-pair selection any more, only the
+//                   128-pool abuse backstop), so the deepest wins on arithmetic.
 //
 // Every case ends the same way — the route is executed on the fork and the
 // output is exactly the quote.
@@ -53,7 +56,7 @@ const AMOUNT_IN = 1_000n * 10n ** 18n
 const INGEST_TRADER: Address = '0x00000000000000000000000000000000000d15c1'
 const COLD_TRADER: Address = '0x00000000000000000000000000000000000d15c2'
 const HOP_TRADER: Address = '0x00000000000000000000000000000000000d15c3'
-const CAP_TRADER: Address = '0x00000000000000000000000000000000000d15c4'
+const MEASURE_TRADER: Address = '0x00000000000000000000000000000000000d15c4'
 
 describe.skipIf(!RUN)('pool discovery (fork)', () => {
   let anvil: AnvilClient
@@ -135,10 +138,9 @@ describe.skipIf(!RUN)('pool discovery (fork)', () => {
     expect(delta).toBe(ready.best.quote.amountOut)
   }, 300_000)
 
-  it('cold, with an honest deployment floor: the wave-0 exact-pair scan finds the same pool', async () => {
+  it('cold, with an honest deployment floor: the exact-pair Initialize scan finds the same pool', async () => {
     // Same world, same pool, a brand-new router that was told nothing. The fee tier is still
-    // unguessable, so the Initialize scan is the only thing that can produce this route — and the
-    // pair scan alone is enough: no adjacency wave has to run.
+    // unguessable, so the Initialize scan is the only thing that can produce this route.
     const counting = countingClient(anvil.rpcUrl)
     const router = createRouter({ client: counting.client, manifest: forkManifest() })
 
@@ -153,7 +155,18 @@ describe.skipIf(!RUN)('pool discovery (fork)', () => {
 
     const queries = classifyLogQueries(counting.logQueries)
     expect(queries.exactPair).toBeGreaterThan(0)
-    expect(queries.adjacency).toBe(0)
+    // NO `adjacency === 0` CLAIM ANY MORE (C4-T14). This test used to assert it, on the wave engine's
+    // ordering: wave 0 was the pair scan, and adjacency was a LATER wave that only ran if wave 0 came
+    // back empty. There are no waves. `search/coverage.ts` scans an eager exact-pair slice up front
+    // and then opens one gate — `search/loop.ts`'s `demandFull()`, taken when the pump goes DRY with
+    // the verifier idle — after which every scope's scans go out concurrently. "Dry" means no leg is
+    // left to measure, NOT "the pair scan came back empty", and on this pair none of the six
+    // derivable pools exist, so the search goes dry (and opens the gate) while the exact-pair
+    // `eth_getLogs` is still in flight. The adjacency and fee scans that follow are correct
+    // behaviour, and an assertion that forbade them was pinning a schedule rather than a result.
+    //
+    // The cost guarantee that DID survive is the one about not needing scans at all when the caller
+    // already knows the pool — see the ingest test above, which still asserts `eth_getLogs === 0`.
     // Everything scanned lives on the fork: the pinned floor keeps the scan off mainnet history.
     for (const q of counting.logQueries) expect(BigInt((q as { fromBlock: bigint }).fromBlock)).toBeGreaterThanOrEqual(FORK_BLOCK)
 
@@ -201,73 +214,94 @@ describe.skipIf(!RUN)('pool discovery (fork)', () => {
     expect(received).toBe(ready.best.quote.amountOut)
   }, 300_000)
 
-  it('seven pools for one pair, cap of six (MAX_POOLS_DIRECT): the newest survives on the reserved slot and wins the quote', async () => {
-    // C4-P7: the direct-pair cap was raised from 3 to 6 (MAX_POOLS_DIRECT) specifically so the
-    // COMMON major-pair shape — one v2 pool, the four standard v3 fee tiers, one v4 pool — fits with
-    // nothing pruned (see the "6th direct pool" unit test in candidates.test.ts). 6 is not a ceiling
-    // that covers every real pool set: a pair that ALSO carries all four standard v4 tiers (v2 + 4 v3
-    // + 4 v4 = 9) still prunes 3 (see `constants.ts#MAX_POOLS_DIRECT`'s doc comment). This test is
-    // about the boundary one pool past the common-shape fit: six standard pools (mixed here as four
-    // v4 tiers + one v2 + one v3, rather than the doc comment's four-v3 mix — the reserved-slot
-    // mechanics below don't care which protocol supplies the four) are found by wave-0 probes, which
-    // also marks them recently-successful — the strongest signal in the per-pair priority order. The
-    // seventh is created last, on an unguessable tier, and can only arrive via the pair scan with no
-    // success history at all, so ordinary priority puts it dead last and the cap would drop it. It is
-    // also, deliberately, by far the deepest pool: if the reserved newest-pool slot did not exist, the
-    // search would quote a strictly worse route and never know.
+  it('seven pools on one pair: EVERY one is measured, the abuse ceiling stays untouched, and the deepest wins', async () => {
+    // MEASUREMENT-FIRST, on the shape that used to be a selection problem.
+    //
+    // Until C4-T3 this pair was a contest: `MAX_POOLS_DIRECT` admitted six pools per pair, ordinary
+    // priority ranked the seventh dead last (created last, on an unguessable tier, with no quote
+    // success behind it), and a reserved "newest pool" slot was what kept it from being dropped
+    // unmeasured. That whole mechanism is gone. There is no per-pair selection to lose any more — the
+    // pump measures every pool it knows about on the pair, and the only per-pair limit left is
+    // `MEASUREMENT_PAIR_CEILING` (128), an abuse backstop against pool-spam pairs rather than a cap
+    // any honest pair reaches.
+    //
+    // So this test asserts the new contract on the OLD adversarial world, unchanged: seven pools, the
+    // seventh reachable only through the pair scan and by far the deepest. Under the old cap, ordinary
+    // priority would have dropped it and the search would have quoted a strictly worse route without
+    // ever knowing. Under measurement-first, all seven are measured (nothing had to survive anything),
+    // `pairCeilingHit` stays false at 7 << 128, and the deepest pool wins on its own numbers.
+    //
+    // IT CONVERGES THE SEARCH RATHER THAN CALLING `getSwap` — see `e2e.ts#convergedSwap` for why.
+    // "Every pool was measured" is a claim about a FINISHED search, and `getSwap` deliberately returns
+    // at the first verified lead: six of these seven pools are derivable by `hypotheses` and get
+    // measured, ranked and verified while the pair scan that finds the seventh is still in flight.
     const rich = await world.deployToken('DiscRich')
     const poor = await world.deployToken('DiscPoor')
+    const allPools: PoolRef[] = []
     for (const config of [
       { fee: 100, tickSpacing: 1 },
       { fee: 500, tickSpacing: 10 },
       { fee: 3000, tickSpacing: 60 },
       { fee: 10000, tickSpacing: 200 },
     ]) {
-      await world.createV4Pool(rich, poor, { ...config, liquidity: 10n ** 21n, priceApprox: 1 })
+      allPools.push((await world.createV4Pool(rich, poor, { ...config, liquidity: 10n ** 21n, priceApprox: 1 })).ref)
     }
-    // Two more standard, wave-0-guessable pools on the SAME pair — a v2 pool and a v3 pool — so the
-    // direct pair holds six ordinarily-ranked pools before the newest (unguessable) one ever enters.
-    // Sized the same as the four v4 pools above (NOT the newest pool's 1000x-deeper liquidity): the
+    // Two more speculatively-guessable pools on the SAME pair — a v2 pool and a v3 pool — so the pair
+    // holds six pools every protocol module can hypothesise before the seventh (unguessable) one ever
+    // enters. Sized the same as the four v4 pools above (NOT the deepest pool's 1000x liquidity): the
     // point is six comparably-shallow candidates losing to one much deeper one, not a second deep pool
-    // that would legitimately outprice "newest" on its own merits.
-    await world.createV2Pool(rich, poor, 10n ** 21n, 10n ** 21n)
-    await world.createV3Pool(rich, poor, 3000, { liquidity: 10n ** 21n, priceApprox: 1 })
-    const newest = await world.createV4Pool(rich, poor, {
+    // that would legitimately outprice it on its own merits.
+    allPools.push(await world.createV2Pool(rich, poor, 10n ** 21n, 10n ** 21n))
+    // `createV3Pool`'s `liquidity` is a REQUEST, not a setting, and it overshoots. It has no liquidity
+    // argument to pass on: it hands the NFPM the amounts `fullRangeAmounts` derives, which carry a
+    // deliberate 2% headroom, as `amountDesired` with `amountMin: 0` — so the pool ends up with ~1.02x
+    // what was asked for, where `createV4Pool` states its liquidity outright and lands on exactly it.
+    // Divided back out here so this pool is genuinely the same depth as the four v4 pools above; at
+    // `AMOUNT_IN` (a trade the size of the whole pool) 2% of depth is worth far more than the fee
+    // difference between tiers, and an uncompensated v3 pool quietly out-prices every v4 pool it was
+    // supposed to be level with.
+    allPools.push(await world.createV3Pool(rich, poor, 3000, { liquidity: (10n ** 21n * 100n) / 102n, priceApprox: 1 }))
+    const deepest = await world.createV4Pool(rich, poor, {
       ...UNGUESSABLE,
       liquidity: 10n ** 24n, // ~1000x the others: deep enough that its price impact is negligible
       priceApprox: 1,
     })
+    allPools.push(deepest.ref)
 
-    await world.fundTrader(CAP_TRADER, { eth: parseEther('10'), tokens: [[rich, AMOUNT_IN]] })
-    await world.approvePermit2(CAP_TRADER, rich, { toRouter: true })
+    await world.fundTrader(MEASURE_TRADER, { eth: parseEther('10'), tokens: [[rich, AMOUNT_IN]] })
+    await world.approvePermit2(MEASURE_TRADER, rich, { toRouter: true })
 
     const router = createRouter({ client: anvil.publicClient, manifest: forkManifest() })
-    const result = await router.getSwap({
-      tokenIn: rich,
-      tokenOut: poor,
-      amountIn: AMOUNT_IN,
-      trader: CAP_TRADER,
-    })
-    const ready = readySwap(result)
+    const ready = readySwap(
+      await convergedSwap(router, { tokenIn: rich, tokenOut: poor, amountIn: AMOUNT_IN, trader: MEASURE_TRADER }),
+    )
 
-    expect(ready.best.route.legs[0]!.pool).toEqual(newest.ref)
-    // Seven pools, six slots (MAX_POOLS_DIRECT): the one that lost is reported rather than silently
-    // dropped. The report no longer counts pruned pools by name — pools left unmeasured on a pair are
-    // what `pairCeilingHit` says, and it is what forfeits `exhaustiveWithinMaxHops` here.
-    expect(ready.search.enumeration.pairCeilingHit).toBe(true)
-    expect(ready.search.enumeration.exhaustiveWithinMaxHops).toBe(false)
-    // All six standard pools quoted successfully, which is what puts every one of them AHEAD of the
-    // newest pool in the per-pair priority order (a recent quote success outranks a recent creation).
-    // With a cap of six, ordinary priority would therefore have dropped the newest pool outright — so
-    // the fact that it is here at all, and leading, is the reserved slot doing its job.
-    expect(ready.alternatives).toHaveLength(6)
-    // The newest pool is 1000x deeper, so its quote must beat every alternative that was quoted.
+    // The deepest pool leads — and under measurement-first that is a statement about ARITHMETIC, not
+    // about surviving a selection step: it is here because every pool on the pair was measured.
+    expect(ready.best.route.legs[0]!.pool).toEqual(deepest.ref)
+
+    // Seven pools, seven direct routes priced: `best` plus six alternatives, one per pool, and the set
+    // of pools they cross is exactly the seven created above. This is the measurement-first claim
+    // stated as something a cap COULD NOT satisfy — under the old six-slot cap one of these pools was
+    // never measured at all, so this assertion is the one that fails if per-pair selection returns.
+    const pricedPools = [ready.best, ...ready.alternatives].map((r) => JSON.stringify(r.route.legs[0]!.pool))
+    expect(new Set(pricedPools).size).toBe(7)
+    expect(new Set(pricedPools)).toEqual(new Set(allPools.map((ref) => JSON.stringify(ref))))
+
+    // 7 is nowhere near `MEASUREMENT_PAIR_CEILING` (128), so the abuse backstop never fires — and with
+    // nothing left unmeasured on the pair, the search does not forfeit exhaustiveness the way the
+    // capped one did.
+    expect(ready.search.enumeration.pairCeilingHit).toBe(false)
+    // One leg per pool at one amount, deduped by (pool, direction, amount) — so the leg ledger is the
+    // second, independent witness that all seven were measured rather than six-and-a-survivor.
+    expect(ready.search.enumeration.legsMeasured).toBeGreaterThanOrEqual(7)
+    // The deepest pool is 1000x the others, so its quote must beat every alternative that was priced.
     for (const alternative of ready.alternatives) {
       expect(ready.best.quote.amountOut).toBeGreaterThan(alternative.quote.amountOut)
     }
 
     const { receipt, delta } = await executeSwap(anvil, {
-      trader: CAP_TRADER,
+      trader: MEASURE_TRADER,
       tx: ready.tx,
       currencyOut: poor,
     })

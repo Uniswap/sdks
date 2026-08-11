@@ -36,7 +36,7 @@
     "typecheck:all": "bun run typecheck && bun run typecheck:tests && bun run typecheck:integration && bun run typecheck:canary && bun run typecheck:cli && bun run typecheck:scripts",
     "release": "changeset publish",
     "cli": "bun cli/rl.ts",
-    "lint": "eslint src cli --ext .ts",
+    "lint": "eslint src cli scripts --ext .ts",
     "test": "bun test"
   },
   "exports": {

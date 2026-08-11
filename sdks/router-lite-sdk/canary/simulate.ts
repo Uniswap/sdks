@@ -7,7 +7,7 @@ import {
   type NeedsActionSwap,
   type ReadySwap,
 } from '@uniswap/router-lite-sdk'
-import { assertResultCoherent, DEFAULT_SLIPPAGE_BPS } from '@uniswap/router-lite-sdk/experimental'
+import { assertResultCoherent } from '@uniswap/router-lite-sdk/experimental'
 import {
   decodeAbiParameters,
   encodeEventTopics,
@@ -93,12 +93,6 @@ const TRANSFER_EVENT_ABI = parseAbi(['event Transfer(address indexed from, addre
  * sentinel address `0xeeee...eeee`, same topic0, `to` in topic2). Filtering on topic0 + topic2 alone
  * (never on `log.address`) is what makes one decode path cover both cases. */
 const TRANSFER_TOPIC0 = encodeEventTopics({ abi: TRANSFER_EVENT_ABI, eventName: 'Transfer' })[0]!
-
-const BPS = 10_000n
-
-function computeMinAmountOut(amountOut: bigint, slippageBps: number): bigint {
-  return (amountOut * (BPS - BigInt(slippageBps))) / BPS
-}
 
 // ---------------------------------------------------------------------------
 // eth_simulateV1 wire types — this package's own minimal surface (no upstream
@@ -360,22 +354,25 @@ export function evaluateSimulateResult(blockResult: SimulateV1BlockResult, recip
  *
  * No keys, no broadcast, ever: `trader`'s spending power inside the simulated block comes from the
  * native-balance override this function sets up, and no state it writes survives the call.
- * `slippageBps` defaults to the SDK's own default (100) since `SwapResult` does not carry the
- * request's slippage back — pass the value your `getSwap` call actually used if it was overridden.
+ *
+ * The success floor is `result.limits.minAmountOut` — the plan's OWN compiled limit, the same number
+ * the encoded `tx` asserts on chain. Re-deriving it from `amountOut` and a slippage assumption (as
+ * this function did until C4-T14) silently measured against the wrong bar for any `getSwap` that
+ * overrode `slippageBps`: a 500-bps request would have been judged against a 100-bps floor and could
+ * report `ok: false` for a swap the chain itself would have accepted.
  */
 export async function simulateSwapE2E(
   client: PublicClient,
   result: ReadySwap | NeedsActionSwap,
   trader: Address,
-  opts?: { slippageBps?: number; recipient?: Address; nativeBalance?: bigint; acquireNativeBudget?: bigint },
+  opts?: { recipient?: Address; nativeBalance?: bigint; acquireNativeBudget?: bigint },
 ): Promise<SimulateSwapOutcome> {
   assertResultCoherent(result)
 
   if (result.best.route.legs.length === 0) throw new Error('simulateSwapE2E: result.best.route has no legs')
   const tokenIn = traderInputCurrency(result)
   const recipient = opts?.recipient ?? trader
-  const slippageBps = opts?.slippageBps ?? DEFAULT_SLIPPAGE_BPS
-  const minAmountOut = computeMinAmountOut(result.best.quote.amountOut, slippageBps)
+  const minAmountOut = result.limits.minAmountOut
 
   const acquisitionTx =
     tokenIn === 'native'

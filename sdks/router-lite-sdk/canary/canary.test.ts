@@ -2,7 +2,16 @@ import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { createRouter, MAINNET_MANIFEST, type BlockRange, type PoolKey, type Router, type SwapRequest } from '@uniswap/router-lite-sdk'
+import {
+  createRouter,
+  MAINNET_MANIFEST,
+  type BlockRange,
+  type PoolKey,
+  type Router,
+  type SearchEvent,
+  type SwapRequest,
+  type SwapResult,
+} from '@uniswap/router-lite-sdk'
 import {
   adjacencyQueries,
   assertResultCoherent,
@@ -525,12 +534,15 @@ describe.skipIf(!RUN)('merged adjacency conformance (canary, live head)', () => 
  * far short of what a complete mainnet discovery costs. */
 const LATENCY_BUDGET_MS = 60_000
 
-type WaveTiming = { index: number; elapsedMs: number; status: string }
+/** One event of the `swaps()` stream, timed. `status` is null on `progress` — a report axis moved
+ * without a new lead, so there is no result to take a status off. */
+type WaveTiming = { index: number; elapsedMs: number; event: SearchEvent<SwapResult>['type']; status: string | null }
 type LatencyRow = {
   label: string
   budgetMs: number
   waves: WaveTiming[]
-  /** Elapsed at the first `ready`/`needs-action` yield — the latency a `getSwap` caller sees. */
+  /** Elapsed at the first `ready`/`needs-action` LEAD — the latency a `getSwap` caller sees, since
+   * `getSwap` stops at exactly that event. */
   firstActionableMs: number | null
   /** False when the iterator was still producing waves when the budget expired. */
   finishedWithinBudget: boolean
@@ -550,10 +562,11 @@ async function timeWaves(label: string, provider: CanaryProvider, req: Omit<Swap
   const waves: WaveTiming[] = []
   let firstActionableMs: number | null = null
   let index = 0
-  for await (const r of router.swaps({ ...req, trader: CANARY_TRADER, signal: AbortSignal.timeout(LATENCY_BUDGET_MS) })) {
+  for await (const event of router.swaps({ ...req, trader: CANARY_TRADER, signal: AbortSignal.timeout(LATENCY_BUDGET_MS) })) {
     const elapsedMs = performance.now() - start
-    waves.push({ index: index++, elapsedMs, status: r.status })
-    if (firstActionableMs === null && (r.status === 'ready' || r.status === 'needs-action')) firstActionableMs = elapsedMs
+    const status = event.type === 'progress' ? null : event.result.status
+    waves.push({ index: index++, elapsedMs, event: event.type, status })
+    if (firstActionableMs === null && (status === 'ready' || status === 'needs-action')) firstActionableMs = elapsedMs
   }
   const totalMs = performance.now() - start
   return { label, budgetMs: LATENCY_BUDGET_MS, waves, firstActionableMs, finishedWithinBudget: totalMs < LATENCY_BUDGET_MS }

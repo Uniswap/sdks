@@ -29,6 +29,7 @@ import { ethCall } from '../src/internal/rpc'
 import { revertDataOf } from '../src/internal/rpcErrors'
 import {
   balanceOf,
+  convergedSwap,
   executeSwap,
   forkManifest,
   minAmountOut,
@@ -251,8 +252,16 @@ describe.skipIf(!RUN)('adversarial worlds (fork)', () => {
     const gateZeroForOne = getAddress(ref.poolKey.currency0) === getAddress(gateIn)
     expect(await quoteDirect(ref.poolKey, gateZeroForOne, ONE)).toBeGreaterThan(0n)
 
+    // CONVERGED, NOT `getSwap` (C4-T14) — see `e2e.ts#convergedSwap`. The claim below is that the
+    // hooked candidate FAILED its preflight, and that is only true of a finished search: a hooked pool
+    // is not derivable by `hypotheses` (v4's hypotheses hardcode `hooks: zeroAddress`) so it arrives
+    // via the `Initialize` scan, while the plain v2 twin is derivable and gets measured, ranked,
+    // preflighted and verified first. `getSwap` returns on that verified v2 lead with the hooked
+    // route's own simulation still in flight — which is correct behaviour, and reports the hooked
+    // candidate as `unverified` because nobody had simulated it yet. `final` waits for the verifier to
+    // go idle, so at that point `failed` means what this test wants it to mean: the chain rejected it.
     const ready = readySwap(
-      await router.getSwap({ tokenIn: gateIn, tokenOut: gateOut, amountIn: ONE, trader: GATE_TRADER }),
+      await convergedSwap(router, { tokenIn: gateIn, tokenOut: gateOut, amountIn: ONE, trader: GATE_TRADER }),
     )
     // The fall-through happened: the executable-but-worse pool leads the result.
     expect(routeProtocols(ready.best.route)).toEqual(['v2'])
