@@ -509,7 +509,7 @@ export const CHUNK_REGROWTH_SUCCESSES = 4
  *
  * WHY A SCAN NEEDED ITS OWN BOUND AT ALL. The router-wide semaphore
  * ({@link DEFAULT_CONCURRENCY} = 20) has always been the ceiling on in-flight requests, but nothing
- * under it ever generated the demand: `search/discovery.ts` fans out across protocols and topic
+ * under it ever generated the demand: `search/coverage.ts` fans out across protocols and topic
  * positions, and every one of those chains then walked its own block range strictly one chunk at a
  * time. Measured during a full cold mainnet drain: 7 of the 20 permits in use at the peak — the
  * per-query loop, not the semaphore, was the bound. With adaptive windows (S1) most queries now
@@ -561,7 +561,7 @@ export const SCAN_CHUNK_CONCURRENCY = 4
 export const MAX_REQUESTS_PER_SCAN = 4_000
 
 /**
- * Requests one fee-tier discovery scan (`search/discovery.ts#discoverFeeTiers`) may spend per search
+ * Requests one fee-tier discovery scan (`search/coverage.ts#discoverFeeTiers`) may spend per search
  * — {@link MAX_REQUESTS_PER_SCAN}'s ceiling narrowed for the one scan that had no business having a
  * ceiling that generous.
  *

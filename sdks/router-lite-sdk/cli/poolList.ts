@@ -360,7 +360,7 @@ export type CurateOptions = {
   /**
    * The manifest's factory / pool-manager addresses. These share the coverage cache's key space with
    * token endpoints but are NOT adjacency scopes: they are what the FEE-DISCOVERY scan
-   * (`search/waves.ts#discoverFeeTiers`) records its progress under, and that scan is a full-history
+   * (`search/coverage.ts#discoverFeeTiers`) records its progress under, and that scan is a full-history
    * sweep of a factory's own `FeeAmountEnabled` logs — expensive, and its result (`enabledFees`) is
    * already published alongside. Claiming the scope is what lets a consumer skip the sweep instead of
    * re-running it to rediscover tiers the list already handed it.

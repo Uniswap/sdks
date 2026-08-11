@@ -883,7 +883,7 @@ test('P1 (F9): a discarded batch tail still counts against the budget — it rea
 })
 
 test('P1 (F9): several concurrent scans never exceed the shared semaphore, however wide their batches', async () => {
-  // P1's per-scan concurrency MULTIPLIES with the fan-out above it (`search/discovery.ts` runs a scan
+  // P1's per-scan concurrency MULTIPLIES with the fan-out above it (`search/coverage.ts` runs a scan
   // per protocol per topic position). The router-wide semaphore is what is supposed to make that
   // product safe, and this is the test that it actually does — a bound that only holds for one scan
   // at a time is not a bound.

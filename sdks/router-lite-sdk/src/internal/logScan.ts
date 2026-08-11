@@ -292,7 +292,7 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * `opts.widthMemory` ({@link ScanWidthMemory}), when supplied, is READ for this scan's starting
  * width and ceiling and WRITTEN with whatever this scan learns — the seam that makes the descent a
  * per-endpoint cost rather than a per-call one. It is a plain mutable object shared by every scan on
- * one router (`search/discovery.ts` threads `PoolIndex`'s), and mutating it is safe under the
+ * one router (`search/coverage.ts` threads `PoolIndex`'s), and mutating it is safe under the
  * concurrent scans a single wave issues: both fields are monotone — the hint only rises, the cap
  * only falls — so interleaved writes converge on the same value whatever order they land in, and a
  * lost update costs one probe. Omitted, every line below behaves exactly as it did before this
@@ -302,7 +302,7 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * makes a long scan incremental for its caller instead of all-or-nothing. It is purely additive
  * (`logs` still accumulates and is still returned whole) and it is best-effort: it must not throw,
  * and nothing about the scan's coverage, budget or descent depends on it. Its reason for existing is
- * `search/discovery.ts`, which used to ingest a scan's pools only once the entire multi-million-block
+ * `search/coverage.ts`, which used to ingest a scan's pools only once the entire multi-million-block
  * range had come back — long after a budgeted caller could do anything with them.
  *
  * `opts.maxRequests` narrows {@link MAX_REQUESTS_PER_SCAN} for THIS scan (never widens it), for a
@@ -319,7 +319,7 @@ export async function scanLogs(
   opts: {
     signal?: AbortSignal
     /** `| undefined` like the four below it, so a caller threading a possibly-absent seam through
-     * (`search/discovery.ts#scanOpts`) need not spread it conditionally: an explicit `undefined`
+     * (`search/coverage.ts#scanOpts`) need not spread it conditionally: an explicit `undefined`
      * means "no override" here exactly as it does for `semaphore` and `initialChunk`. */
     sleep?: ((ms: number) => Promise<void>) | undefined
     semaphore?: Semaphore | undefined
@@ -535,6 +535,6 @@ export async function scanLogs(
 
   // `requests` is what actually reached the wire (skipped-on-abort chunks are handed back above), so
   // a caller spreading one budget across several scans can subtract it and get an exact remainder
-  // rather than an estimate — see `search/discovery.ts#discoverFeeTiers`.
+  // rather than an estimate — see `search/coverage.ts#discoverFeeTiers`.
   return { logs, covered, complete, requests }
 }

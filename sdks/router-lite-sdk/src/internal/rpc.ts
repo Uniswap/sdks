@@ -43,7 +43,7 @@ import { classifyRpcError } from './rpcErrors'
 //     `probeQuotes`), readiness's three ERC-20/Permit2 reads (`verify/readiness.ts#readErc20State`),
 //     and hint validation (`search/waves.ts#resolveHints`).
 //   - `scanLogs` (`internal/logScan.ts`) — every `eth_getLogs`: adjacency/fee-tier/exact-pair
-//     discovery (`search/discovery.ts`).
+//     discovery (`search/coverage.ts`).
 //   - `preflightTx` (`verify/preflight.ts`) — the leader's simulation `eth_call`
 //     (`search/leader.ts#verifyLeader`); raw, not through `ethCall`, because it simulates a real
 //     transaction rather than decoding a quoter's return data.

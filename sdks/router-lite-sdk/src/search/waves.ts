@@ -42,7 +42,7 @@ import { checkReadiness } from '../verify/readiness'
 
 import { generateRoutes } from './candidates'
 import { enabledModules, node } from './context'
-import { completeExactPairScan, discoverFeeTiers, scanAdjacency, scanExactPairRecent } from './discovery'
+import { completeExactPairScan, discoverFeeTiers, scanAdjacency, scanExactPairRecent } from './coverage'
 import { evaluate } from './leader'
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ import { evaluate } from './leader'
 //   wave 2  adjacency for BOTH endpoints, in four merged `eth_getLogs` chains
 //           rather than twelve — six where v2 and v3 deployed apart, as on
 //           mainnet (C5-C — address arrays and OR-topics; see
-//           `discovery.ts#scanAdjacency`), plus the exact pair's remaining
+//           `coverage.ts#runAdjacencyScans`), plus the exact pair's remaining
 //           history; then exact-pair probes from each discovered neighbor to
 //           the other endpoint
 //   wave 3  a retry of that adjacency for whatever wave 2 did not manage to
@@ -81,7 +81,7 @@ import { evaluate } from './leader'
 //           cross product over everything the index now knows
 //
 // The engine's stages live in three sibling files, each with its own header:
-// `discovery.ts` (log-scan orchestration), `leader.ts` (compile/encode/
+// `coverage.ts` (log-scan orchestration), `leader.ts` (compile/encode/
 // simulate, and the ordering invariant that makes needs-action-vs-verified
 // gating sound), `report.ts` (SearchReport assembly). What all three share is
 // `context.ts` (the three one-line accessors onto `SearchContext`) and
@@ -143,7 +143,7 @@ import { evaluate } from './leader'
 //    before wave 1 — and priced AS IT ARRIVES, not only at the end.
 //  - The report cannot overclaim. The pair scan never writes
 //    `ProtocolDiscovery.complete` (it is pair-scoped, not endpoint-scoped —
-//    see `discovery.ts#exactPairPlan`), so a consumer that stops at 0a reads
+//    see `coverage.ts#exactPairPlan`), so a consumer that stops at 0a reads
 //    `v4: partial` exactly as it did when the scan ran inside wave 0.
 //  - The extra yield is an improvement event, not a new kind of event.
 //    `signatureOf` still suppresses a stage that changed nothing, so 0b yields

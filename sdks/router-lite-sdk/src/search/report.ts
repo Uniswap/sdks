@@ -101,7 +101,7 @@ export function discoveryStatus(
  * disagree with the word next to it — reading near-full while the status still says `partial`,
  * indefinitely, whenever one endpoint is fully cached and the other has never been touched. The
  * intersection is what "the router knows this pair, here" actually means: the same reasoning
- * `discovery.ts#scanAdjacency` already applies one layer down, intersecting a single endpoint's two
+ * `coverage.ts#runAdjacencyScans` already applies one layer down, intersecting a single endpoint's two
  * topic-slot queries before it will call that endpoint's range covered at all.
  *
  * A protocol with no deployment block configured (disabled on this chain) reports no coverage: there

@@ -68,7 +68,7 @@ function unique<T>(values: T[]): T[] {
  *
  * BOTH ARE NEEDED FOR COVERAGE, always: a pool whose creation event put the endpoint in the other
  * slot is invisible to the first filter, so a block range is only genuinely covered for an endpoint
- * where BOTH filters succeeded (`search/discovery.ts` intersects them, and has since long before
+ * where BOTH filters succeeded (`search/coverage.ts` intersects them, and has since long before
  * they were merged).
  *
  * EVERY `shapes` ENTRY MUST AGREE ON `slot` — they are the same two topic positions in one filter,

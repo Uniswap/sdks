@@ -606,7 +606,7 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
  * A creation log as an adjacency scan would return it.
  *
  * `address` is the protocol's OWN factory and not a fixed one, because a merged response is routed
- * back to a module BY EMITTER (`discovery.ts#ingestMerged`) — the one field that tells a v2 log from
+ * back to a module BY EMITTER (`coverage.ts#ingestMerged`) — the one field that tells a v2 log from
  * a v3 log in a mixed answer without decoding it. A fixture that stamped every log with the same
  * factory would hand v3's logs to the v2 module, whose `parsePoolLog` correctly rejects them.
  */
