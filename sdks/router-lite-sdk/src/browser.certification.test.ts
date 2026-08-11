@@ -128,18 +128,27 @@ test('no file the package ships reads a Node-only global', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Gzipped size of the minified browser bundle of BOTH entry points, measured on the commit that
- * introduced this test (bun 1.3.14, viem 2.47.2): 44,800 bytes gzipped, from 144,433 bytes minified —
- * about 44 kB over the wire for the whole router plus all five built-in manifests, viem included and
- * tree-shaken.
+ * Gzipped size of the minified browser bundle of BOTH entry points: **48,428 bytes gzipped, from
+ * 153,725 bytes minified** — about 48 kB over the wire for the whole router plus all five built-in
+ * manifests, viem included and tree-shaken. Re-recorded 2026-08-11, on the toolchain CI pins
+ * (bun 1.3.14, viem 2.47.2).
+ *
+ * WHY IT MOVED, AND WHY RE-RECORDING WAS THE RIGHT ANSWER. The first baseline (44,800 B from
+ * 144,433 B) was measured on the *same* bun and the *same* viem, so the +3,628 B is not minifier
+ * drift — it is source: the event-driven search core replaced the staged wave engine, and the loop /
+ * pump / coverage / verifier / state modules are genuinely more code than `waves.ts` was. A budget
+ * that quietly absorbed real growth would be a budget that stops meaning anything, so the number is
+ * moved deliberately, in the commit that grew it, rather than left to accumulate against a stale
+ * reading of 108%.
  *
  * The budget is 1.5x, not a tight pin, ON PURPOSE. Minifier output moves with the bun version (CI
  * and a laptop are rarely on the same one) and a legitimate feature costs a few kB; neither should
  * turn a green suite red. What 1.5x DOES catch is the failure this exists for: an import that
  * defeats tree-shaking (a barrel re-export, a side-effectful module, a dependency that pulls its own
- * polyfills) and takes the bundle from tens of kB to hundreds in one line.
+ * polyfills) and takes the bundle from tens of kB to hundreds in one line. Re-record this constant
+ * when a change legitimately moves the real number — never widen `SIZE_BUDGET` to make room for one.
  */
-const BASELINE_GZIP_BYTES = 44_800
+const BASELINE_GZIP_BYTES = 48_428
 const SIZE_BUDGET = 1.5
 
 /**

@@ -12,7 +12,7 @@ pool is routable with zero historical scanning.
 
 The SDK is built on [viem](https://viem.sh) — bring your own `PublicClient`, no transport of its
 own. That is its only dependency, and it performs no I/O itself, so it runs unmodified in browsers
-and edge workers (44.8 kB gzipped, certified on every commit — see
+and edge workers (48.4 kB gzipped, certified on every commit — see
 [Runs in browsers and edge workers](#runs-in-browsers-and-edge-workers)).
 
 ## Installation
@@ -63,10 +63,14 @@ merely "the pump has nothing due", is what makes the launcher promise structural
 `getSwap` whose preflight is one round trip from resolving issues **zero** unbounded log scans, and
 that is a counted contract test rather than a timing accident.
 
-**The intermediates frontier.** Two-hop intermediates are not capped — they are a frontier that
-advances one batch (`MAX_INTERMEDIATES`, 8) per quiet cycle, ordered hinted → manifest cores →
-newest-pool-touching discovered node. So `enumeration.intermediatesPruned` reads *"not reached
-yet"*, never *"capped"*: a consumer that keeps pulling drives it to zero.
+**The intermediates frontier.** Two-hop intermediates are not capped — they are a frontier whose
+batch size is `MAX_INTERMEDIATES` (8), ordered hinted → manifest cores → newest-pool-touching
+discovered node. That 8 is the **seed as well as the step**: the first batch is selected *before*
+the first pump cycle runs, so a cold two-hop never waits for a dry cycle to learn that the manifest's
+cores exist and the very first measurement round already covers as many intermediates as the old
+permanent cap ever allowed; every later quiet cycle adds another 8. So
+`enumeration.intermediatesPruned` reads *"not reached yet"*, never *"capped"*: a consumer that keeps
+pulling drives it to zero.
 
 **Exhaustive in the limit.** There is exactly one advance rule — *when the search goes quiet and the
 consumer is still pulling, the gate opens and every frontier advances one notch* — and "still
@@ -751,14 +755,17 @@ is no filesystem access, no `process.env`, no `Buffer`, no `node:` import anywhe
 publishes, so the same build that runs on a Node server runs unmodified in a browser tab, a service
 worker, a Cloudflare Worker, or a Vercel edge function. Bundled for `target: browser` with both
 entry points imported, the whole thing — router, search engine, encoder, all five built-in manifests,
-viem included and tree-shaken — is **~144 kB minified, ~45 kB gzipped**.
+viem included and tree-shaken — is **~154 kB minified, ~48 kB gzipped**.
 
-Those two numbers are a **recorded baseline, not a constant**: they are minifier output, so they
-move with the bun version (144,433 B / 44,800 B gzipped under bun 1.3.14 with viem 2.47.2, the
-toolchain the baseline was recorded on) and a different bun would print a slightly different pair
-for byte-identical source. That is why CI pins `bun-version: 1.3.14` in the workflows that run this
-suite, and why the assertion below is a 1.5x budget rather than a tight pin — the failure worth
-catching is a dependency that stops tree-shaking, not a minifier release.
+Those two numbers are a **recorded baseline, not a constant**, and they move for two different
+reasons. They are minifier output, so a different bun prints a slightly different pair for
+byte-identical source — which is why CI pins `bun-version: 1.3.14` in the workflows that run this
+suite. And they move when the package legitimately grows: the current reading (153,725 B minified /
+48,428 B gzipped, bun 1.3.14 with viem 2.47.2) was **re-recorded on 2026-08-11**, up from
+144,433 B / 44,800 B on that same toolchain — the +3.6 kB gzipped is the event-driven search core
+replacing the staged wave engine, not drift. The baseline is re-recorded in the commit that moves
+it, deliberately; the 1.5x budget below is headroom for a minifier release, never a place to hide
+real growth. The failure worth catching is a dependency that stops tree-shaking.
 
 That is certified, not asserted: `src/browser.certification.test.ts` runs in the ordinary suite
 (`bun test`, hence in CI) and checks three things on every commit. It parses every file the two
@@ -769,7 +776,9 @@ conditions an edge runtime's bundler adds, requiring a clean build with no Node 
 injected `process.env` shim, byte-identical across all four; and it measures the gzipped bundle
 against a recorded baseline with a 1.5x budget — loose enough to absorb a minifier version bump or a
 feature, tight enough to catch the one failure that actually matters, a dependency that stops
-tree-shaking and doubles the download for every consumer.
+tree-shaking and doubles the download for every consumer. Growth that is real gets the baseline
+re-recorded (`BASELINE_GZIP_BYTES`, whose docstring carries the reading and the reason); the budget
+itself is never widened to accommodate one.
 
 `sideEffects: false` and an `exports` map with `types` first and ESM before CJS (asserted by the
 same test) are what let a bundler drop the parts a given consumer never imports.
