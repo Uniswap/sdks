@@ -295,13 +295,13 @@ function compareRoutes(a: QuotedRoute, b: QuotedRoute): number {
  *
  * A PROMOTION IS MARKED, NOT JUST APPLIED (C4-P7). The promoted candidate carries
  * `promotedOverComplex: true` (declared on `RankedRoute`, which every real caller sees this route
- * as — `search/leader.ts#withExecution` spreads this object verbatim) so a caller reading only
+ * as — `search/verifier.ts#withExecution` spreads this object verbatim) so a caller reading only
  * `best`/`alternatives` can tell "the higher-`amountOut` route lost to a simpler one" apart from
  * "this was simply the best route found", rather than having to re-run `compareRoutes`/`isComplex`
  * against the whole ranked list to notice the override happened at all.
  */
 export function rankRoutes(quoted: QuotedRoute[]): QuotedRoute[] {
-  // THE MARKER IS THIS CALL'S OUTPUT, NEVER ITS INPUT. `search/leader.ts` re-ranks the accumulated
+  // THE MARKER IS THIS CALL'S OUTPUT, NEVER ITS INPUT. `search/verifier.ts` re-ranks the accumulated
   // quote set on EVERY wave, so a route promoted in wave 1 comes back into wave 2 still carrying the
   // marker. Once wave 2 has priced a route that outprices the complex leader outright, or the leader
   // itself has been demoted, the promotion is no longer happening — but the marker would ride along

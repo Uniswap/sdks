@@ -45,7 +45,7 @@ import { classifyRpcError } from './rpcErrors'
 //   - `scanLogs` (`internal/logScan.ts`) — every `eth_getLogs`: adjacency/fee-tier/exact-pair
 //     discovery (`search/coverage.ts`).
 //   - `preflightTx` (`verify/preflight.ts`) — the leader's simulation `eth_call`
-//     (`search/leader.ts#verifyLeader`); raw, not through `ethCall`, because it simulates a real
+//     (`search/verifier.ts#Verifier`); raw, not through `ethCall`, because it simulates a real
 //     transaction rather than decoding a quoter's return data.
 //   - `getNativeBalance` (`verify/readiness.ts`) — the native-`currencyIn` `eth_getBalance` read;
 //     raw for the same reason (`eth_getBalance` has no revert/quote semantics to classify).

@@ -216,6 +216,20 @@ test('applyPreflight maps each settlement onto an execution status, and spends t
   expect(s.verification.preflightAttempted).toBe(4)
 })
 
+test('applyPreflight: an uncompilable route fails at zero budget cost, keeping the FIRST reason', () => {
+  const s = createState(BLOCK, false)
+
+  applyPreflight(s, 'r1', { kind: 'uncompilable', reason: 'the recipient is the v2 pool this plan trades through' })
+  applyPreflight(s, 'r2', { kind: 'uncompilable', reason: 'a quoted amount does not fit' })
+
+  expect(s.execution.get('r1')).toEqual({ status: 'failed' })
+  expect(s.execution.get('r2')).toEqual({ status: 'failed' })
+  // The leader's reason, not the last candidate's — it is the one the caller most likely caused.
+  expect(s.firstCompileError).toBe('the recipient is the v2 pool this plan trades through')
+  // A disqualification, not a simulation: `PREFLIGHT_TOP_K` budgets round trips.
+  expect(s.verification.preflightAttempted).toBe(0)
+})
+
 test('applyPreflight: a revert with no data records the failure without inventing one', () => {
   const s = createState(BLOCK, false)
   applyPreflight(s, 'r1', { kind: 'reverted' })

@@ -192,7 +192,7 @@ export type QuotedRoute = {
    *
    * A FACT ABOUT THE ROUTE, NOT ABOUT FINAL PLACEMENT — it USUALLY ends up leading (`best`), since
    * promotion happens before verification and nothing downstream un-does it, but it is not
-   * guaranteed to: `rankRoutes` runs before `search/leader.ts#verifyLeader` ever simulates anything,
+   * guaranteed to: `rankRoutes` runs before `search/verifier.ts#Verifier` ever simulates anything,
    * so a promoted candidate that itself then fails preflight can still be demoted into `alternatives`
    * (by a different, verified candidate becoming `best`) while carrying this marker right along with
    * it — the marker travels with the route object, not with whichever slot it lands in. A caller that
@@ -378,7 +378,7 @@ type ResultBase = { search: SearchReport; alternatives: RankedRoute[] }
  * The compiled plan's own on-chain limits, echoed onto a `ready`/`needs-action` result (C4-P7) so a
  * caller can log/compare what the plan actually asserts without re-deriving it from `slippageBps`/
  * `deadlineSeconds` and the pinned block — both already exist on `ExecutionPlan.deliverOutput` and
- * the deadline handed to the encoder (`search/leader.ts#compileAndEncode`); this is that same pair,
+ * the deadline handed to the encoder (`search/verifier.ts#compileAndEncode`); this is that same pair,
  * not a re-computation with its own chance to disagree with the encoded `tx`.
  */
 export type CompiledLimits = { minAmountOut: bigint; deadline: bigint }
@@ -544,7 +544,7 @@ export type SearchReport = {
   /**
    * Preflight-simulation budget, reported rather than silently absorbed (C4-P7) — the one cap that
    * otherwise converts to an authoritative verdict with no visible trace: `verifyLeader`
-   * (`search/leader.ts`) falls through at most `PREFLIGHT_TOP_K` reverting/uncompilable candidates
+   * (`search/verifier.ts`) falls through at most `PREFLIGHT_TOP_K` reverting/uncompilable candidates
    * per wave before giving up on that wave's leader, and without this a search that reverted through
    * exactly its budget's worth of candidates is indistinguishable, from the report alone, from one
    * that tried every candidate there was.

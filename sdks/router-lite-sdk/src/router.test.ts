@@ -592,7 +592,7 @@ describe('createRouter — validation (before any RPC)', () => {
     const base: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
 
     // The regression this closes: a fractional deadline used to reach `BigInt(req.deadlineSeconds)`
-    // in `search/leader.ts` and throw a bare RangeError from the middle of a search.
+    // in `search/verifier.ts` and throw a bare RangeError from the middle of a search.
     await expect(router.getSwap({ ...base, deadlineSeconds: 1.5 })).rejects.toThrow(RouterConfigError)
     await expect(router.getSwap({ ...base, deadlineSeconds: 0 })).rejects.toThrow(RouterConfigError)
     await expect(router.getSwap({ ...base, deadlineSeconds: -60 })).rejects.toThrow(RouterConfigError)
@@ -863,7 +863,7 @@ test('assertResultCoherent: an UNMARKED quote inversion is the bug, and it is re
 })
 
 test('assertResultCoherent: a marker that OUTLIVED its promotion is the bug too, in the other direction', () => {
-  // The stale half. `search/leader.ts` re-ranks the accumulated quote set every wave, so a marker set
+  // The stale half. `search/verifier.ts` re-ranks the accumulated quote set every wave, so a marker set
   // in wave 1 is an input to wave 2 — and if it survives a re-rank that promoted nothing, it is a
   // false explanation attached to a leader that simply won outright. (`rankRoutes` strips input
   // markers precisely so this cannot happen; this is the assertion that would catch it if that ever
@@ -918,7 +918,7 @@ test('classifySwap: promotedOverComplex survives onto the public SwapResult.best
 
 test('classifySwap: `needs-action` is gated on the ROUTE\'s discriminant, not on the requirement count', () => {
   // The two used to be read as interchangeable, and they are only interchangeable because of the
-  // order of `verifyLeader`'s body (`search/leader.ts`, "DO NOT REORDER"). This is the shape that
+  // order of `verifyLeader`'s body (`search/verifier.ts`, "DO NOT REORDER"). This is the shape that
   // tells them apart: a full requirement list, a compiled tx, a clean report — and a leader the
   // engine did NOT gate on those requirements. `needs-action` would be a promise about a route
   // nothing gated, and `assertResultCoherent` rejects exactly that result ("needs-action whose best

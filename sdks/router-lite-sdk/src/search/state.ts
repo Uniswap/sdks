@@ -134,6 +134,11 @@ export type PreflightOutcome =
   | { kind: 'reverted'; revertData?: Hex }
   | { kind: 'transport' }
   | { kind: 'unverified' }
+  /** The route cannot be turned into calldata at all — an unsupported shape, or a quoted amount that
+   * overruns the Universal Router's `uint128` fields. A disqualification rather than a simulation:
+   * it rules the candidate out at zero cost, and its `reason` is the one the facade appends to a
+   * `no-route` so the caller learns the cause and not only the verdict. */
+  | { kind: 'uncompilable'; reason: string }
 
 export type OutcomeEntry =
   | { t: 'measurement'; o: MeasurementOutcome }
@@ -211,15 +216,22 @@ export function applyReadiness(s: SearchState, r: ReadinessOutcome): void {
 }
 
 /**
- * `needs-action` is the readiness gate's verdict, decided before any simulation, so it spends no
- * budget; every other arm is the settlement of a real preflight call and costs one attempt.
+ * Two arms are verdicts reached WITHOUT a round trip and so spend no budget: `needs-action` (the
+ * readiness gate's, decided before any simulation) and `uncompilable` (the encoder's, decided
+ * without one). Every other arm is the settlement of a real preflight call and costs one attempt —
+ * `PREFLIGHT_TOP_K` budgets round trips, not disqualifications.
  */
 export function applyPreflight(s: SearchState, routeId: string, o: PreflightOutcome): void {
   record(s, { t: 'preflight', routeId, o })
-  if (o.kind !== 'needs-action') s.verification.preflightAttempted++
+  if (o.kind !== 'needs-action' && o.kind !== 'uncompilable') s.verification.preflightAttempted++
   if (o.kind === 'verified') s.execution.set(routeId, { status: 'verified' })
   else if (o.kind === 'needs-action') s.execution.set(routeId, { status: 'needs-action' })
-  else if (o.kind === 'reverted')
+  else if (o.kind === 'uncompilable') {
+    // First rather than last: it is the leader's failure, the one the caller most likely caused,
+    // and later candidates tend to fail for the same reason anyway.
+    s.firstCompileError ??= o.reason
+    s.execution.set(routeId, { status: 'failed' })
+  } else if (o.kind === 'reverted')
     s.execution.set(routeId, { status: 'failed', ...(o.revertData !== undefined && { revertData: o.revertData }) })
   else {
     // A simulation that never happened rules nothing out: the route stays `unverified`, and a lost

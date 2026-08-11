@@ -530,7 +530,7 @@ test('rankRoutes ignores gasEstimate entirely — it reports gas, it never ranks
 })
 
 test('rankRoutes is idempotent: re-ranking its own output never carries a stale promotion marker', () => {
-  // `search/leader.ts` re-ranks the ACCUMULATED quote set on every wave, so a route promoted in one
+  // `search/verifier.ts` re-ranks the ACCUMULATED quote set on every wave, so a route promoted in one
   // wave is an input to the next still wearing the marker. The marker is not decorative —
   // `assertResultCoherent` reads it as the licence for a `best` outpriced by its own `alternatives`,
   // and the CLI prints it as the explanation — so one that outlives the promotion it describes is a

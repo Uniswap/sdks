@@ -390,7 +390,7 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
   }
 
   // Mirrors `slippageBps`, and for the same reason: it is a plain `number` reaching a `BigInt()`
-  // conversion in `search/leader.ts`, where a fractional value is a bare `RangeError` thrown from
+  // conversion in `search/verifier.ts`, where a fractional value is a bare `RangeError` thrown from
   // the middle of a search rather than a rejected request. The ceiling is separate from the shape
   // check — see MAX_DEADLINE_SECONDS on why an unbounded deadline is its own hazard.
   if (
@@ -616,17 +616,17 @@ export function classifyQuote(e: InternalResult): QuoteResult {
 export function classifySwap(e: InternalResult): SwapResult {
   // BOTH LEADING STATUSES GATE ON THE ROUTE'S OWN `execution` DISCRIMINANT, which is the fact each
   // one is a claim about: `verified` means the chain simulated this candidate at this block,
-  // `needs-action` means `verifyLeader` short-circuited the simulation because the trader is not
+  // `needs-action` means the verifier short-circuited the simulation because the trader is not
   // ready. `needs-action` used to be inferred from `requirements.length > 0` instead — a PROXY that
-  // agrees with the discriminant only because of the order of `verifyLeader`'s body (`search/
-  // leader.ts`, whose header has to say DO NOT REORDER for exactly this reason). Reading the
+  // agrees with the discriminant only because of the order of the verifier's walk
+  // (`search/verifier.ts`, whose header states that ordering as an invariant). Reading the
   // discriminant asks the question directly, and `assertResultCoherent`'s
   // "`needs-action` whose best route is X" check stops being a rule this function could break.
   //
   // `verificationDegraded` still guards `needs-action` independently. `needs-action` promises that
   // this list is exactly what stands between the trader and the swap; when a readiness read never
   // landed the list is known-incomplete and the promise cannot be made — the caller would be sent to
-  // approve things while the real blocker stayed invisible. (`leader.ts` already declines to mark
+  // approve things while the real blocker stayed invisible. (`verifier.ts` already declines to mark
   // the route `needs-action` in that case, so this is belt-and-braces, not the only line of defence.)
   //
   // EVERY FIELD IS CHECKED RATHER THAN ASSERTED. The three `!` assertions this function used to

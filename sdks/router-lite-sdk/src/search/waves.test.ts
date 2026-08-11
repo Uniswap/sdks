@@ -35,7 +35,7 @@ import type {
 
 import { generateRoutes } from './candidates'
 import { node } from './context'
-import { evaluate } from './leader'
+import { evaluate } from './verifier'
 import type { InternalResult, Run, SearchContext } from './waves'
 import { initialState, searchWaves, selectFocus } from './waves'
 

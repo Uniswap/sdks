@@ -45,7 +45,7 @@ type PreflightResult =
  * @param blockNumber The block at which to simulate
  * @param semaphore The router's global request semaphore (C4-P6), acquired around the `eth_call`
  *   below and released however it settles — optional so direct unit tests need not construct one;
- *   every real search always supplies `ctx.semaphore` (see `search/leader.ts#verifyLeader`).
+ *   every real search always supplies `ctx.semaphore` (see `search/verifier.ts#Verifier`).
  * @returns Promise resolving to a preflight result: success, `reverted` (with optional revert data), or `transport`
  */
 export async function preflightTx(
@@ -81,7 +81,7 @@ export async function preflightTx(
     return { ok: true }
   } catch (err) {
     // A transport failure is not a verdict on the transaction — the caller must not fail the route
-    // over it (see `search/waves.ts`'s `verifyLeader`). Neither is a node that could not serve the
+    // over it (see `search/verifier.ts`). Neither is a node that could not serve the
     // pinned block: `!== 'execution'` rather than `=== 'transport'` so the node-state channel can
     // never be laundered into the `reverted` branch below and read as revert-data-free rejection.
     if (classifyRpcError(err) !== 'execution') return { ok: false, kind: 'transport' }

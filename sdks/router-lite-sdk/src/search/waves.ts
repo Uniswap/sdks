@@ -43,7 +43,7 @@ import { checkReadiness } from '../verify/readiness'
 import { generateRoutes } from './candidates'
 import { enabledModules, node } from './context'
 import { completeExactPairScan, discoverFeeTiers, scanAdjacency, scanExactPairRecent } from './coverage'
-import { evaluate } from './leader'
+import { evaluate } from './verifier'
 
 // ---------------------------------------------------------------------------
 // The wave engine — the only module that owns *policy*: what to look at first,
@@ -81,7 +81,7 @@ import { evaluate } from './leader'
 //           cross product over everything the index now knows
 //
 // The engine's stages live in three sibling files, each with its own header:
-// `coverage.ts` (log-scan orchestration), `leader.ts` (compile/encode/
+// `coverage.ts` (log-scan orchestration), `verifier.ts` (compile/encode/
 // simulate, and the ordering invariant that makes needs-action-vs-verified
 // gating sound), `report.ts` (SearchReport assembly). What all three share is
 // `context.ts` (the three one-line accessors onto `SearchContext`) and
@@ -408,7 +408,7 @@ type ExecutionState = { status: RankedRoute['execution']; revertData?: Hex }
  *
  * ONE RECORD RATHER THAN TWO PARALLEL MAPS, and that is the whole point of the type. These used to
  * be `txById` and `limitsById`, written on adjacent lines of `compileAndEncode` and read on adjacent
- * lines of `evaluate`, with three separate comments (here, in `leader.ts`, and in `router.ts`'s
+ * lines of `evaluate`, with three separate comments (here, in `verifier.ts`, and in `router.ts`'s
  * `classifySwap`) each promising the reader that the two could never describe different plans for
  * the same routeId. A promise restated in three modules is a promise nothing enforces; a single
  * record makes it unstateable instead — there is no write that sets one without the other, and no
@@ -458,7 +458,7 @@ export type EngineState = {
    * transport-failed probe on the same one-shot terms as {@link seen} — see {@link retryTransportFailures}. */
   probed: Set<string>
   execution: Map<string, ExecutionState>
-  /** routeId -> everything `search/leader.ts#compileAndEncode` produced for it. */
+  /** routeId -> everything `search/verifier.ts#compileAndEncode` produced for it. */
   compiledById: Map<string, CompiledRoute>
   /**
    * The first reason a candidate could not be turned into an executable plan, verbatim.
@@ -556,7 +556,7 @@ export type EngineState = {
   headRegressed: boolean
   /** Preflight-simulation budget, across the whole search (C4-P7) — see `SearchReport.verification`
    * for what each field means and why. Recomputed (not accumulated) every wave for
-   * `preflightBudgetExhausted`; `preflightAttempted` accumulates. Set by `search/leader.ts#verifyLeader`. */
+   * `preflightBudgetExhausted`; `preflightAttempted` accumulates. Set by `search/verifier.ts#Verifier`. */
   verification: SearchReport['verification']
 }
 
@@ -1354,7 +1354,7 @@ async function wave0a(run: Run): Promise<void> {
   // renumbered by a probe added to the batch (which is exactly how `probeContendedCoreLegs`'s
   // insertion briefly handed `readinessResult` a probe pass's `undefined`).
   //
-  // AND THIS BATCH IS WHAT THE `leader.ts` INVARIANT MEANS BY "ONCE, IN WAVE 0, CONCURRENTLY": the
+  // AND THIS BATCH IS WHAT THE `verifier.ts` INVARIANT MEANS BY "ONCE, IN WAVE 0, CONCURRENTLY": the
   // readiness reads are awaited here, in the FIRST stage, so every `evaluate` the generator runs —
   // wave 0a's included — already has `state.requirements` in hand. Splitting the wave moved the pair
   // scan out; it did not move this.

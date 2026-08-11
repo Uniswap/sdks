@@ -141,7 +141,7 @@ search issued; `preflightBudgetExhausted` is true when the most recent search wa
 leader after exhausting its per-wave simulation budget while other, untried candidates remained.
 Neither one changes a `no-route` verdict into `inconclusive` — a candidate that reverted in
 preflight is real evidence the route does not execute, whatever else was left untried, and
-`alternatives` already shows exactly what was attempted (see `search/leader.ts` for the reasoning,
+`alternatives` already shows exactly what was attempted (see `search/verifier.ts` for the reasoning,
 mirrored in `router.ts#isSearchComplete`).
 
 Swap routes are `RankedRoute`s, and one field beyond `execution`/`revertData` can appear on any of
