@@ -149,13 +149,35 @@ test('quote mode, only-delta world: an unverifiable route may lead — a price i
   expect(ranked[1]!.quoteUnverifiable).toBe(true)
 })
 
-test('swap mode: ordering is untouched — preflight is the authority — but the marker is still stamped', () => {
+test('swap mode: the PARTITION never runs — preflight is the authority — but the marker is still stamped', () => {
+  // Narrowly about the partition, and the title says so. Swap mode is NOT "ranking with the
+  // overrides off": the simplicity margin still applies there (the test below pins it), and a
+  // comment claiming ordering is untouched wholesale would license removing the margin from swap
+  // mode without a single test noticing.
   const ranked = rankRoutes([simpleRoute(10_000n), deltaRoute(100_000_000_000_000n)], 'swap')
-  // amountOut alone decides, exactly as before this change: the echo route leads the ranked list
-  // (and would then fail its preflight, which is the swap path's own guard).
+  // amountOut alone decides between these two: the echo route leads the ranked list (and would then
+  // fail its preflight, which is the swap path's own guard).
   expect(ranked[0]!.route).toBe(deltaRoute(100_000_000_000_000n).route)
   expect(ranked[0]!.quoteUnverifiable).toBe(true)
   expect(ranked[1]!.route).toBe(simpleRoute(10_000n).route)
+})
+
+test('swap mode: the simplicity margin STILL promotes — only the partition is quote-only', () => {
+  // The asymmetry stated as a test rather than left to be inferred from the partition's `kind`
+  // check. The two overrides have different justifications: the partition exists because a hook's
+  // CLAIM is not a price, which preflight settles on its own in swap mode; the margin exists
+  // because a route that is barely better is not worth the extra execution surface, and preflight
+  // has nothing to say about that. So the margin is mode-independent.
+  const ranked = rankRoutes([hookedRoute(10_002n), simpleRoute(10_000n)], 'swap')
+  expect(ranked[0]!.route).toBe(simpleRoute(10_000n).route) // within 5 bps → the simple route leads
+  expect((ranked[0] as RankedRoute).promotedOverComplex).toBe(true)
+  expect(ranked[1]!.route).toBe(hookedRoute(10_002n).route)
+
+  // ...and the bound is the same one quote mode uses: beat it by MORE than the margin and the
+  // complex route keeps the top spot, unmarked.
+  const notPromoted = rankRoutes([hookedRoute(10_010n), simpleRoute(10_000n)], 'swap')
+  expect(notPromoted[0]!.quote.amountOut).toBe(10_010n)
+  expect((notPromoted[0] as RankedRoute).promotedOverComplex).toBeUndefined()
 })
 
 test('the partition and the margin compose: the margin still promotes within the verifiable block', () => {

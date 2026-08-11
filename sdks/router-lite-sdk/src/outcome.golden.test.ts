@@ -295,11 +295,12 @@ describe('the golden canonical shape (independent of the deep-equal)', () => {
 // ---------------------------------------------------------------------------
 // THE CORPUS ITSELF IS AN ASSERTION.
 //
-// A golden suite is only as good as what it holds, and the four cases below are
-// the ones whose absence would be invisible: each is a different terminal
-// verdict, and three of them are verdicts NO amount of quote-shaped fixtures can
-// reach. Derived from the goldens rather than from a self-declared tag on each
-// fixture — a label can lie about what its search found; a status cannot.
+// A golden suite is only as good as what it holds, and the cases below are the
+// ones whose absence would be invisible: each is a different terminal verdict or
+// a different arm of the fold, and several are shapes NO amount of ordinary
+// quote-shaped fixtures can reach. Derived from the goldens rather than from a
+// self-declared tag on each fixture — a label can lie about what its search
+// found; a status cannot.
 // ---------------------------------------------------------------------------
 
 describe('the corpus covers every verdict the goldens exist to pin', () => {
@@ -408,6 +409,26 @@ describe('the corpus covers every verdict the goldens exist to pin', () => {
       expect(report.verificationDegraded).toBe(false)
       expect(report.headRegressed).toBe(false)
       expect(Object.values(report.discovery).every((d) => d.status === 'complete' || d.status === 'disabled')).toBe(true)
+    }
+  })
+
+  test('an ABORTED search — the caller stopped it, and the best-so-far is handed back anyway', () => {
+    // The abort contract in one assertion: stopping early costs the remaining COVERAGE, never the
+    // answer already paid for. Nothing else in the corpus reaches `applyAbort`, so without this the
+    // fold's abort arm is a `case` no golden ever replays — and a fold that quietly stopped setting
+    // `aborted` would be reproducing every other fixture perfectly.
+    const abortedFixtures = fixtures.filter(({ fixture }) => fixture.golden.report.aborted)
+    expect(abortedFixtures.length).toBeGreaterThan(0)
+    for (const { fixture } of abortedFixtures) {
+      // Derived from the golden, not from the label: a fixture can be renamed, a report cannot lie.
+      expect(fixture.log.some((entry) => entry.t === 'abort')).toBe(true)
+      // BEST-SO-FAR, NOT AN EMPTY RESULT. An aborted search that priced something answers with it —
+      // the alternative (throwing the work away and reporting nothing) is the failure mode the
+      // `aborted && inFlightKeys.size === 0` drain in `search/loop.ts` exists to prevent.
+      expect(fixture.golden.status).toBe('quote')
+      expect(fixture.golden.best?.amountOut).toMatch(/^[1-9]\d*$/)
+      // The other half of the same honesty: a wave the abort cut short never claims to have settled.
+      expect(fixture.golden.report.firstRoundComplete).toBe(false)
     }
   })
 

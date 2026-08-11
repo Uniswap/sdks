@@ -157,10 +157,19 @@ async function recordHermetic(): Promise<void> {
       stopAt: 'final',
       notes: scenario.notes,
       inlineManifest: true,
+      // A fake world's head is a constant, so its `recordedAt` is derived from that rather than from
+      // a clock: re-recording an unchanged corpus then produces no diff at all, and every line of a
+      // diff that DOES appear is a real change. See `outcomeLog.ts#snapshotFixture`.
+      recordedAtFromPinnedBlock: true,
     })
-    if (fixture.golden.status !== scenario.expect) {
+    const claimed = `${scenario.expect.status}${scenario.expect.reason !== undefined ? `/${scenario.expect.reason}` : ''}`
+    const produced = `${fixture.golden.status}${fixture.golden.reason !== undefined ? `/${fixture.golden.reason.code}` : ''}`
+    const matches =
+      fixture.golden.status === scenario.expect.status &&
+      (scenario.expect.reason === undefined || fixture.golden.reason?.code === scenario.expect.reason)
+    if (!matches) {
       throw new Error(
-        `[record:${scenario.label}] scenario claims '${scenario.expect}' but the search produced '${fixture.golden.status}' — ` +
+        `[record:${scenario.label}] scenario claims '${claimed}' but the search produced '${produced}' — ` +
           'the world no longer exercises what this fixture exists for; fix the world, not the claim',
       )
     }

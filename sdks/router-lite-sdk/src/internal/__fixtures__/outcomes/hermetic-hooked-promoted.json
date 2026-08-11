@@ -3,7 +3,7 @@
   "label": "hermetic-hooked-promoted",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T19:41:12.991Z",
+  "recordedAt": "2023-11-14T22:13:20.000Z",
   "notes": "The simplicity margin, marked. A HOOKED v4 pool prices ~2bps above a plain v2 pool on the same pair — inside `SIMPLICITY_MARGIN_BPS` (5) — so ranking promotes the simple route to `best` and marks it `promotedOverComplex`. The only fixture whose `best` is deliberately outpriced by its own `alternatives`, which is exactly the shape `assertResultCoherent` accepts ONLY when that marker is set.",
   "manifest": {
     "chainId": 31337,

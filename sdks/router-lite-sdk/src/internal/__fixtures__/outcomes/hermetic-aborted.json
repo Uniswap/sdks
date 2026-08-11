@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
-  "label": "hermetic-rpc-degraded",
+  "label": "hermetic-aborted",
   "chainId": 31337,
   "kind": "quote",
   "recordedAt": "2023-11-14T22:13:20.000Z",
-  "notes": "The other half of the no-route contract: the same pair, but the gateway 429s every quote instead of the chain answering. Discovery still completes, so only the transport-loss axis separates this from an authoritative no-route — and it must, or a rate-limited provider would be indistinguishable from a chain with no liquidity.",
+  "notes": "The abort arm, pinned through a golden. The caller's signal fires DURING the search — the moment the first (and only) pool has been quoted — so the log carries an `abort` entry and the report says `aborted: true`, while the result still hands back the best route the search had already paid for. That combination is the whole abort contract: stopping early costs the remaining coverage, never the answer already in hand. It is also the only fixture whose log exercises `applyAbort`, so without it the fold's abort arm is code no golden ever replays.",
   "manifest": {
     "chainId": 31337,
     "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -36,7 +36,7 @@
       "notch": 1
     },
     "pairCeilingHit": false,
-    "firstRoundComplete": true,
+    "firstRoundComplete": false,
     "hookData": [],
     "index": {
       "schemaVersion": 2,
@@ -46,82 +46,66 @@
         {
           "pool": {
             "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002200",
+            "address": "0x0000000000000000000000000000000000002600",
             "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002200",
+            "id": "v2:0x0000000000000000000000000000000000002600",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
             ]
           },
           "source": "event",
-          "createdAtBlock": "$bigint:1"
+          "createdAtBlock": "$bigint:1",
+          "lastQuoteSuccessBlock": "$bigint:1000000"
         }
       ],
-      "coverage": [
-        [
-          "v2:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-          [
-            {
-              "fromBlock": "$bigint:0",
-              "toBlock": "$bigint:1000000"
-            }
-          ]
-        ],
-        [
-          "v2:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          [
-            {
-              "fromBlock": "$bigint:0",
-              "toBlock": "$bigint:1000000"
-            }
-          ]
-        ]
-      ],
-      "enabledFees": [],
-      "learnedScanWidth": "$bigint:1000001"
+      "coverage": [],
+      "enabledFees": []
     }
   },
   "log": [
     {
-      "t": "measurement",
-      "o": {
-        "kind": "transport",
-        "key": "v2:0x0000000000000000000000000000000000002200|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
-        "candidateRetry": true
-      }
+      "t": "abort"
     },
     {
       "t": "measurement",
       "o": {
-        "kind": "transport",
-        "key": "v2:0x0000000000000000000000000000000000002200|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
-        "candidateRetry": true
-      }
-    },
-    {
-      "t": "coverage",
-      "p": "v2",
-      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-      "o": {
-        "kind": "complete"
-      }
-    },
-    {
-      "t": "coverage",
-      "p": "v2",
-      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-      "o": {
-        "kind": "complete"
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002600",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002600",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:996999"
+        }
       }
     }
   ],
   "golden": {
-    "status": "inconclusive",
-    "reason": {
-      "code": "rpc-degraded",
-      "detail": "some RPC calls were 429'd, timed out, or lost, or the pinned head regressed; the search ran but cannot be promised complete"
+    "status": "quote",
+    "best": {
+      "routeId": "v2:0x0000000000000000000000000000000000002600",
+      "protocols": [
+        "v2"
+      ],
+      "path": [
+        "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+      ],
+      "amountIn": "1000000",
+      "amountOut": "996999",
+      "intermediateAmounts": []
     },
     "alternatives": [],
     "report": {
@@ -131,13 +115,8 @@
       },
       "discovery": {
         "v2": {
-          "status": "complete",
-          "coveredRanges": [
-            {
-              "fromBlock": "0",
-              "toBlock": "999968"
-            }
-          ],
+          "status": "partial",
+          "coveredRanges": [],
           "demandFloor": "0"
         },
         "v3": {
@@ -160,16 +139,16 @@
         "pairCeilingHit": false
       },
       "quoting": {
-        "attempted": 2,
-        "succeeded": 0,
+        "attempted": 1,
+        "succeeded": 1,
         "failed": 0,
-        "transportFailed": 2,
+        "transportFailed": 0,
         "unattempted": 0
       },
-      "aborted": false,
+      "aborted": true,
       "verificationDegraded": false,
       "headRegressed": false,
-      "firstRoundComplete": true,
+      "firstRoundComplete": false,
       "verification": {
         "preflightAttempted": 0,
         "preflightBudgetExhausted": false

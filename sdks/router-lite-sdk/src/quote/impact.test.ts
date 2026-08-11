@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import fc from 'fast-check'
 import type { Address } from 'viem'
 
 import { v2PoolRef } from '../protocols/poolRef'
@@ -71,6 +72,63 @@ describe('composePriceImpactBps', () => {
     expect(composePriceImpactBps([sample(1_000n, 2_000n, 1n, 0n)])).toBeUndefined()
     expect(composePriceImpactBps([sample(1_000n, 0n, 1n, 2n)])).toBeUndefined()
     expect(composePriceImpactBps([sample(0n, 2_000n, 1n, 2n)])).toBeUndefined()
+  })
+
+  // The four laws the composition is, as opposed to the worked examples above. Each one is a
+  // property of `Π(execOutᵢ·refInᵢ) / Π(execInᵢ·refOutᵢ)` that a "simplification" could quietly
+  // break while every hand-picked case above kept passing — a per-leg average instead of a product
+  // (loses permutation invariance the moment the legs differ), a division moved inside the loop
+  // (loses scale invariance to truncation), a stray fee constant (loses the identity).
+  describe('the composition laws', () => {
+    const positive = fc.bigInt({ min: 1n, max: 10n ** 18n })
+    const anySample = fc.record({ execIn: positive, execOut: positive, refIn: positive, refOut: positive })
+
+    test('PERMUTATION INVARIANT: a route is a product of ratios, so leg order cannot change the figure', () => {
+      fc.assert(
+        fc.property(fc.array(anySample, { minLength: 1, maxLength: 5 }), (samples) => {
+          expect(composePriceImpactBps([...samples].reverse())).toBe(composePriceImpactBps(samples))
+        }),
+      )
+    })
+
+    test('SCALE INVARIANT: multiplying a leg\'s two execution amounts by the same factor is a no-op', () => {
+      // The figure is about unit PRICES, not sizes: measuring the same leg in wei or in gwei has to
+      // give the same answer. Exact even in bigint, because the factor cancels before the division.
+      fc.assert(
+        fc.property(anySample, fc.bigInt({ min: 2n, max: 10n ** 6n }), (s, k) => {
+          expect(composePriceImpactBps([{ ...s, execIn: s.execIn * k, execOut: s.execOut * k }])).toBe(composePriceImpactBps([s]))
+          expect(composePriceImpactBps([{ ...s, refIn: s.refIn * k, refOut: s.refOut * k }])).toBe(composePriceImpactBps([s]))
+        }),
+      )
+    })
+
+    test('IDENTITY: a leg executing at exactly its reference unit price contributes nothing', () => {
+      fc.assert(
+        fc.property(positive, positive, fc.array(anySample, { minLength: 1, maxLength: 3 }), (execIn, execOut, rest) => {
+          // Same unit price on both sides (literally the same pair of amounts), so this leg's ratio
+          // is 1: alone it reports exactly 0, and inserted anywhere into a route it leaves that
+          // route's figure untouched.
+          const identity = { execIn, execOut, refIn: execIn, refOut: execOut }
+          expect(composePriceImpactBps([identity])).toBe(0)
+          expect(composePriceImpactBps([identity, ...rest])).toBe(composePriceImpactBps(rest))
+          expect(composePriceImpactBps([...rest, identity])).toBe(composePriceImpactBps(rest))
+        }),
+      )
+    })
+
+    test('FLOORED AT -10,000: no composition can report giving up more than everything', () => {
+      // A ratio of positive quantities is non-negative, so `(ratio − 1) × 10,000` cannot go below
+      // −10,000 — the reading "this trade realizes 100% less per unit than the marginal price".
+      // Nothing in the formula clamps; the bound is structural, and this is the assertion that it
+      // stays structural.
+      fc.assert(
+        fc.property(fc.array(anySample, { minLength: 1, maxLength: 4 }), (samples) => {
+          const bps = composePriceImpactBps(samples)
+          expect(bps).toBeDefined()
+          expect(bps!).toBeGreaterThanOrEqual(-10_000)
+        }),
+      )
+    })
   })
 })
 

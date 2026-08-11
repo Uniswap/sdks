@@ -576,6 +576,7 @@ type RecordArgs = {
   request: QuoteRequest | SwapRequest
   notes?: string
   inlineManifest?: boolean
+  recordedAtFromPinnedBlock?: boolean
 }
 
 /** Copies everything a fold will need out of the LIVE state, synchronously, at one instant. */
@@ -587,7 +588,17 @@ function snapshotFixture(args: RecordArgs, state: SearchState, live: QuoteResult
     label: args.label,
     chainId: args.chainId,
     kind,
-    recordedAt: new Date().toISOString(),
+    // WALL CLOCK FOR A LIVE RECORDING, THE PINNED BLOCK FOR A HERMETIC ONE. A live fixture's
+    // `recordedAt` is provenance — when this chain state was really observed — and only a clock can
+    // say that. A hermetic world has no such moment: its head is a constant, so a wall-clock stamp
+    // is the ONE field that makes re-recording an unchanged corpus produce a diff, which turns
+    // "re-record and check nothing drifted" into a review of nine timestamps looking for the one
+    // value that did. Derived from the world's own pinned timestamp instead, re-recording is
+    // byte-identical when nothing changed and every line of a diff is a real change.
+    recordedAt:
+      args.recordedAtFromPinnedBlock === true
+        ? new Date(Number(state.block.timestamp) * 1000).toISOString()
+        : new Date().toISOString(),
     ...(args.notes !== undefined && { notes: args.notes }),
     ...(args.inlineManifest === true && { manifest: ctx.manifest }),
     request: {
@@ -652,6 +663,9 @@ export async function recordOutcomeFixture(args: {
   notes?: string
   /** Write the manifest into the fixture — for a fake chain that `manifestFor` cannot produce. */
   inlineManifest?: boolean
+  /** Stamp `recordedAt` from the search's PINNED BLOCK instead of the wall clock, so re-recording a
+   * world whose head is a constant is byte-identical. See {@link snapshotFixture}. */
+  recordedAtFromPinnedBlock?: boolean
 }): Promise<OutcomeFixture> {
   const { ctx, request, kind } = args
   const classify = (event: Extract<EngineEvent, { type: 'lead' | 'final' }>): QuoteResult | SwapResult => {

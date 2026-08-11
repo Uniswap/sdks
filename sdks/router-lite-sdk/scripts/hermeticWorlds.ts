@@ -13,8 +13,9 @@ import type { ChainManifest, CurrencyRef, PoolRef, Protocol, QuoteRequest, SwapR
 // THE HERMETIC CORPUS' WORLDS — deterministic, offline, and each built for
 // exactly one thing the golden corpus must contain: a ready swap, a
 // needs-action swap, a two-hop quote, a completed no-route, an rpc-degraded
-// search, a simplicity-margin promotion over a hooked v4 pool, and an m_X
-// improvement that outdates an already-priced out-leg.
+// search, a simplicity-margin promotion over a hooked v4 pool, an
+// unverifiable-quote partition, an m_X improvement that outdates an
+// already-priced out-leg, and a caller's abort mid-search.
 //
 // The shape is `search/loop.test.ts`'s: a scripted constant-product world where
 // each pool's fate (price, revert, or a transport loss) is decided by a map
@@ -256,6 +257,16 @@ type WorldOptions = {
    * that wants a pool to ARRIVE MID-SEARCH serves it here, since a scan is the only channel through
    * which the engine learns about a pool it did not start with. */
   logs?: (filter: { topics?: unknown[] }) => Log[]
+  /**
+   * Called with a pool's id the moment its quote call is SERVED — after the world has decided the
+   * answer, before the module decodes it. The one seam a world has for making something happen
+   * *during* a search rather than before it, which is what an abort has to be: aborting before the
+   * search starts records a search that never priced anything, and aborting after it ends records
+   * nothing at all. The abort itself is observed by the loop on its NEXT cycle, so the outcome of
+   * the call that triggered it is applied first — which is exactly the best-so-far an abort is
+   * contractually supposed to keep.
+   */
+  onQuoteServed?: (poolId: string) => void
 }
 
 /** Every RPC one search issues, answered from the world: the pinned head, log scans (empty unless the
@@ -289,6 +300,7 @@ function scriptedClient(world: World, options: WorldOptions = {}): Pick<PublicCl
         const identity = Buffer.from(String((params[0] as { data?: string }).data ?? '0x').slice(2), 'hex').toString()
         const poolId = identity.split('|')[0] ?? ''
         if (world.get(poolId)?.kind === 'transport') throw gatewayRefusal()
+        options.onQuoteServed?.(poolId)
         return '0x' // decoded locally by the fake module against the world
       }
       throw new Error(`unexpected RPC method ${String(method)}`)
@@ -317,10 +329,19 @@ function contextOf(world: World, manifest: ChainManifest, index: PoolIndex, opti
 export type HermeticScenario = {
   label: string
   kind: 'quote' | 'swap'
-  /** The status this world exists to produce. The recorder REFUSES to write a fixture whose golden
+  /**
+   * The verdict this world exists to produce. The recorder REFUSES to write a fixture whose golden
    * disagrees, so a world that drifts into producing something else fails loudly rather than quietly
-   * leaving the corpus without the case it was supposed to cover. */
-  expect: string
+   * leaving the corpus without the case it was supposed to cover.
+   *
+   * `reason` IS PART OF THE CLAIM WHERE IT DISCRIMINATES. `inconclusive` is not one verdict — a
+   * rate-limited provider, an expired budget and a head regression all land there, wearing different
+   * `reason.code`s, and a world built for one of them silently drifting into another would keep
+   * satisfying a status-only claim. Optional because the terminal statuses (`quote`, `ready`,
+   * `needs-action`, and a completed `no-route`, whose reason is a single constant) have nothing left
+   * to disambiguate.
+   */
+  expect: { status: string; reason?: string }
   notes: string
   build: () => { ctx: SearchContext; request: QuoteRequest | SwapRequest }
 }
@@ -329,7 +350,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-hinted-swap-ready',
     kind: 'swap',
-    expect: 'ready',
+    expect: { status: 'ready' },
     notes:
       'A hinted v2 pool nothing else can reach: the caller asserts it, the pump proves it by measuring it, ' +
       'readiness finds the trader funded and approved, and the preflight simulates cleanly. The golden pins ' +
@@ -352,7 +373,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-two-hop-quote',
     kind: 'quote',
-    expect: 'quote',
+    expect: { status: 'quote' },
     notes:
       'Composition and the gas rule in one fixture: a v3->v3 two-hop through the manifest core out-prices ' +
       'a v2 direct pool, so `best` carries the two legs\' summed gasEstimate and its runner-up — priced by ' +
@@ -377,7 +398,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-no-route-complete',
     kind: 'quote',
-    expect: 'no-route',
+    expect: { status: 'no-route' },
     notes:
       'The authoritative negative: every pool on the pair is known and every one of them reverts with no data ' +
       '(the pool-absent shape), discovery completes on both endpoints, and nothing was lost in the transport — ' +
@@ -398,7 +419,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-needs-action-swap',
     kind: 'swap',
-    expect: 'needs-action',
+    expect: { status: 'needs-action' },
     notes:
       'The swap verdict no quote-shaped fixture can reach: the same hinted, verified route as the ready swap, ' +
       'but the trader has not approved the token to Permit2. The plan compiles, the preflight simulates ' +
@@ -424,7 +445,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-hooked-promoted',
     kind: 'quote',
-    expect: 'quote',
+    expect: { status: 'quote' },
     notes:
       'The simplicity margin, marked. A HOOKED v4 pool prices ~2bps above a plain v2 pool on the same pair — ' +
       'inside `SIMPLICITY_MARGIN_BPS` (5) — so ranking promotes the simple route to `best` and marks it ' +
@@ -450,7 +471,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-echo-hook-unverifiable',
     kind: 'quote',
-    expect: 'quote',
+    expect: { status: 'quote' },
     notes:
       'The unverifiable-quote partition, marked. A v4 pool whose hooks address carries ' +
       'BEFORE_SWAP_RETURNS_DELTA (the live Arbitrum echo hook) answers `amountIn` back as ' +
@@ -481,7 +502,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-mx-invalidation',
     kind: 'quote',
-    expect: 'quote',
+    expect: { status: 'quote' },
     notes:
       'The invalidation arm, pinned through a golden. A shallow (T_IN, WETH) pool sets m_X first and an ' +
       'out-leg is priced at that amount; then the adjacency scan — which only runs once the pump has gone ' +
@@ -520,7 +541,7 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
   {
     label: 'hermetic-rpc-degraded',
     kind: 'quote',
-    expect: 'inconclusive',
+    expect: { status: 'inconclusive', reason: 'rpc-degraded' },
     notes:
       'The other half of the no-route contract: the same pair, but the gateway 429s every quote instead of the ' +
       'chain answering. Discovery still completes, so only the transport-loss axis separates this from an ' +
@@ -535,6 +556,40 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
       index.upsert({ pool, source: 'event', createdAtBlock: 1n })
       const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
       return { ctx: contextOf(world, manifest, index), request }
+    },
+  },
+  {
+    label: 'hermetic-aborted',
+    kind: 'quote',
+    expect: { status: 'quote' },
+    notes:
+      "The abort arm, pinned through a golden. The caller's signal fires DURING the search — the moment the " +
+      'first (and only) pool has been quoted — so the log carries an `abort` entry and the report says ' +
+      '`aborted: true`, while the result still hands back the best route the search had already paid for. ' +
+      'That combination is the whole abort contract: stopping early costs the remaining coverage, never the ' +
+      'answer already in hand. It is also the only fixture whose log exercises `applyAbort`, so without it ' +
+      "the fold's abort arm is code no golden ever replays.",
+    build: () => {
+      const world: World = new Map()
+      const manifest = manifestOf({ v2: true })
+      const index = new PoolIndex(WETH)
+      const pool = v2Ref(addr(0x2600), T_IN, T_OUT)
+      world.set(pool.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+      index.upsert({ pool, source: 'event', createdAtBlock: 1n })
+      // DETERMINISTIC BY POSITION IN THE CONVERSATION, not by a timer. The abort fires as this one
+      // pool's quote is served, so the outcome of the call that triggered it is applied before the
+      // loop ever observes the signal (it is read at the top of the NEXT cycle) — the search always
+      // has exactly this one price when it stops, on every machine, at any speed.
+      const caller = new AbortController()
+      const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN, signal: caller.signal }
+      return {
+        ctx: contextOf(world, manifest, index, {
+          onQuoteServed: (poolId) => {
+            if (poolId === pool.id) caller.abort()
+          },
+        }),
+        request,
+      }
     },
   },
 ]

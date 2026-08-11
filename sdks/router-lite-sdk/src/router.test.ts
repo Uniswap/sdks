@@ -972,13 +972,20 @@ test('getQuote answers only after the first round settles: a fast bad first enve
       ...entryFor(goodCall, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
     },
   })
-  // The honest pool's envelope is the SLOW one: its quote call parks ~30ms while the vanguard's
-  // envelope settles instantly and emits its (bad) lead.
+  // The honest pool's envelope is the SLOW one: its quote call parks on a GATE the consumer opens
+  // the moment it has seen the partial round's (bad) lead. Keyed off the event this test is about
+  // rather than off a stopwatch — the old form slept 30ms and hoped that was longer than the
+  // vanguard took, which is a wager on a machine's load, not a statement about the engine. If the
+  // partial lead never fires, this hangs instead of quietly passing for the wrong reason.
+  let openGate!: () => void
+  const vanguardLed = new Promise<void>((resolve) => {
+    openGate = resolve
+  })
   const client = {
     ...base,
     async request(args: { method: string; params: unknown[] }) {
       const to = args.method === 'eth_call' ? String((args.params[0] as { to?: string }).to ?? '') : ''
-      if (to.toLowerCase() === goodPair.toLowerCase()) await new Promise((resolve) => setTimeout(resolve, 30))
+      if (to.toLowerCase() === goodPair.toLowerCase()) await vanguardLed
       return (base.request as (a: unknown) => Promise<unknown>)(args)
     },
   } as unknown as PublicClient
@@ -997,13 +1004,20 @@ test('getQuote answers only after the first round settles: a fast bad first enve
         pool: ev.result.best.route.legs[0]!.pool.id,
         firstRoundComplete: ev.result.search.firstRoundComplete,
       })
+      // The gate, opened by the very thing it is holding the honest pool behind: a lead the engine
+      // emitted over a round it says has NOT settled. Nothing else can open it, so the sequence
+      // this test asserts is the sequence that actually happened.
+      if (!ev.result.search.firstRoundComplete) openGate()
     }
     if (ev.type === 'final') break
   }
   expect(leads[0]).toEqual({ pool: `v2:${fakes[0]!.toLowerCase()}`, firstRoundComplete: false })
   expect(leads.some((l) => l.pool === `v2:${goodPair.toLowerCase()}` && l.firstRoundComplete)).toBe(true)
 
-  // And the promise surface returns the honest pool, not the vanguard's fast bad lead.
+  // And the promise surface returns the honest pool, not the vanguard's fast bad lead. The gate is
+  // open by now (the stream above opened it), so this second search runs with NO artificial hold at
+  // all — which is the stronger statement: the answer is decided by the first-round rule, not by
+  // which envelope happened to be slower.
   const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
   expect(res.status).toBe('quote')
   if (res.status === 'quote') {
@@ -1066,6 +1080,47 @@ describe('price impact — reported on the answering route, never a refusal', ()
       // Exact integer arithmetic of the constant-product quote at 1000 in vs the 1-unit dust
       // reference: the trade realizes ~33% of the marginal price, i.e. it moves the pool by ~67%.
       expect(res.best.quote.priceImpactBps).toBe(-6654)
+    }
+    assertResultCoherent(res)
+  })
+
+  test('a TWO-HOP answer composes its impact across both legs', async () => {
+    // Every other impact test here is single-leg, so the composition step (`Π` of the per-leg
+    // ratios, `quote/impact.ts`) has only ever been exercised over hand-built samples. This is the
+    // same arithmetic reached the way a caller reaches it: a route the search itself composed, with
+    // the mid-leg amount the engine realized, annotated by the facade.
+    const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+    // 10 million in, against 10^9 reserves — sized so the dust reference (amountIn / 10,000) is
+    // still a meaningful 1,000 units on the first leg rather than the floor of 1. A v2 leg's
+    // reference quote is the SAME `getReserves()` read the execution quote made, so one entry per
+    // hop scripts both prices.
+    const amountIn = 10_000_000n
+    const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+    const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+    const [aMidToken0] = sortAddresses(TOKEN_A, MID)
+    const [midBToken0] = sortAddresses(MID, TOKEN_B)
+    const { client } = stubClient({
+      calls: {
+        ...entryFor(leg1Call, v2Return(10n ** 9n, 10n ** 9n, aMidToken0.toLowerCase() === TOKEN_A.toLowerCase())),
+        ...entryFor(leg2Call, v2Return(10n ** 9n, 10n ** 9n, midBToken0.toLowerCase() === MID.toLowerCase())),
+      },
+    })
+    const router = createRouter({ client, manifest })
+    // No direct A→B pool exists (an unscripted call reverts), so the only answer is the two-hop.
+    router.ingestLogs([
+      pairCreatedLog(manifest, TOKEN_A, MID, manifest.v2!.deploymentBlock + 1n),
+      pairCreatedLog(manifest, MID, TOKEN_B, manifest.v2!.deploymentBlock + 2n),
+    ])
+
+    const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn })
+
+    expect(res.status).toBe('quote')
+    if (res.status === 'quote') {
+      expect(res.best.route.legs).toHaveLength(2)
+      // Exact integer arithmetic, both hops. Per leg the trade realizes ~99.1% and ~99.0% of the
+      // dust-reference unit price; composed that is 0.9815, i.e. -185 bps. A single-leg reading
+      // would land at exactly -89, so this number is the composition and nothing else.
+      expect(res.best.quote.priceImpactBps).toBe(-185)
     }
     assertResultCoherent(res)
   })

@@ -423,14 +423,21 @@ test('orderedIntermediates memo: a maxPools eviction forces a fresh recompute th
   expect(after).not.toContain(x.toLowerCase())
 })
 
-test('property: memoized orderedIntermediates ≡ a fresh computation after every prefix of any upsert/eviction interleaving', () => {
+test('property: memoized orderedIntermediates ≡ a fresh computation after every prefix of any index-mutation interleaving', () => {
   const xs = Array.from({ length: 8 }, (_, i) => addr(0xe100 + i))
   fc.assert(
     fc.property(
       fc.array(
         fc.record({
           x: fc.integer({ min: 0, max: 7 }),
-          side: fc.constantFrom('in', 'out', 'both', 'unrelated'),
+          // THE LAST THREE ARMS ARE THE ONES THAT DO NOT MOVE `index.version()`. `markSuccess`,
+          // `markNegative` and `touchAll` write quote history and LRU touches — none of which the
+          // memo's key can see, and none of which the ORDERING depends on directly. What they do
+          // change is which pool the NEXT over-cap upsert evicts, so they reach the memo the long
+          // way round: a mutation the key ignores, silently re-aiming an eviction the key does
+          // notice. Without them the interleaving only ever exercised "version moved / version did
+          // not", which is the easy half of the invalidation rule.
+          side: fc.constantFrom('in', 'out', 'both', 'unrelated', 'mark-success', 'mark-negative', 'touch'),
           createdAt: fc.bigInt({ min: 1n, max: 40n }),
         }),
         { maxLength: 24 },
@@ -441,16 +448,23 @@ test('property: memoized orderedIntermediates ≡ a fresh computation after ever
         const memoizedCtx = ctxOver(index) // ONE ctx across every prefix — this is the memo under test
         const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1n }
         let nextAddr = 0xe200
+        // Every pool ever inserted, so the history/touch arms have real refs to aim at — including
+        // refs the cap has since evicted, which those methods must tolerate silently.
+        const created: PoolRef[] = []
+        const insert = (pool: PoolRef, createdAtBlock: bigint): void => {
+          created.push(pool)
+          index.upsert({ pool, source: 'event', createdAtBlock })
+        }
         for (const op of ops) {
           const x = xs[op.x]!
-          if (op.side === 'in' || op.side === 'both') {
-            index.upsert({ pool: v2Ref(addr(nextAddr++), T_IN, x), source: 'event', createdAtBlock: op.createdAt })
-          }
-          if (op.side === 'out' || op.side === 'both') {
-            index.upsert({ pool: v2Ref(addr(nextAddr++), x, T_OUT), source: 'event', createdAtBlock: op.createdAt })
-          }
-          if (op.side === 'unrelated') {
-            index.upsert({ pool: v2Ref(addr(nextAddr++), addr(0xeff0), addr(0xeff1)), source: 'event', createdAtBlock: op.createdAt })
+          if (op.side === 'in' || op.side === 'both') insert(v2Ref(addr(nextAddr++), T_IN, x), op.createdAt)
+          if (op.side === 'out' || op.side === 'both') insert(v2Ref(addr(nextAddr++), x, T_OUT), op.createdAt)
+          if (op.side === 'unrelated') insert(v2Ref(addr(nextAddr++), addr(0xeff0), addr(0xeff1)), op.createdAt)
+          const target = created.length > 0 ? created[op.x % created.length]! : undefined
+          if (target !== undefined) {
+            if (op.side === 'mark-success') index.markSuccess(target, op.createdAt)
+            if (op.side === 'mark-negative') index.markNegative(target, op.createdAt)
+            if (op.side === 'touch') index.touchAll([target], op.createdAt)
           }
           // A fresh PumpCtx has no memo entry, so it always computes from the live index.
           expect(orderedIntermediates(memoizedCtx, req)).toEqual(orderedIntermediates(ctxOver(index), req))
@@ -460,8 +474,8 @@ test('property: memoized orderedIntermediates ≡ a fresh computation after ever
   )
 })
 
-test('planDueLegs stops at its checked yield point under an abort, and pump dispatches nothing over the partial plan', async () => {
-  const { state, ctx, req, world, index, record } = fakeSetup()
+test('planDueLegs stops at its checked yield point under an abort', () => {
+  const { state, ctx, req, world, index } = fakeSetup()
   // A pathological frontier: hundreds of selected intermediates, each with pools on both sides.
   const selected: string[] = []
   for (let i = 0; i < 200; i++) {
@@ -479,11 +493,10 @@ test('planDueLegs stops at its checked yield point under an abort, and pump disp
   // ahead of the yield point) survives, so an abort costs at most one pair's planning.
   const planned = planDueLegs(state, ctx, req)
   expect(planned.every((p) => p.role.kind === 'direct')).toBe(true)
-
-  // And the pump never dispatches a new round over a partial plan — nothing reaches the wire.
-  expect(await pump(state, ctx, req)).toBe(false)
-  expect(record).toHaveLength(0)
-  expect(state.inFlightKeys.size).toBe(0)
+  // What an aborted pump then does with that partial plan (nothing — it refuses to dispatch) is the
+  // subject of 'an abort mid-round reports unattempted once per key and never re-dispatches them'
+  // below, which asserts it against a round that really was in flight. Restating it here would pin
+  // the same guard twice and leave two places to update when it moves.
 })
 
 // ---------------------------------------------------------------------------

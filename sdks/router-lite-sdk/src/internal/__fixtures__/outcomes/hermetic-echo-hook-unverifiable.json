@@ -3,7 +3,7 @@
   "label": "hermetic-echo-hook-unverifiable",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T19:41:12.992Z",
+  "recordedAt": "2023-11-14T22:13:20.000Z",
   "notes": "The unverifiable-quote partition, marked. A v4 pool whose hooks address carries BEFORE_SWAP_RETURNS_DELTA (the live Arbitrum echo hook) answers `amountIn` back as `amountOut` — numerically plausible, above the honest v2 price, and structurally just a hook's claim — so quote-mode ranking partitions it below the verifiable route: `best` is the honest pool with NO promotion marker, and the echo route sits in `alternatives` outpricing it, licensed by its own `quoteUnverifiable: true`. The second legal `best`-outpriced-by-alternatives shape `assertResultCoherent` accepts, and the golden that pins the marker end-to-end.",
   "manifest": {
     "chainId": 31337,

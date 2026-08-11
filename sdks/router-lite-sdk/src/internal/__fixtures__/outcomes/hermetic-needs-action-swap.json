@@ -3,7 +3,7 @@
   "label": "hermetic-needs-action-swap",
   "chainId": 31337,
   "kind": "swap",
-  "recordedAt": "2026-08-11T18:44:03.388Z",
+  "recordedAt": "2023-11-14T22:13:20.000Z",
   "notes": "The swap verdict no quote-shaped fixture can reach: the same hinted, verified route as the ready swap, but the trader has not approved the token to Permit2. The plan compiles, the preflight simulates against the router's own state and passes, and the result still carries `tx` — gated behind ONE stated requirement rather than being downgraded to no-route, which is the distinction this fixture pins.",
   "manifest": {
     "chainId": 31337,

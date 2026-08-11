@@ -1393,3 +1393,80 @@ test('firstRoundComplete flips exactly when the initial round\'s last leg settle
   if (final.type !== 'final') throw new Error('unreachable')
   expect(final.report.firstRoundComplete).toBe(true)
 })
+
+test('an eager-scan pool that lands BEFORE dryness joins the first round — the wave is "everything due", not "the initial plan"', async () => {
+  // THE RULE IS THE WHOLE RULE (`state.ts#firstRoundComplete`): the first round is everything that
+  // became due before the pump first went dry, WHATEVER MADE IT DUE. The obvious reading — "the
+  // round the initial planning pass dispatched, plus what its own answers woke" — is a list of the
+  // usual contributors, not the definition, and a discovery is the case that separates them: the
+  // eager pair scan runs concurrently with the first round and owes nothing to its answers.
+  //
+  // The shape: one indexed v2 pool whose quote is HELD on the wire, so the round cannot go dry;
+  // meanwhile the eager v4 pair scan delivers a second, BETTER pool, which becomes due and is
+  // measured while the first is still in flight. Releasing the held quote is the first moment
+  // dryness is even possible — so if the scanned pool were not part of the first round, the flip
+  // would arrive without it.
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true, v4: true })
+  const index = new PoolIndex(WETH)
+  const known = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+
+  const [c0, c1] = [T_IN.toLowerCase(), T_OUT.toLowerCase()].sort() as [Address, Address]
+  const scanned = v4Ref({ currency0: c0, currency1: c1, fee: 3000, tickSpacing: 60, hooks: addr(0) })
+  // Strictly deeper on the way out, so it must LEAD once it is priced — an assertion on the flip
+  // lead's leader is then a claim about the scanned pool specifically, not about a set.
+  world.set(scanned.id, { kind: 'price', r0: 10n ** 12n, r1: 5n * 10n ** 12n })
+  const createdAt = HEAD - 10n
+  const initializeLog = {
+    address: V4_POOL_MANAGER,
+    topics: [V4_TOPIC],
+    data: '0x',
+    blockNumber: createdAt,
+    record: { pool: scanned, createdAtBlock: createdAt, source: 'event' },
+  } as unknown as Log
+
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let scannedQuoted = false
+  const { client } = makeClient({
+    logs: ({ from, to }) => (from <= createdAt && createdAt <= to ? [initializeLog] : []),
+    onQuote: async (key) => {
+      if (key.startsWith(scanned.id)) {
+        scannedQuoted = true
+        return
+      }
+      // The known pool's answer is what dryness waits on: while it sits here `inFlightKeys` is
+      // non-empty, so no cycle can flip the axis however much else settles.
+      await held
+    },
+  })
+  const ctx = ctxOf(client, manifest, world, { index })
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
+
+  const gen = search(ctx, req, 'quote')
+  // Pull until the scanned pool has been priced — with the known pool still held, this is proof the
+  // discovery joined a round the initial plan had already dispatched.
+  const before: EngineEvent[] = []
+  while (!scannedQuoted) {
+    const step = await gen.next()
+    if (step.done) throw new Error('the search ended before the scanned pool was ever quoted')
+    before.push(step.value)
+    if (step.value.type === 'final') throw new Error('the search finalled with the known pool still on the wire')
+  }
+  expect(before.every((e) => e.type === 'progress' || !e.report.firstRoundComplete)).toBe(true)
+
+  release()
+  const rest = await collectAll(gen)
+
+  const flipLead = [...before, ...rest].find((e) => e.type !== 'progress' && e.report.firstRoundComplete)
+  expect(flipLead).toBeDefined()
+  if (flipLead === undefined || flipLead.type === 'progress') throw new Error('unreachable')
+  // THE CLAIM: the wave the flip declares settled contains BOTH legs — the one the initial plan
+  // dispatched and the one a scan discovered underneath it — and the scanned pool is the leader,
+  // so the first answer the facade is allowed to give is already the better route.
+  expect(flipLead.report.enumeration.legsMeasured).toBe(2)
+  expect(flipLead.ranked.map((r) => r.route.legs[0]!.pool.id).sort()).toEqual([known.id, scanned.id].sort())
+  expect(flipLead.ranked[0]!.route.legs[0]!.pool.id).toBe(scanned.id)
+})

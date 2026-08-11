@@ -3,7 +3,7 @@
   "label": "hermetic-no-route-complete",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T18:44:03.385Z",
+  "recordedAt": "2023-11-14T22:13:20.000Z",
   "notes": "The authoritative negative: every pool on the pair is known and every one of them reverts with no data (the pool-absent shape), discovery completes on both endpoints, and nothing was lost in the transport — the four conditions that entitle a search to say no rather than \"could not tell\".",
   "manifest": {
     "chainId": 31337,
