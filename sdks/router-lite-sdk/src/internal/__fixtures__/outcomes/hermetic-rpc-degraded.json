@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "label": "hermetic-rpc-degraded",
+  "chainId": 31337,
+  "kind": "quote",
+  "recordedAt": "2026-08-11T08:50:12.325Z",
+  "notes": "The other half of the no-route contract: the same pair, but the gateway 429s every quote instead of the chain answering. Discovery still completes, so only the transport-loss axis separates this from an authoritative no-route — and it must, or a rate-limited provider would be indistinguishable from a chain with no liquidity.",
+  "manifest": {
+    "chainId": 31337,
+    "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "coreIntermediates": [
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    "v2": {
+      "factory": "0x6666666666666666666666666666666666666666",
+      "deploymentBlock": "$bigint:0"
+    }
+  },
+  "request": {
+    "tokenIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "tokenOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "amountIn": "$bigint:1000000"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:1000000",
+      "hash": "0xabababababababababababababababababababababababababababababababab",
+      "timestamp": "$bigint:1700000000"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "discovered": 1,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002200",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002200",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:1"
+        }
+      ],
+      "coverage": [
+        [
+          "v2:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v2:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ]
+      ],
+      "enabledFees": [],
+      "learnedScanWidth": "$bigint:1000001"
+    }
+  },
+  "log": [
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "transport",
+        "key": "v2:0x0000000000000000000000000000000000002200|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "candidateRetry": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "transport",
+        "key": "v2:0x0000000000000000000000000000000000002200|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "candidateRetry": true
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "o": {
+        "kind": "complete"
+      }
+    }
+  ],
+  "golden": {
+    "status": "inconclusive",
+    "reason": {
+      "code": "rpc-degraded",
+      "detail": "some RPC calls were 429'd, timed out, or lost, or the pinned head regressed; the search ran but cannot be promised complete"
+    },
+    "alternatives": [],
+    "report": {
+      "block": {
+        "number": "1000000",
+        "timestamp": "1700000000"
+      },
+      "discovery": {
+        "v2": {
+          "status": "complete",
+          "coveredRanges": [
+            {
+              "fromBlock": "0",
+              "toBlock": "999968"
+            }
+          ],
+          "demandFloor": "0"
+        },
+        "v3": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        },
+        "v4": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": false,
+        "intermediatesDiscovered": 1,
+        "intermediatesSelected": 1,
+        "intermediatesPruned": 0,
+        "legsMeasured": 1,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 2,
+        "succeeded": 0,
+        "failed": 0,
+        "transportFailed": 2,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 0,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}

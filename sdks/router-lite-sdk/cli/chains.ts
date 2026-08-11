@@ -42,7 +42,7 @@ function supportedList(): string {
 
 /**
  * The RPC endpoint to connect to, and the single precedence every entry point in this package
- * (`cli/rl.ts`, `scripts/compare.ts`, `scripts/buildPoolList.ts`, `scripts/recordSession.ts`) shares:
+ * (`cli/rl.ts`, `scripts/compare.ts`, `scripts/buildPoolList.ts`, `scripts/recordOutcomes.ts`) shares:
  * `--rpc` wins, `$ETH_RPC_URL` is next (that variable is exactly what `chainz exec <chain> --`
  * exports, so chainz-driven usage needs no flag at all), and `$RPC_URL` is the last, more generic
  * fallback for callers that already export that name for other tooling. Having none of the three is

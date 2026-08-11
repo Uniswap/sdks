@@ -87,11 +87,14 @@ function detailsOf(message: string): string | undefined {
  * `-32602` is in no code set (publicnode's archive-paywall capture carries the same code for a
  * completely different failure), so drpc classifies off its message either way.
  *
- * NOT `internal/replay.ts#rebuildError`, and the two must not be merged. That one replays a `cause`
- * chain that was walked and written down frame by frame (`captureError`) and invents nothing; this
- * one has only a message string and must INFER the wrapper from it. Same shape out, opposite amount
- * of evidence in — and this one's inference is the thing under test, so borrowing the other's
- * fidelity would defeat the point.
+ * IT HAS NO SIBLING ANY MORE, AND THAT IS WORTH SAYING. `internal/replay.ts#rebuildError` used to do
+ * the superficially similar job of reviving a recorded provider error, from a `cause` chain that had
+ * been walked and written down frame by frame; the two were deliberately never merged, because this
+ * one has only a message string and must INFER the wrapper from it — same shape out, opposite amount
+ * of evidence in, and this one's inference is the thing under test. That module died with the
+ * RPC-session goldens (the outcome-log format records outcomes, not conversations, so nothing
+ * anywhere else rebuilds an error now). These fixtures are LIVE PROVIDER CAPTURES, not sessions, and
+ * they are unaffected: they are about wire shapes, which is exactly what this suite is for.
  */
 function rebuildCapturedError(capture: Capture): Error {
   const status = statusOf(capture.message)

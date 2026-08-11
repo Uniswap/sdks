@@ -1,0 +1,1735 @@
+{
+  "schemaVersion": 1,
+  "label": "live-mainnet-eth-usdc",
+  "chainId": 1,
+  "kind": "quote",
+  "recordedAt": "2026-08-11T08:52:27.617Z",
+  "notes": "Live mainnet ETH->USDC, recorded at the first actionable lead exactly as getQuote stops: the deepest, most-forked pair on the chain, and the one whose answer a ranking or composition regression would move first.",
+  "request": {
+    "tokenIn": "native",
+    "tokenOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amountIn": "$bigint:1000000000000000000"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:25730684",
+      "hash": "0x747ad939f2be8f55e3839b7984ef7c5bd455f1354721cb5558114595f45c115c",
+      "timestamp": "$bigint:1786438343"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "0x6b175474e89094c44da98b954eedeac495271d0f"
+      ],
+      "discovered": 3,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xe0554a476a092703abdb3ef35c80e0d76d32939f",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x7BeA39867e4169DBe237d55C8242a8f2fcDcc387",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0x7bea39867e4169dbe237d55c8242a8f2fcdcc387",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x00b9edc1583bf6ef09ff3a09f6c23ecb57fd7d0bb75625717ec81eed181e22d7",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x00b9edc1583bf6ef09ff3a09f6c23ecb57fd7d0bb75625717ec81eed181e22d7",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd934712639fede326a3ff8d2a9c2f73749bac510c23fb33443cea7f3c9aca6f3",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd934712639fede326a3ff8d2a9c2f73749bac510c23fb33443cea7f3c9aca6f3",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "id": "v2:0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 100,
+            "id": "v3:0xc7bbec68d12a0d1830360f8ec58fa599ba1b0e9b",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 500,
+            "id": "v3:0x11b815efb8f581194ae79006d24e0d814b7697f6",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 3000,
+            "id": "v3:0x4e68ccd3e89f51c3074ca5072bbac773960dfa36",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xC5aF84701f98Fa483eCe78aF83F11b6C38ACA71D",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 10000,
+            "id": "v3:0xc5af84701f98fa483ece78af83f11b6c38aca71d",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x72331fcb696b0151904c03584b66dc8365bc63f8a144d89a773384e3a579ca73",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x72331fcb696b0151904c03584b66dc8365bc63f8a144d89a773384e3a579ca73",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee5fa8",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee5fa8",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x1bbf82bb780dc9c312dfcb2430c04395675a7c925ec9f3e5eb5bd64f4fa1424d",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x1bbf82bb780dc9c312dfcb2430c04395675a7c925ec9f3e5eb5bd64f4fa1424d",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xbb2b8038a1640196fbe3e38816f3e67cba72d940",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xe6ff8b9A37B0fab776134636D9981Aa778c4e718",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xe6ff8b9a37b0fab776134636d9981aa778c4e718",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x4585FE77225b41b697C938B018E2Ac67Ac5a20c0",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x4585fe77225b41b697c938b018e2ac67ac5a20c0",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0xcbcdf9626bc03e24f779434178a73a0b4bad62ed",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x6Ab3bba2F41e7eAA262fa5A1A9b3932fA161526F",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0x6ab3bba2f41e7eaa262fa5a1a9b3932fa161526f",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x3d8a4e3c8985f514808a901424724c9bc03b7a5b5ac3ca8b679d4681690d1e7f",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x3d8a4e3c8985f514808a901424724c9bc03b7a5b5ac3ca8b679d4681690d1e7f",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x54c72c46df32f2cc455e84e41e191b26ed73a29452cdd3d82f511097af9f427e",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x54c72c46df32f2cc455e84e41e191b26ed73a29452cdd3d82f511097af9f427e",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xa478c2975ab1ea89e8196811f51a7b7ade33eb11",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xD8dEC118e1215F02e10DB846DCbBfE27d477aC19",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xd8dec118e1215f02e10db846dcbbfe27d477ac19",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x60594a405d53811d3BC4766596EFD80fd545A270",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x60594a405d53811d3bc4766596efd80fd545a270",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0xc2e9f25be6257c210d7adf0d4cd6e3e881ba25f8",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xa80964C5bBd1A0E95777094420555fead1A26c1e",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0xa80964c5bbd1a0e95777094420555fead1a26c1e",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x042a5b2c816d473338d6d1fff7d4e2f74a4bf6d9517e74538f3778d0693aef69",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x042a5b2c816d473338d6d1fff7d4e2f74a4bf6d9517e74538f3778d0693aef69",
+            "currencies": [
+              "native",
+              "0x6b175474e89094c44da98b954eedeac495271d0f"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xf30bb08535b65d93477b210f2bf9fbffc9d02d98209c4f6e61d035a6d25769b6",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xf30bb08535b65d93477b210f2bf9fbffc9d02d98209c4f6e61d035a6d25769b6",
+            "currencies": [
+              "native",
+              "0x6b175474e89094c44da98b954eedeac495271d0f"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:25730684"
+        }
+      ],
+      "coverage": [],
+      "enabledFees": []
+    }
+  },
+  "log": [
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1867643608"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xE0554a476A092703abdB3Ef35c80e0D76d32939F",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xe0554a476a092703abdb3ef35c80e0d76d32939f",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1875824260",
+          "gasEstimate": "$bigint:98348"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1875402290",
+          "gasEstimate": "$bigint:89070"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1869486850",
+          "gasEstimate": "$bigint:98727"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x7BeA39867e4169DBe237d55C8242a8f2fcDcc387",
+            "token0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0x7bea39867e4169dbe237d55c8242a8f2fcdcc387",
+            "currencies": [
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1861688644",
+          "gasEstimate": "$bigint:98655"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x00b9edc1583bf6ef09ff3a09f6c23ecb57fd7d0bb75625717ec81eed181e22d7",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x00b9edc1583bf6ef09ff3a09f6c23ecb57fd7d0bb75625717ec81eed181e22d7",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1874363049",
+          "gasEstimate": "$bigint:48857"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1874610774",
+          "gasEstimate": "$bigint:39893"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1868470129",
+          "gasEstimate": "$bigint:40786"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd934712639fede326a3ff8d2a9c2f73749bac510c23fb33443cea7f3c9aca6f3",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd934712639fede326a3ff8d2a9c2f73749bac510c23fb33443cea7f3c9aca6f3",
+            "currencies": [
+              "native",
+              "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1627116504",
+          "gasEstimate": "$bigint:128162"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "id": "v2:0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1870040997"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xc7bBeC68d12a0d1830360F8Ec58fA599bA1b0e9b",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 100,
+            "id": "v3:0xc7bbec68d12a0d1830360f8ec58fa599ba1b0e9b",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1876932906",
+          "gasEstimate": "$bigint:99336"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x11b815efB8f581194ae79006d24E0d814B7697F6",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 500,
+            "id": "v3:0x11b815efb8f581194ae79006d24e0d814b7697f6",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1876824987",
+          "gasEstimate": "$bigint:99712"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 3000,
+            "id": "v3:0x4e68ccd3e89f51c3074ca5072bbac773960dfa36",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1870437405",
+          "gasEstimate": "$bigint:91039"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xC5aF84701f98Fa483eCe78aF83F11b6C38ACA71D",
+            "token0": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "token1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "fee": 10000,
+            "id": "v3:0xc5af84701f98fa483ece78af83f11b6c38aca71d",
+            "currencies": [
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1838722226",
+          "gasEstimate": "$bigint:129638"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1876520213",
+          "gasEstimate": "$bigint:40499"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x72331fcb696b0151904c03584b66dc8365bc63f8a144d89a773384e3a579ca73",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x72331fcb696b0151904c03584b66dc8365bc63f8a144d89a773384e3a579ca73",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1876781758",
+          "gasEstimate": "$bigint:40818"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee5fa8",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee5fa8",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1868308854",
+          "gasEstimate": "$bigint:39893"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x1bbf82bb780dc9c312dfcb2430c04395675a7c925ec9f3e5eb5bd64f4fa1424d",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x1bbf82bb780dc9c312dfcb2430c04395675a7c925ec9f3e5eb5bd64f4fa1424d",
+            "currencies": [
+              "native",
+              "0xdac17f958d2ee523a2206206994597c13d831ec7"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:47065941",
+          "gasEstimate": "$bigint:51611"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xbb2b8038a1640196fbe3e38816f3e67cba72d940",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2917192"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xe6ff8b9A37B0fab776134636D9981Aa778c4e718",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xe6ff8b9a37b0fab776134636d9981aa778c4e718",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2925185",
+          "gasEstimate": "$bigint:90515"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x4585FE77225b41b697C938B018E2Ac67Ac5a20c0",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x4585fe77225b41b697c938b018e2ac67ac5a20c0",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2927659",
+          "gasEstimate": "$bigint:81215"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0xcbcdf9626bc03e24f779434178a73a0b4bad62ed",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2918227",
+          "gasEstimate": "$bigint:90856"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x6Ab3bba2F41e7eAA262fa5A1A9b3932fA161526F",
+            "token0": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0x6ab3bba2f41e7eaa262fa5a1a9b3932fa161526f",
+            "currencies": [
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2829085",
+          "gasEstimate": "$bigint:144735"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x3d8a4e3c8985f514808a901424724c9bc03b7a5b5ac3ca8b679d4681690d1e7f",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x3d8a4e3c8985f514808a901424724c9bc03b7a5b5ac3ca8b679d4681690d1e7f",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2919446",
+          "gasEstimate": "$bigint:61124"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2927637",
+          "gasEstimate": "$bigint:40760"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x54c72c46df32f2cc455e84e41e191b26ed73a29452cdd3d82f511097af9f427e",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x54c72c46df32f2cc455e84e41e191b26ed73a29452cdd3d82f511097af9f427e",
+            "currencies": [
+              "native",
+              "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:2915385",
+          "gasEstimate": "$bigint:40796"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x0e4cee89e539022bdcb35075cb75362aa622400ac3e188e060bd851712424f9f|native|1000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x0e4cee89e539022bdcb35075cb75362aa622400ac3e188e060bd851712424f9f",
+          "poolKey": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "fee": 10000,
+            "tickSpacing": 200,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x0e4cee89e539022bdcb35075cb75362aa622400ac3e188e060bd851712424f9f",
+          "currencies": [
+            "native",
+            "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "id": "v2:0xa478c2975ab1ea89e8196811f51a7b7ade33eb11",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1868184523439009158138"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xD8dEC118e1215F02e10DB846DCbBfE27d477aC19",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 100,
+            "id": "v3:0xd8dec118e1215f02e10db846dcbbfe27d477ac19",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:840975421847739818",
+          "gasEstimate": "$bigint:28665962"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x60594a405d53811d3BC4766596EFD80fd545A270",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 500,
+            "id": "v3:0x60594a405d53811d3bc4766596efd80fd545a270",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1869974509522626759179",
+          "gasEstimate": "$bigint:117389"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 3000,
+            "id": "v3:0xc2e9f25be6257c210d7adf0d4cd6e3e881ba25f8",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1868341312147816847715",
+          "gasEstimate": "$bigint:118363"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xa80964C5bBd1A0E95777094420555fead1A26c1e",
+            "token0": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "fee": 10000,
+            "id": "v3:0xa80964c5bbd1a0e95777094420555fead1a26c1e",
+            "currencies": [
+              "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            ]
+          },
+          "currencyIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:94181550131343488476",
+          "gasEstimate": "$bigint:316154"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xf62093fa22b04d27ae97c6178b992f0358f393e179d77e615cd8e0268674c11b|native|1000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xf62093fa22b04d27ae97c6178b992f0358f393e179d77e615cd8e0268674c11b",
+          "poolKey": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xf62093fa22b04d27ae97c6178b992f0358f393e179d77e615cd8e0268674c11b",
+          "currencies": [
+            "native",
+            "0x6b175474e89094c44da98b954eedeac495271d0f"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x8922482d0185ef7304277311c87d41b4ae8ed28903df03a1891b68a4026fe4d6|native|1000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x8922482d0185ef7304277311c87d41b4ae8ed28903df03a1891b68a4026fe4d6",
+          "poolKey": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+            "fee": 500,
+            "tickSpacing": 10,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x8922482d0185ef7304277311c87d41b4ae8ed28903df03a1891b68a4026fe4d6",
+          "currencies": [
+            "native",
+            "0x6b175474e89094c44da98b954eedeac495271d0f"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x042a5b2c816d473338d6d1fff7d4e2f74a4bf6d9517e74538f3778d0693aef69",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x042a5b2c816d473338d6d1fff7d4e2f74a4bf6d9517e74538f3778d0693aef69",
+            "currencies": [
+              "native",
+              "0x6b175474e89094c44da98b954eedeac495271d0f"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:1863747063364040436109",
+          "gasEstimate": "$bigint:40448"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xf30bb08535b65d93477b210f2bf9fbffc9d02d98209c4f6e61d035a6d25769b6",
+            "poolKey": {
+              "currency0": "0x0000000000000000000000000000000000000000",
+              "currency1": "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xf30bb08535b65d93477b210f2bf9fbffc9d02d98209c4f6e61d035a6d25769b6",
+            "currencies": [
+              "native",
+              "0x6b175474e89094c44da98b954eedeac495271d0f"
+            ]
+          },
+          "currencyIn": "native",
+          "currencyOut": "0x6b175474e89094c44da98b954eedeac495271d0f",
+          "amountIn": "$bigint:1000000000000000000",
+          "amountOut": "$bigint:3363754445154616912",
+          "gasEstimate": "$bigint:51429"
+        }
+      }
+    }
+  ],
+  "golden": {
+    "status": "quote",
+    "best": {
+      "routeId": "v3:0xe0554a476a092703abdb3ef35c80e0d76d32939f",
+      "protocols": [
+        "v3"
+      ],
+      "path": [
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+      ],
+      "amountIn": "1000000000000000000",
+      "amountOut": "1875824260",
+      "intermediateAmounts": [],
+      "gasEstimate": "98348"
+    },
+    "alternatives": [
+      {
+        "routeId": "v3:0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+        "protocols": [
+          "v3"
+        ],
+        "path": [
+          "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1875402290",
+        "intermediateAmounts": [],
+        "gasEstimate": "89070"
+      },
+      {
+        "routeId": "v4:0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27",
+        "protocols": [
+          "v4"
+        ],
+        "path": [
+          "native",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1874610774",
+        "intermediateAmounts": [],
+        "gasEstimate": "39893"
+      },
+      {
+        "routeId": "v4:0x00b9edc1583bf6ef09ff3a09f6c23ecb57fd7d0bb75625717ec81eed181e22d7",
+        "protocols": [
+          "v4"
+        ],
+        "path": [
+          "native",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1874363049",
+        "intermediateAmounts": [],
+        "gasEstimate": "48857"
+      },
+      {
+        "routeId": "v3:0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8",
+        "protocols": [
+          "v3"
+        ],
+        "path": [
+          "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1869486850",
+        "intermediateAmounts": [],
+        "gasEstimate": "98727"
+      },
+      {
+        "routeId": "v4:0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d",
+        "protocols": [
+          "v4"
+        ],
+        "path": [
+          "native",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1868470129",
+        "intermediateAmounts": [],
+        "gasEstimate": "40786"
+      },
+      {
+        "routeId": "v2:0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc",
+        "protocols": [
+          "v2"
+        ],
+        "path": [
+          "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1867643608",
+        "intermediateAmounts": []
+      },
+      {
+        "routeId": "v3:0x7bea39867e4169dbe237d55c8242a8f2fcdcc387",
+        "protocols": [
+          "v3"
+        ],
+        "path": [
+          "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1861688644",
+        "intermediateAmounts": [],
+        "gasEstimate": "98655"
+      },
+      {
+        "routeId": "v4:0xd934712639fede326a3ff8d2a9c2f73749bac510c23fb33443cea7f3c9aca6f3",
+        "protocols": [
+          "v4"
+        ],
+        "path": [
+          "native",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        ],
+        "amountIn": "1000000000000000000",
+        "amountOut": "1627116504",
+        "intermediateAmounts": [],
+        "gasEstimate": "128162"
+      }
+    ],
+    "report": {
+      "block": {
+        "number": "25730684",
+        "timestamp": "1786438343"
+      },
+      "discovery": {
+        "v2": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "10000835"
+        },
+        "v3": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "12369621"
+        },
+        "v4": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "21688329"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": false,
+        "intermediatesDiscovered": 3,
+        "intermediatesSelected": 3,
+        "intermediatesPruned": 0,
+        "legsMeasured": 36,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 36,
+        "succeeded": 33,
+        "failed": 3,
+        "transportFailed": 0,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 0,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}

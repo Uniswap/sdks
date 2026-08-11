@@ -1,0 +1,341 @@
+{
+  "schemaVersion": 1,
+  "label": "hermetic-two-hop-quote",
+  "chainId": 31337,
+  "kind": "quote",
+  "recordedAt": "2026-08-11T08:50:12.323Z",
+  "notes": "Composition and the gas rule in one fixture: a v3->v3 two-hop through the manifest core out-prices a v2 direct pool, so `best` carries the two legs' summed gasEstimate and its runner-up — priced by v2's local reserve math, which measures no gas — carries none.",
+  "manifest": {
+    "chainId": 31337,
+    "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "coreIntermediates": [
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    "v2": {
+      "factory": "0x6666666666666666666666666666666666666666",
+      "deploymentBlock": "$bigint:0"
+    },
+    "v3": {
+      "factory": "0x5555555555555555555555555555555555555555",
+      "deploymentBlock": "$bigint:0",
+      "v3QuoterV2": "0x4444444444444444444444444444444444444444"
+    }
+  },
+  "request": {
+    "tokenIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "tokenOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "amountIn": "$bigint:1000000"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:1000000",
+      "hash": "0xabababababababababababababababababababababababababababababababab",
+      "timestamp": "$bigint:1700000000"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "discovered": 1,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0000000000000000000000000000000000003001",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "fee": 500,
+            "id": "v3:0x0000000000000000000000000000000000003001",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:10",
+          "lastQuoteSuccessBlock": "$bigint:1000000"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0000000000000000000000000000000000003002",
+            "token0": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "fee": 500,
+            "id": "v3:0x0000000000000000000000000000000000003002",
+            "currencies": [
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:11",
+          "lastQuoteSuccessBlock": "$bigint:1000000"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002001",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002001",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:12",
+          "lastQuoteSuccessBlock": "$bigint:1000000"
+        }
+      ],
+      "coverage": [
+        [
+          "v2:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v2:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v3:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v3:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ]
+      ],
+      "enabledFees": [],
+      "learnedScanWidth": "$bigint:1000001"
+    }
+  },
+  "log": [
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002001",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002001",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:498499"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0000000000000000000000000000000000003001",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "fee": 500,
+            "id": "v3:0x0000000000000000000000000000000000003001",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ]
+          },
+          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "currencyOut": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:996999",
+          "gasEstimate": "$bigint:90000"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0000000000000000000000000000000000003002",
+            "token0": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "fee": 500,
+            "id": "v3:0x0000000000000000000000000000000000003002",
+            "currencies": [
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ]
+          },
+          "currencyIn": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:996999",
+          "amountOut": "$bigint:994007",
+          "gasEstimate": "$bigint:90000"
+        }
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v3",
+      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v3",
+      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "o": {
+        "kind": "complete"
+      }
+    }
+  ],
+  "golden": {
+    "status": "quote",
+    "best": {
+      "routeId": "v3:0x0000000000000000000000000000000000003001>v3:0x0000000000000000000000000000000000003002",
+      "protocols": [
+        "v3",
+        "v3"
+      ],
+      "path": [
+        "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+      ],
+      "amountIn": "1000000",
+      "amountOut": "994007",
+      "intermediateAmounts": [
+        "996999"
+      ],
+      "gasEstimate": "180000"
+    },
+    "alternatives": [
+      {
+        "routeId": "v2:0x0000000000000000000000000000000000002001",
+        "protocols": [
+          "v2"
+        ],
+        "path": [
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+        ],
+        "amountIn": "1000000",
+        "amountOut": "498499",
+        "intermediateAmounts": []
+      }
+    ],
+    "report": {
+      "block": {
+        "number": "1000000",
+        "timestamp": "1700000000"
+      },
+      "discovery": {
+        "v2": {
+          "status": "complete",
+          "coveredRanges": [
+            {
+              "fromBlock": "0",
+              "toBlock": "999968"
+            }
+          ],
+          "demandFloor": "0"
+        },
+        "v3": {
+          "status": "complete",
+          "coveredRanges": [
+            {
+              "fromBlock": "0",
+              "toBlock": "999968"
+            }
+          ],
+          "demandFloor": "0"
+        },
+        "v4": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": true,
+        "intermediatesDiscovered": 1,
+        "intermediatesSelected": 1,
+        "intermediatesPruned": 0,
+        "legsMeasured": 3,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 3,
+        "succeeded": 3,
+        "failed": 0,
+        "transportFailed": 0,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 0,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}

@@ -79,7 +79,18 @@ export type SearchState = {
   firstCompileError?: string | undefined
   verification: SearchReport['verification']
   discovery: Record<Protocol, { complete: Set<string>; failed: boolean }>
-  /** Present only when recording: every applied outcome, in order, for golden replay. */
+  /**
+   * Present only when recording (`loop.ts`'s `SearchContext.recording`): every applied outcome, in
+   * order — the golden format `internal/outcomeLog.ts` folds back through the `apply*` functions
+   * below.
+   *
+   * IT IS COMPLETE FOR WHAT `apply*` OWNS AND NOTHING ELSE, which is the honest boundary rather than
+   * an omission. Four fields on this type are written by their owners directly — `indexVersion` and
+   * `pairCeilingHit` (the pump), `gateOpened` (the coverage worker's `demandFull`), `intermediates`
+   * (the loop's frontier advance) — plus the `compiledById` memo. A fold therefore reproduces every
+   * counter, measurement and verdict from the log alone, and takes the rest from the fixture; see
+   * `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
+   */
   outcomeLog?: OutcomeEntry[] | undefined
 }
 

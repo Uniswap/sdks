@@ -19,7 +19,7 @@ import ts from 'typescript'
 // reaches fewer files and both tests pass by looking at nothing.
 //
 // TEST-ONLY, AND EXCLUDED FROM EVERY BUILD FOR IT (`tsconfig.{esm,cjs,types}
-// .json#exclude`, the same treatment `internal/replay.ts` gets). It imports
+// .json#exclude`, the same treatment `internal/outcomeLog.ts` gets). It imports
 // `typescript` and `node:fs`, neither of which this package ships; shipping it
 // would put both in the published graph and fail the very certifications it
 // exists to serve. `build.surface.test.ts` asserts the exclusion holds.

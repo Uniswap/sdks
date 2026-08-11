@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "label": "hermetic-no-route-complete",
+  "chainId": 31337,
+  "kind": "quote",
+  "recordedAt": "2026-08-11T08:50:12.324Z",
+  "notes": "The authoritative negative: every pool on the pair is known and every one of them reverts with no data (the pool-absent shape), discovery completes on both endpoints, and nothing was lost in the transport — the four conditions that entitle a search to say no rather than \"could not tell\".",
+  "manifest": {
+    "chainId": 31337,
+    "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "coreIntermediates": [
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    "v2": {
+      "factory": "0x6666666666666666666666666666666666666666",
+      "deploymentBlock": "$bigint:0"
+    }
+  },
+  "request": {
+    "tokenIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "tokenOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "amountIn": "$bigint:1000000"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:1000000",
+      "hash": "0xabababababababababababababababababababababababababababababababab",
+      "timestamp": "$bigint:1700000000"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "discovered": 1,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002100",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002100",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:1",
+          "quoteFailureBlocks": 1,
+          "lastQuoteFailureBlock": "$bigint:1000000"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002101",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002101",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:2",
+          "quoteFailureBlocks": 1,
+          "lastQuoteFailureBlock": "$bigint:1000000"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002102",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x0000000000000000000000000000000000002102",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "event",
+          "createdAtBlock": "$bigint:3",
+          "quoteFailureBlocks": 1,
+          "lastQuoteFailureBlock": "$bigint:1000000"
+        }
+      ],
+      "coverage": [
+        [
+          "v2:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v2:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ]
+      ],
+      "enabledFees": [],
+      "learnedScanWidth": "$bigint:1000001"
+    }
+  },
+  "log": [
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v2:0x0000000000000000000000000000000000002100|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "pool": {
+          "protocol": "v2",
+          "address": "0x0000000000000000000000000000000000002100",
+          "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "id": "v2:0x0000000000000000000000000000000000002100",
+          "currencies": [
+            "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v2:0x0000000000000000000000000000000000002101|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "pool": {
+          "protocol": "v2",
+          "address": "0x0000000000000000000000000000000000002101",
+          "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "id": "v2:0x0000000000000000000000000000000000002101",
+          "currencies": [
+            "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v2:0x0000000000000000000000000000000000002102|0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1|1000000",
+        "pool": {
+          "protocol": "v2",
+          "address": "0x0000000000000000000000000000000000002102",
+          "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "id": "v2:0x0000000000000000000000000000000000002102",
+          "currencies": [
+            "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "o": {
+        "kind": "complete"
+      }
+    }
+  ],
+  "golden": {
+    "status": "no-route",
+    "reason": {
+      "code": "no-viable-route",
+      "detail": "search complete: no viable route found"
+    },
+    "alternatives": [],
+    "report": {
+      "block": {
+        "number": "1000000",
+        "timestamp": "1700000000"
+      },
+      "discovery": {
+        "v2": {
+          "status": "complete",
+          "coveredRanges": [
+            {
+              "fromBlock": "0",
+              "toBlock": "999968"
+            }
+          ],
+          "demandFloor": "0"
+        },
+        "v3": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        },
+        "v4": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": true,
+        "intermediatesDiscovered": 1,
+        "intermediatesSelected": 1,
+        "intermediatesPruned": 0,
+        "legsMeasured": 3,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 3,
+        "succeeded": 0,
+        "failed": 3,
+        "transportFailed": 0,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 0,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}

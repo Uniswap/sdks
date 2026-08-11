@@ -12,9 +12,9 @@ import { ENTRY_POINTS, importClosure, PKG_ROOT } from './internal/moduleGraph'
 // `package.json#files` is `["dist"]`, so every file the three build tsconfigs
 // compile is published — and the build's file set is defined SUBTRACTIVELY
 // (`include: src/**/*` minus a hand-written exclude list). A subtractive
-// definition cannot notice a new file: `src/internal/replay.ts` — the recorded-
-// replay harness, which exists only to serve `replay.golden.test.ts` and
-// `scripts/recordSession.ts` — was compiled into `dist/esm`, `dist/cjs` and
+// definition cannot notice a new file: the golden-replay harness — which exists
+// only to serve the golden suite and the recorder script, and today is
+// `src/internal/outcomeLog.ts` — was compiled into `dist/esm`, `dist/cjs` and
 // `dist/types` of every build since it was written, because the excludes named
 // `src/**/testing.ts` and the test files and nothing else. It is dead weight in
 // the tarball, it is an implicit public surface (anyone can deep-import a path
@@ -69,9 +69,9 @@ test('the closure is the real one: it reaches deep internals and stops at the te
   for (const reached of ['src/index.ts', 'src/router.ts', 'src/internal/logScan.ts', 'src/internal/rpcErrors.ts']) {
     expect([...closure]).toContain(reached)
   }
-  // The two modules that exist only for the suites and the recorder. Neither is imported by anything
-  // the package exports, which is precisely why neither may be compiled into `dist/`.
-  for (const testOnly of ['src/internal/testing.ts', 'src/internal/replay.ts', 'src/internal/moduleGraph.ts']) {
+  // The three modules that exist only for the suites and the recorder. None is imported by anything
+  // the package exports, which is precisely why none may be compiled into `dist/`.
+  for (const testOnly of ['src/internal/testing.ts', 'src/internal/outcomeLog.ts', 'src/internal/moduleGraph.ts']) {
     expect(existsSync(join(PKG, testOnly))).toBe(true) // still there, so the check below means something
     expect([...closure]).not.toContain(testOnly)
   }

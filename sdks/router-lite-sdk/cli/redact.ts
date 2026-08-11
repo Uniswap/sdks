@@ -60,7 +60,7 @@ export function redactKeyedUrl(message: string): string {
 // A MODULE-LEVEL REGISTRY, on purpose and for the same reason `cli/cache.ts`'s `pendingSave` is
 // one: an `rl` invocation resolves exactly one header set for its one chain context, so a single
 // slot is the whole registry needed — no map, no ids, and every error path (`rl.ts`'s catch-all,
-// `commands/context.ts`'s chain-probe failure, `scripts/recordSession.ts`'s captured fixture
+// `commands/context.ts`'s chain-probe failure, `scripts/recordOutcomes.ts`'s live recording
 // errors) reads the same slot without having to thread the headers through every call that might
 // end up printing or persisting a message.
 // ---------------------------------------------------------------------------

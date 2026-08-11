@@ -39,7 +39,7 @@ describe('parseRpcHeaderPairs', () => {
   // first), so a comma reaching this parser is always read as a pair separator, never part of a
   // value: 'X-Csv: a,b' is NOT the one-pair value 'a,b', it is two pieces, and the second ('b') has
   // no colon of its own — which is exactly why it surfaces as the loud malformed-pair error rather
-  // than silently keeping the truncated value 'a'. Matches foundry/recordSession's behaviour rather
+  // than silently keeping the truncated value 'a'. Matches foundry/chainz's behaviour rather
   // than inventing an escaping rule that does not exist upstream.
   it('a comma inside what looks like one value is read as a pair separator, not escaped', () => {
     expect(() => parseRpcHeaderPairs('X-Csv: a,b')).toThrow(UsageError)

@@ -216,8 +216,12 @@ export type PoolIndexSnapshot = {
  * ref, a `source` enum member, or a coverage/fee key (an address, or `pair:`-prefixed). None can
  * begin with `$bigint:`, and none is caller-controlled free text — the index never stores a symbol,
  * a URL, or anything else a user typed.
+ *
+ * Exported so the ONE other file in this package that JSON-encodes bigints — `internal/outcomeLog.ts`,
+ * whose fixtures embed a snapshot of this very type — encodes them the same way rather than inventing
+ * a second marker: a fixture with two bigint dialects in it is a file nobody can read with one reviver.
  */
-const BIGINT_TAG = '$bigint:'
+export const BIGINT_TAG = '$bigint:'
 
 /**
  * A snapshot as JSON, with every `bigint` encoded as a tagged string (see {@link BIGINT_TAG}).

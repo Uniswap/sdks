@@ -840,58 +840,74 @@ The complete set of environment variables the private workspaces read:
 | `CANARY_RPC_URL_ROBINHOOD` | `canary/env.ts` | Robinhood Chain's endpoint. Deliberately *not* a fourth `CANARY_RPC_URL_*`: those three are one chain seen three ways, this is a different chain. Its suites skip when it is unset, even with the canary on. |
 | `ETH_RPC_URL` | `cli/`, `scripts/` | The endpoint for the CLI and the recorder/pool-list scripts. Passed through the environment rather than a command line, where a keyed URL would land in a process listing. Part of the `--rpc > $ETH_RPC_URL > $RPC_URL` precedence every entry point shares — see `cli/chains.ts#resolveRpcUrl`. |
 | `RPC_URL` | `cli/`, `scripts/` | The same endpoint as `ETH_RPC_URL`, one rung lower in the shared `--rpc > $ETH_RPC_URL > $RPC_URL` precedence — a fallback for a caller that already exports this more generic name for other tooling. |
-| `ETH_RPC_HEADERS` | `cli/`, `scripts/recordSession.ts` | Extra RPC headers, foundry's own format (comma-separated `Name: value` pairs) — exactly what `chainz exec`/`chainz shell` export, so a header-authenticated gateway needs no flag at all. The CLI's `--rpc-header <spec>` (repeatable) overrides an env pair of the same name; both are parsed by the one shared `cli/rpcHeaders.ts`. Values are never printed or cached. |
+| `ETH_RPC_HEADERS` | `cli/`, `scripts/recordOutcomes.ts` | Extra RPC headers, foundry's own format (comma-separated `Name: value` pairs) — exactly what `chainz exec`/`chainz shell` export, so a header-authenticated gateway needs no flag at all. The CLI's `--rpc-header <spec>` (repeatable) overrides an env pair of the same name; both are parsed by the one shared `cli/rpcHeaders.ts`. Values are never printed or cached. |
 | `UNISWAP_API_KEY` | `scripts/compare.ts` | The Trading API key `compare.ts` needs to quote the API side of its side-by-side comparison. Unset means the `api` column reads `skipped` rather than the script failing — `--dry-run` needs no key at all. |
 | `XDG_CACHE_HOME` | `cli/cache.ts` | Where the CLI's on-disk pool-index cache lives: `$XDG_CACHE_HOME/router-lite` when set, else `~/.cache/router-lite`. |
 | `NO_COLOR` | `cli/ansi.ts` | Disables ANSI styling in CLI output (https://no-color.org) — checked alongside "is stdout a TTY", so piping output already disables color without it. |
 
-### Recorded-replay golden sessions
+### Outcome-log golden fixtures
 
-`src/replay.golden.test.ts` is the hermetic "does the router find the RIGHT answer" layer: each
-fixture under `src/internal/__fixtures__/sessions/` is one real `getQuote` run's complete,
-block-pinned RPC conversation, and the test replays it against the real `createRouter` + built-in
-manifest and asserts the exact best route, exact `amountOut`, every alternative, and the
-canonicalized `SearchReport` against the committed golden. It runs as part of the ordinary unit
-suite (`bun test src`) — no env gate, no network. Requests are matched by canonical
-(method, canonicalized-params) key, so request *order* never matters; a request the recording never
-saw fails loudly by name, because a change to what the search *asks* is a deliberate golden
-regeneration, not noise.
+`src/outcome.golden.test.ts` is the hermetic "does the router reach the RIGHT answer" layer: each
+fixture under `src/internal/__fixtures__/outcomes/` is one real search's **outcome log** — every
+`apply*` input in order (`search/state.ts`) — plus the handful of facts written outside `apply*` (the
+pinned block, the intermediates frontier, the `PoolIndex` snapshot) and the canonical result it
+produced. The test *folds* each log back through the real `apply*` + `composeRoutes` + `buildReport`
++ `classifyQuote`/`classifySwap` and asserts the exact best route, exact `amountOut`, every
+alternative, a swap's compiled calldata and limits, and the whole `SearchReport` against the
+committed golden. It runs as part of the ordinary unit suite (`bun test src`) — no env gate, no
+network, no clock.
 
-Regenerate a session (or record a new one) through `chainz exec`, so the keyed RPC URL never
-touches the fixture or the output. A gateway that authenticates by header rather than a keyed URL
-needs no extra step here — `chainz exec` exports `$ETH_RPC_HEADERS` (foundry's format) alongside
-the URL, and `recordSession.ts` reads it automatically through the same parser the CLI's
-`--rpc-header` uses (`cli/rpcHeaders.ts`), with header values redacted out of anything it prints or
-records exactly like a keyed URL is:
+**Why outcomes and not RPC conversations.** The predecessor recorded a search's complete
+block-pinned RPC conversation and replayed the engine against it. That keyed the golden on what the
+search *asked*, so the event-driven engine — which changed every request shape and none of the
+answers — retired the whole corpus in one commit, with no regeneration path that would have asserted
+anything. An outcome log is keyed on what the search *concluded*: a refactor of how prices are
+fetched moves nothing in it, while a regression in ranking, composition, classification or report
+assembly moves everything. RPC-level fixtures survive only in
+`src/internal/__fixtures__/providerErrors.json`, which is about wire shapes on purpose
+(`internal/providerConformance.test.ts`).
+
+**What a fold reproduces, and what the fixture carries.** `internal/outcomeLog.ts`'s header is the
+full account; in short, the log is complete for everything `apply*` owns (every counter, every
+measurement, every verdict) and the fixture supplies the three things written elsewhere: the pinned
+block and head verdict, the frontier and pair ceiling, and the index — whose coverage cache the
+report's `coveredRanges` come from and whose negative cache composition excludes routes by. Two
+`SearchState` fields are deliberately not reproduced, because nothing the golden asserts reads them:
+`gateOpened` and `indexVersion`.
+
+The corpus is recorded, never hand-written, by `scripts/recordOutcomes.ts` — which refuses to emit a
+fixture whose fold disagrees with the live search it came from:
 
 ```bash
-# re-record one session (request + notes are reused from the existing fixture)
-chainz exec 8453 -- bun scripts/recordSession.ts --label base-eth-usdc --rpc @rpc
+# the hermetic four (ready swap, two-hop quote, completed no-route, rpc-degraded) — no network at all
+bun scripts/recordOutcomes.ts --hermetic
 
-# re-record every session
-bun scripts/recordSession.ts --all
+# a live golden, through chainz so the keyed RPC URL never touches a shell history
+chainz exec 1 -- bun scripts/recordOutcomes.ts --label live-mainnet-eth-usdc --chain 1 \
+  --token-in native --token-out 0xA0b8...eB48 --amount-in 1000000000000000000 --notes "..."
 
-# record a brand-new session
-chainz exec 1 -- bun scripts/recordSession.ts --label mainnet-eth-usdc --rpc @rpc \
-  --chain 1 --token-in native --token-out 0xA0b8...eB48 --amount-in 1000000000000000000 --notes "..."
-
-# rebuild every golden from the conversations already on disk — NO network, no RPC URL, no chainz
-bun scripts/recordSession.ts --regold
+# re-fold every committed fixture and rewrite its golden — NO network, no RPC URL, no chainz
+bun scripts/recordOutcomes.ts --regold
 ```
 
-`--regold` is the update path when the change is to what a result *reports*, not to what the search
-*asks*: it replays each recorded session strictly (twice, and refuses to write if the two disagree —
-the same determinism proof a fresh recording makes) and rewrites only the golden. `gasEstimate` was
-added to the canonical route shape that way: the gas word was already sitting in the recorded
-quoter responses, so every golden gained the field with no session re-recorded. Re-recording for a
-reporting change would be strictly worse — it would move every amount in every golden (the chain has
-moved on) and bury the one field that actually changed.
+A **hermetic** fixture is a deterministic fake world (`scripts/hermeticWorlds.ts`) driven to `final`;
+a **live** fixture stops exactly where `getQuote`/`getSwap` stop, at the first actionable lead, since
+driving a mainnet search to `final` would mean walking every factory's whole deployment history for a
+golden that is about the answer. Both go through the same recorder, and a header-authenticated
+gateway needs no extra step — `chainz exec` exports `$ETH_RPC_HEADERS` and the script reads it
+through the same parser the CLI's `--rpc-header` uses (`cli/rpcHeaders.ts`).
+
+`--regold` is the update path when the change is to what a result *reports* rather than to what the
+search *finds*. Because a golden rebuilt from the same outcomes is self-consistent whatever it
+dropped, the canonical SHAPE is pinned in the test rather than in the files — the key set is closed,
+`gasEstimate` is asserted present exactly when a route has no v2 leg, and `execution` exactly on a
+swap's routes. The corpus itself is asserted too: it must always contain a ready swap, a two-hop
+quote, a completed no-route, and an rpc-degraded search.
 
 Goldens legitimately change when: (a) ranking/pruning/classification policy changes on purpose —
-regenerate and review the diff as the behavioral change it is; (b) the search starts asking
-different questions (new probe, different scan windows) — the replay transport names the unrecorded
-request and regeneration re-records the conversation; (c) a session is deliberately re-pinned to a
-newer block; (d) the canonical result shape gains a field — `--regold`, above, no network. They never legitimately change on their own: the recorder derives every golden from a
-strict replay and proves two replays agree before writing, so a golden diff with no code change is a
-determinism bug. Fixtures are redacted by construction (no RPC URLs — provider error messages pass
-through the keyed-URL redaction rule) and total ~1.1 MB across 7 sessions.
+re-record and review the diff as the behavioral change it is; (b) a live fixture is deliberately
+re-pinned to a newer block; (c) the canonical result shape gains a field — `--regold`, no network.
+They never legitimately change on their own: a fold is pure, so a golden diff with no code change is
+a determinism bug. **Redaction is structural**: an outcome entry has no field that can hold a URL, a
+key, or a provider's error text, and `outcome.golden.test.ts` asserts exactly that over the
+committed bytes.

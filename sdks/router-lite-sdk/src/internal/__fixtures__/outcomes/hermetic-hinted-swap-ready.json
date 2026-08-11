@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "label": "hermetic-hinted-swap-ready",
+  "chainId": 31337,
+  "kind": "swap",
+  "recordedAt": "2026-08-11T08:50:12.321Z",
+  "notes": "A hinted v2 pool nothing else can reach: the caller asserts it, the pump proves it by measuring it, readiness finds the trader funded and approved, and the preflight simulates cleanly. The golden pins the compiled Universal Router calldata, which the fold recompiles rather than copies.",
+  "manifest": {
+    "chainId": 31337,
+    "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "coreIntermediates": [
+      "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    "execution": {
+      "address": "0x2222222222222222222222222222222222222222",
+      "commandSet": "ur-2.0",
+      "permit2": "0x3333333333333333333333333333333333333333",
+      "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "v2": {
+      "factory": "0x6666666666666666666666666666666666666666",
+      "deploymentBlock": "$bigint:0"
+    }
+  },
+  "request": {
+    "tokenIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "tokenOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "amountIn": "$bigint:1000000",
+    "hints": [
+      {
+        "protocol": "v2",
+        "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+      }
+    ],
+    "trader": "0x1111111111111111111111111111111111111111"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:1000000",
+      "hash": "0xabababababababababababababababababababababababababababababababab",
+      "timestamp": "$bigint:1700000000"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "discovered": 1,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x27ba5470dcb3E780e4dA69a1B453cC2f96828194",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "source": "hint",
+          "lastQuoteSuccessBlock": "$bigint:1000000"
+        }
+      ],
+      "coverage": [
+        [
+          "v2:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ],
+        [
+          "v2:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          [
+            {
+              "fromBlock": "$bigint:0",
+              "toBlock": "$bigint:1000000"
+            }
+          ]
+        ]
+      ],
+      "enabledFees": [],
+      "learnedScanWidth": "$bigint:1000001"
+    }
+  },
+  "log": [
+    {
+      "t": "readiness",
+      "r": {
+        "requirements": [],
+        "degraded": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x27ba5470dcb3E780e4dA69a1B453cC2f96828194",
+            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "id": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
+            "currencies": [
+              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+            ]
+          },
+          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:996999"
+        }
+      }
+    },
+    {
+      "t": "preflight",
+      "routeId": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
+      "o": {
+        "kind": "verified"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "o": {
+        "kind": "complete"
+      }
+    },
+    {
+      "t": "coverage",
+      "p": "v2",
+      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "o": {
+        "kind": "complete"
+      }
+    }
+  ],
+  "golden": {
+    "status": "ready",
+    "best": {
+      "routeId": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
+      "protocols": [
+        "v2"
+      ],
+      "path": [
+        "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+      ],
+      "amountIn": "1000000",
+      "amountOut": "996999",
+      "intermediateAmounts": [],
+      "execution": "verified"
+    },
+    "alternatives": [],
+    "tx": {
+      "to": "0x2222222222222222222222222222222222222222",
+      "data": "0x3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000006553f22c00000000000000000000000000000000000000000000000000000000000000010800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000100000000000000000000000000111111111111111111111111111111111111111100000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000f0f9500000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1000000000000000000000000b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "value": "0"
+    },
+    "limits": {
+      "minAmountOut": "987029",
+      "deadline": "1700000300"
+    },
+    "report": {
+      "block": {
+        "number": "1000000",
+        "timestamp": "1700000000"
+      },
+      "discovery": {
+        "v2": {
+          "status": "complete",
+          "coveredRanges": [
+            {
+              "fromBlock": "0",
+              "toBlock": "999968"
+            }
+          ],
+          "demandFloor": "0"
+        },
+        "v3": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        },
+        "v4": {
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": true,
+        "intermediatesDiscovered": 1,
+        "intermediatesSelected": 1,
+        "intermediatesPruned": 0,
+        "legsMeasured": 1,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "transportFailed": 0,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 1,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}

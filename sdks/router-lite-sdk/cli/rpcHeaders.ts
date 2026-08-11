@@ -5,7 +5,7 @@
 // foundry's own wire format: comma-separated `Name: value` pairs (chainz
 // src/variables.rs, `pairs.push(format!("{name}: {value}"))` then
 // `pairs.join(",")`), which is exactly what cast/forge parse natively. This
-// is the SAME variable `scripts/recordSession.ts` already reads (its own
+// is the SAME variable `scripts/recordOutcomes.ts` already reads (its own
 // `rpcHeaders()` — see there); this module is the one parser both it and the
 // CLI's chain-touching commands import, rather than two copies drifting.
 //

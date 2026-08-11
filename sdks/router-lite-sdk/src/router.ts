@@ -504,8 +504,13 @@ export type EngineOutcome = {
  * execution status at emission, and the leader's compiled tx/limits, the readiness requirements,
  * and the first compile error are copied out of the live state HERE — never held for later, because
  * an in-flight preflight settling after `final` may still write through the state.
+ *
+ * Exported alongside `classifyQuote`/`classifySwap` for the same reason they are: the outcome-log
+ * recorder (`internal/outcomeLog.ts`) folds a `final` event into a result through exactly this path,
+ * so a recorded golden and a live `getQuote`/`getSwap` are the same three lines of classification
+ * rather than two implementations that agree until one of them moves. Not part of the `Router` surface.
  */
-function foldEvent(ranked: RankedRoute[], state: SearchState, report: SearchReport): EngineOutcome {
+export function foldEvent(ranked: RankedRoute[], state: SearchState, report: SearchReport): EngineOutcome {
   const best = ranked[0]
   const compiled = best !== undefined ? state.compiledById.get(routeId(best.route)) : undefined
   return {

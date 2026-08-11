@@ -113,6 +113,12 @@ export type SearchContext = {
    * engine run: the loop then calls {@link fetchBlock} itself, identically.
    */
   pinnedBlock?: Promise<{ block: BlockRef; regressed: boolean }>
+  /**
+   * Appends every applied outcome to `state.outcomeLog` (`search/state.ts`) — the recording half of
+   * the outcome-log golden format (`internal/outcomeLog.ts`). Off by default and never set by
+   * `router.ts`: a live search pays nothing for it, and the recorder is the only caller that asks.
+   */
+  recording?: boolean | undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +363,7 @@ export async function* search(
   const { block, regressed } = await (ctx.pinnedBlock ??
     fetchBlock(ctx.client, maxPlausibleHeadRegression(reorgOverlapBlocksOf(ctx.manifest)), ctx.head, ctx.semaphore))
 
-  const state = createState(block, regressed)
+  const state = createState(block, regressed, ctx.recording)
   const wake = createNotifier()
   const sources = new SourceSet(wake)
   const pumpCtx: PumpCtx = {

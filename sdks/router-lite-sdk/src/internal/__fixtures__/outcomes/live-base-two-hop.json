@@ -1,0 +1,1698 @@
+{
+  "schemaVersion": 1,
+  "label": "live-base-two-hop",
+  "chainId": 8453,
+  "kind": "quote",
+  "recordedAt": "2026-08-11T08:53:16.947Z",
+  "notes": "Base DEGEN -> BRETT: a long-tail pair with no direct Uniswap pool, so every route is a composition through an intermediate and the golden pins a real chained on-chain amount (the out-leg was asked at exactly the amount the in-leg delivers). Recorded at the first actionable lead, exactly where getQuote stops.",
+  "request": {
+    "tokenIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+    "tokenOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+    "amountIn": "$bigint:100000000000000000000000"
+  },
+  "context": {
+    "block": {
+      "number": "$bigint:49824524",
+      "hash": "0xf6a0699ca8e084664538f6eb214bd1b359afc27d785f2319c39063c0c037e4ce",
+      "timestamp": "$bigint:1786438395"
+    },
+    "headRegressed": false,
+    "intermediates": {
+      "selected": [
+        "0x4200000000000000000000000000000000000006",
+        "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+      ],
+      "discovered": 2,
+      "notch": 1
+    },
+    "pairCeilingHit": false,
+    "hookData": [],
+    "index": {
+      "schemaVersion": 2,
+      "wrappedNative": "0x4200000000000000000000000000000000000006",
+      "reorgOverlapBlocks": "$bigint:32",
+      "pools": [
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x7C327d692B72f60b28AecEDbcC1BA784712fE7b2",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "id": "v2:0x7c327d692b72f60b28aecedbcc1ba784712fe7b2",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xac1BD19BA4d6e8E4a40EB6088f9CDC7CA34f36B6",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 100,
+            "id": "v3:0xac1bd19ba4d6e8e4a40eb6088f9cdc7ca34f36b6",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xB0037FfFfFB6E514F88458Bc698102865bCa910A",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 500,
+            "id": "v3:0xb0037fffffb6e514f88458bc698102865bca910a",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xc9034c3E7F58003E6ae0C8438e7c8f4598d5ACAA",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 3000,
+            "id": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0cA6485b7e9cF814A3Fd09d81672B07323535b64",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 10000,
+            "id": "v3:0x0ca6485b7e9cf814a3fd09d81672b07323535b64",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd01a51e5afaf5befd4411752821b71138dec6a687a86b97e34aae8e980772b47",
+            "poolKey": {
+              "currency0": "0x4200000000000000000000000000000000000006",
+              "currency1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd01a51e5afaf5befd4411752821b71138dec6a687a86b97e34aae8e980772b47",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x1281769c87c71BfC2613259C4beA97670E04C4a4",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "id": "v2:0x1281769c87c71bfc2613259c4bea97670e04c4a4",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xa528671c1C7c50D685674A2b06d9B9D5d0BF798D",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 500,
+            "id": "v3:0xa528671c1c7c50d685674a2b06d9b9d5d0bf798d",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0cC3150056fF3fA2e70bE77D25fE9EC33D12a437",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 3000,
+            "id": "v3:0x0cc3150056ff3fa2e70be77d25fe9ec33d12a437",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x29715d8D279cAB143A12fF515b40a2b35d7BAD37",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 10000,
+            "id": "v3:0x29715d8d279cab143a12ff515b40a2b35d7bad37",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x58323abd86618fb8d0531b49adfb0fa2d6a58f779323aa10640a64ca54e3fead",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x58323abd86618fb8d0531b49adfb0fa2d6a58f779323aa10640a64ca54e3fead",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xb1764ddae994ed70f143216f8ca225450034fb1167610d68fce1893c4c8f6c8e",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xb1764ddae994ed70f143216f8ca225450034fb1167610d68fce1893c4c8f6c8e",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x48ab6b64f4f1c20366041439435814a8c101760307982f8d533fb2b784ff0a00",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x48ab6b64f4f1c20366041439435814a8c101760307982f8d533fb2b784ff0a00",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xb34380BA6a17B022782c7FC91e319C10c168FB98",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "id": "v2:0xb34380ba6a17b022782c7fc91e319c10c168fb98",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x36a46dFF597C5A444bbC521D26787F57867D2214",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 500,
+            "id": "v3:0x36a46dff597c5a444bbc521d26787f57867d2214",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x76Bf0abD20f1e0155Ce40A62615a90A709a6C3D8",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 3000,
+            "id": "v3:0x76bf0abd20f1e0155ce40a62615a90a709a6c3d8",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xBA3F945812a83471d709BCe9C3CA699A19FB46f7",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 10000,
+            "id": "v3:0xba3f945812a83471d709bce9c3ca699a19fb46f7",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xe0B2d3a2c11794B65e4E5B20B3E3B670a4CbAFB0",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "id": "v2:0xe0b2d3a2c11794b65e4e5b20b3e3b670a4cbafb0",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xCfE206D9880C5F16B6822ce1b95be59D2feC6e77",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 3000,
+            "id": "v3:0xcfe206d9880c5f16b6822ce1b95be59d2fec6e77",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xBF0A0C12E7C0610002F6Aa6E609755EDe42D6A4d",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 10000,
+            "id": "v3:0xbf0a0c12e7c0610002f6aa6e609755ede42d6a4d",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        },
+        {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xafea197aa9b2f65f9efdb498f02ff2bf7fcccf22c189170137c4faccf7b8c948",
+            "poolKey": {
+              "currency0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xafea197aa9b2f65f9efdb498f02ff2bf7fcccf22c189170137c4faccf7b8c948",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "source": "factory",
+          "lastQuoteSuccessBlock": "$bigint:49824524"
+        }
+      ],
+      "coverage": [
+        [
+          "v4:pair:0x4ed4e862860bed51a9570b96d89af5e1b0efefed-0x532f27101965dd16442e59d40670faf5ebb142e4",
+          [
+            {
+              "fromBlock": "$bigint:49522125",
+              "toBlock": "$bigint:49824524"
+            }
+          ]
+        ]
+      ],
+      "enabledFees": [],
+      "learnedScanWidth": "$bigint:302400"
+    }
+  },
+  "log": [
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v2:0xf51a5d5cb992797a512c33f3039d02bc89c233ff|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v2",
+          "address": "0xf51A5d5cb992797A512c33F3039d02bc89C233Ff",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "id": "v2:0xf51a5d5cb992797a512c33f3039d02bc89c233ff",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x262efc2dd434b572a498285ddd1bc85546d533ee|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x262eFc2Dd434B572a498285ddd1bc85546D533eE",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "fee": 100,
+          "id": "v3:0x262efc2dd434b572a498285ddd1bc85546d533ee",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x113bf3b91d6e310c51e30ed7d9377efeec0a71f2|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x113bF3B91d6E310C51E30Ed7d9377eFEec0a71f2",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "fee": 500,
+          "id": "v3:0x113bf3b91d6e310c51e30ed7d9377efeec0a71f2",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x87e43b6077d95fbfc4e078eb7474aab7aa1a0aa0|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x87E43b6077D95fbFc4E078EB7474Aab7Aa1a0aa0",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "fee": 3000,
+          "id": "v3:0x87e43b6077d95fbfc4e078eb7474aab7aa1a0aa0",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x6506943966f0a9435749cfac2099613a3b57681d|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x6506943966F0a9435749cFAc2099613A3B57681D",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "fee": 10000,
+          "id": "v3:0x6506943966f0a9435749cfac2099613a3b57681d",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x5da698e0218ef67a468323c685d6bc8b502685e8d72818c5259c74ea8b3d6675|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x5da698e0218ef67a468323c685d6bc8b502685e8d72818c5259c74ea8b3d6675",
+          "poolKey": {
+            "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x5da698e0218ef67a468323c685d6bc8b502685e8d72818c5259c74ea8b3d6675",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xb304616c765ce9bd437fb3541618bf7e43f58da181aa30efc3e418b3950b8fc8|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xb304616c765ce9bd437fb3541618bf7e43f58da181aa30efc3e418b3950b8fc8",
+          "poolKey": {
+            "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 500,
+            "tickSpacing": 10,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xb304616c765ce9bd437fb3541618bf7e43f58da181aa30efc3e418b3950b8fc8",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x0d5647c57643df8ad991c64fdbfe5f87964e30df39651858b278604d0113ecbd|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x0d5647c57643df8ad991c64fdbfe5f87964e30df39651858b278604d0113ecbd",
+          "poolKey": {
+            "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 3000,
+            "tickSpacing": 60,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x0d5647c57643df8ad991c64fdbfe5f87964e30df39651858b278604d0113ecbd",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x153da1b1c5b39cd3eb7cdbe099df58fcf0bab51ab5940888a0e61f7f1a3b9393|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x153da1b1c5b39cd3eb7cdbe099df58fcf0bab51ab5940888a0e61f7f1a3b9393",
+          "poolKey": {
+            "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 10000,
+            "tickSpacing": 200,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x153da1b1c5b39cd3eb7cdbe099df58fcf0bab51ab5940888a0e61f7f1a3b9393",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x7C327d692B72f60b28AecEDbcC1BA784712fE7b2",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "id": "v2:0x7c327d692b72f60b28aecedbcc1ba784712fe7b2",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:20792042547605234"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xac1BD19BA4d6e8E4a40EB6088f9CDC7CA34f36B6",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 100,
+            "id": "v3:0xac1bd19ba4d6e8e4a40eb6088f9cdc7ca34f36b6",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:1117422615285016",
+          "gasEstimate": "$bigint:2556270"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xB0037FfFfFB6E514F88458Bc698102865bCa910A",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 500,
+            "id": "v3:0xb0037fffffb6e514f88458bc698102865bca910a",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:15813549908299902",
+          "gasEstimate": "$bigint:291735"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xc9034c3E7F58003E6ae0C8438e7c8f4598d5ACAA",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 3000,
+            "id": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:66011240619556890",
+          "gasEstimate": "$bigint:88182"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0cA6485b7e9cF814A3Fd09d81672B07323535b64",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 10000,
+            "id": "v3:0x0ca6485b7e9cf814a3fd09d81672b07323535b64",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:65530823639673469",
+          "gasEstimate": "$bigint:88124"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xf30e2bca00914a87546d287926f12a3f166b2db96c74cbde1142e6db40854dd1|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xf30e2bca00914a87546d287926f12a3f166b2db96c74cbde1142e6db40854dd1",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xf30e2bca00914a87546d287926f12a3f166b2db96c74cbde1142e6db40854dd1",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xaf60d3f30f4bd968f15cd314db173fa601ace546d7b544b293263738b7a1e0f2|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xaf60d3f30f4bd968f15cd314db173fa601ace546d7b544b293263738b7a1e0f2",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 500,
+            "tickSpacing": 10,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xaf60d3f30f4bd968f15cd314db173fa601ace546d7b544b293263738b7a1e0f2",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd01a51e5afaf5befd4411752821b71138dec6a687a86b97e34aae8e980772b47",
+            "poolKey": {
+              "currency0": "0x4200000000000000000000000000000000000006",
+              "currency1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd01a51e5afaf5befd4411752821b71138dec6a687a86b97e34aae8e980772b47",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x4200000000000000000000000000000000000006",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:203681003914755",
+          "gasEstimate": "$bigint:85933"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x3357ddc3b64d0544fc8fefbcc0b3648cf177ae3e52e8b8aec6e3ed485b9e5fca|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x3357ddc3b64d0544fc8fefbcc0b3648cf177ae3e52e8b8aec6e3ed485b9e5fca",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "fee": 10000,
+            "tickSpacing": 200,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x3357ddc3b64d0544fc8fefbcc0b3648cf177ae3e52e8b8aec6e3ed485b9e5fca",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x1281769c87c71BfC2613259C4beA97670E04C4a4",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "id": "v2:0x1281769c87c71bfc2613259c4bea97670e04c4a4",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:25679393"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x8f8799cef65e4dda2853619ada8f5290493f3ae5|0x4ed4e862860bed51a9570b96d89af5e1b0efefed|100000000000000000000000",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x8F8799ceF65E4DDA2853619aDA8F5290493F3aE5",
+          "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "fee": 100,
+          "id": "v3:0x8f8799cef65e4dda2853619ada8f5290493f3ae5",
+          "currencies": [
+            "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xa528671c1C7c50D685674A2b06d9B9D5d0BF798D",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 500,
+            "id": "v3:0xa528671c1c7c50d685674a2b06d9b9d5d0bf798d",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:47155",
+          "gasEstimate": "$bigint:667401"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x0cC3150056fF3fA2e70bE77D25fE9EC33D12a437",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 3000,
+            "id": "v3:0x0cc3150056ff3fa2e70be77d25fe9ec33d12a437",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:72236790",
+          "gasEstimate": "$bigint:1022544"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x29715d8D279cAB143A12fF515b40a2b35d7BAD37",
+            "token0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 10000,
+            "id": "v3:0x29715d8d279cab143a12ff515b40a2b35d7bad37",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:12346448",
+          "gasEstimate": "$bigint:427795"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x58323abd86618fb8d0531b49adfb0fa2d6a58f779323aa10640a64ca54e3fead",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 100,
+              "tickSpacing": 1,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x58323abd86618fb8d0531b49adfb0fa2d6a58f779323aa10640a64ca54e3fead",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:36900",
+          "gasEstimate": "$bigint:3651072"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xb1764ddae994ed70f143216f8ca225450034fb1167610d68fce1893c4c8f6c8e",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 500,
+              "tickSpacing": 10,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xb1764ddae994ed70f143216f8ca225450034fb1167610d68fce1893c4c8f6c8e",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:493451",
+          "gasEstimate": "$bigint:733486"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0x48ab6b64f4f1c20366041439435814a8c101760307982f8d533fb2b784ff0a00",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0x48ab6b64f4f1c20366041439435814a8c101760307982f8d533fb2b784ff0a00",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:916570",
+          "gasEstimate": "$bigint:502964"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e",
+            "poolKey": {
+              "currency0": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e",
+            "currencies": [
+              "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "currencyOut": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "amountIn": "$bigint:100000000000000000000000",
+          "amountOut": "$bigint:110431545",
+          "gasEstimate": "$bigint:144747"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xb34380BA6a17B022782c7FC91e319C10c168FB98",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "id": "v2:0xb34380ba6a17b022782c7fc91e319c10c168fb98",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "currencyIn": "0x4200000000000000000000000000000000000006",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:66011240619556890",
+          "amountOut": "$bigint:20906175994009397947767"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0xa75f3a2b9ec0df5a485b4776760588d4d9d7e66b|0x4200000000000000000000000000000000000006|66011240619556890",
+        "pool": {
+          "protocol": "v3",
+          "address": "0xA75F3a2B9eC0df5A485B4776760588d4D9D7E66B",
+          "token0": "0x4200000000000000000000000000000000000006",
+          "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "fee": 100,
+          "id": "v3:0xa75f3a2b9ec0df5a485b4776760588d4d9d7e66b",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x36a46dFF597C5A444bbC521D26787F57867D2214",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 500,
+            "id": "v3:0x36a46dff597c5a444bbc521d26787f57867d2214",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "currencyIn": "0x4200000000000000000000000000000000000006",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:66011240619556890",
+          "amountOut": "$bigint:16950526702770126519023",
+          "gasEstimate": "$bigint:422963"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0x76Bf0abD20f1e0155Ce40A62615a90A709a6C3D8",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 3000,
+            "id": "v3:0x76bf0abd20f1e0155ce40a62615a90a709a6c3d8",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "currencyIn": "0x4200000000000000000000000000000000000006",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:66011240619556890",
+          "amountOut": "$bigint:30063011262597014724706",
+          "gasEstimate": "$bigint:130225"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xBA3F945812a83471d709BCe9C3CA699A19FB46f7",
+            "token0": "0x4200000000000000000000000000000000000006",
+            "token1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 10000,
+            "id": "v3:0xba3f945812a83471d709bce9c3ca699a19fb46f7",
+            "currencies": [
+              "0x4200000000000000000000000000000000000006",
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+            ]
+          },
+          "currencyIn": "0x4200000000000000000000000000000000000006",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:66011240619556890",
+          "amountOut": "$bigint:29696783435454463947064",
+          "gasEstimate": "$bigint:129107"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xf7b27c5cf22e37faf1bf4f2e5b69ddd045fa620db180cdcc2e211bddb4e66ee4|0x4200000000000000000000000000000000000006|66011240619556890",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xf7b27c5cf22e37faf1bf4f2e5b69ddd045fa620db180cdcc2e211bddb4e66ee4",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xf7b27c5cf22e37faf1bf4f2e5b69ddd045fa620db180cdcc2e211bddb4e66ee4",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x19cf484d1b72e9b0ad3c2058b3fe5a81cfac6f6991b218f88cc7ae6a708ad628|0x4200000000000000000000000000000000000006|66011240619556890",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x19cf484d1b72e9b0ad3c2058b3fe5a81cfac6f6991b218f88cc7ae6a708ad628",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 500,
+            "tickSpacing": 10,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x19cf484d1b72e9b0ad3c2058b3fe5a81cfac6f6991b218f88cc7ae6a708ad628",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x5b04a9a735e1252a137241eecfdccbaa20169f73be732cca17f03508e026fcf4|0x4200000000000000000000000000000000000006|66011240619556890",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x5b04a9a735e1252a137241eecfdccbaa20169f73be732cca17f03508e026fcf4",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 3000,
+            "tickSpacing": 60,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x5b04a9a735e1252a137241eecfdccbaa20169f73be732cca17f03508e026fcf4",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x587f3bf94a988e52a62243d3a5b153a44aa5186f9c389bc4e0e1ba90c2225577|0x4200000000000000000000000000000000000006|66011240619556890",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x587f3bf94a988e52a62243d3a5b153a44aa5186f9c389bc4e0e1ba90c2225577",
+          "poolKey": {
+            "currency0": "0x4200000000000000000000000000000000000006",
+            "currency1": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "fee": 10000,
+            "tickSpacing": 200,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x587f3bf94a988e52a62243d3a5b153a44aa5186f9c389bc4e0e1ba90c2225577",
+          "currencies": [
+            "0x4200000000000000000000000000000000000006",
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0xe0B2d3a2c11794B65e4E5B20B3E3B670a4CbAFB0",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "id": "v2:0xe0b2d3a2c11794b65e4e5b20b3e3b670a4cbafb0",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:110431545",
+          "amountOut": "$bigint:33416578989384642358"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0xa3e10f7686ebf1d75a6449481823ffffde7582fa|0x833589fcd6edb6e08f4c7c32d4f71b54bda02913|110431545",
+        "pool": {
+          "protocol": "v3",
+          "address": "0xa3e10F7686EBF1d75A6449481823FFfFdE7582FA",
+          "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "fee": 100,
+          "id": "v3:0xa3e10f7686ebf1d75a6449481823ffffde7582fa",
+          "currencies": [
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": true
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v3:0x3b22a2801cc2434acb8aed531beacfdde07d769c|0x833589fcd6edb6e08f4c7c32d4f71b54bda02913|110431545",
+        "pool": {
+          "protocol": "v3",
+          "address": "0x3B22A2801Cc2434Acb8aeD531beAcfDDE07d769c",
+          "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "fee": 500,
+          "id": "v3:0x3b22a2801cc2434acb8aed531beacfdde07d769c",
+          "currencies": [
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xCfE206D9880C5F16B6822ce1b95be59D2feC6e77",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 3000,
+            "id": "v3:0xcfe206d9880c5f16b6822ce1b95be59d2fec6e77",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:110431545",
+          "amountOut": "$bigint:6129558547154981372",
+          "gasEstimate": "$bigint:472818"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v3",
+            "address": "0xBF0A0C12E7C0610002F6Aa6E609755EDe42D6A4d",
+            "token0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "token1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 10000,
+            "id": "v3:0xbf0a0c12e7c0610002f6aa6e609755ede42d6a4d",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:110431545",
+          "amountOut": "$bigint:24392061950471561341895",
+          "gasEstimate": "$bigint:135275"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0x91c8d423bbfc8d55c091512a587e82e83644ba813082c59d826abd3a3c6a4d36|0x833589fcd6edb6e08f4c7c32d4f71b54bda02913|110431545",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0x91c8d423bbfc8d55c091512a587e82e83644ba813082c59d826abd3a3c6a4d36",
+          "poolKey": {
+            "currency0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0x91c8d423bbfc8d55c091512a587e82e83644ba813082c59d826abd3a3c6a4d36",
+          "currencies": [
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xcabc9121d33a7efe3569ce9f22a12c1ad253f6bbd624f30637d004faca5bb063|0x833589fcd6edb6e08f4c7c32d4f71b54bda02913|110431545",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xcabc9121d33a7efe3569ce9f22a12c1ad253f6bbd624f30637d004faca5bb063",
+          "poolKey": {
+            "currency0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 500,
+            "tickSpacing": 10,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xcabc9121d33a7efe3569ce9f22a12c1ad253f6bbd624f30637d004faca5bb063",
+          "currencies": [
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "reverted",
+        "key": "v4:0xb55c9df5f15aaf74921cea7f26b3816781ef53445550b6f05a55a6c4e4736404|0x833589fcd6edb6e08f4c7c32d4f71b54bda02913|110431545",
+        "pool": {
+          "protocol": "v4",
+          "poolId": "0xb55c9df5f15aaf74921cea7f26b3816781ef53445550b6f05a55a6c4e4736404",
+          "poolKey": {
+            "currency0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "fee": 3000,
+            "tickSpacing": 60,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "id": "v4:0xb55c9df5f15aaf74921cea7f26b3816781ef53445550b6f05a55a6c4e4736404",
+          "currencies": [
+            "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+          ]
+        },
+        "amountIndependent": false
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v4",
+            "poolId": "0xafea197aa9b2f65f9efdb498f02ff2bf7fcccf22c189170137c4faccf7b8c948",
+            "poolKey": {
+              "currency0": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            },
+            "id": "v4:0xafea197aa9b2f65f9efdb498f02ff2bf7fcccf22c189170137c4faccf7b8c948",
+            "currencies": [
+              "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+              "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+            ]
+          },
+          "currencyIn": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "currencyOut": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "amountIn": "$bigint:110431545",
+          "amountOut": "$bigint:3128033891163238518536",
+          "gasEstimate": "$bigint:48848"
+        }
+      }
+    }
+  ],
+  "golden": {
+    "status": "quote",
+    "best": {
+      "routeId": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa>v3:0x76bf0abd20f1e0155ce40a62615a90a709a6c3d8",
+      "protocols": [
+        "v3",
+        "v3"
+      ],
+      "path": [
+        "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+        "0x4200000000000000000000000000000000000006",
+        "0x532f27101965dd16442e59d40670faf5ebb142e4"
+      ],
+      "amountIn": "100000000000000000000000",
+      "amountOut": "30063011262597014724706",
+      "intermediateAmounts": [
+        "66011240619556890"
+      ],
+      "gasEstimate": "218407"
+    },
+    "alternatives": [
+      {
+        "routeId": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa>v3:0xba3f945812a83471d709bce9c3ca699a19fb46f7",
+        "protocols": [
+          "v3",
+          "v3"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x4200000000000000000000000000000000000006",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "29696783435454463947064",
+        "intermediateAmounts": [
+          "66011240619556890"
+        ],
+        "gasEstimate": "217289"
+      },
+      {
+        "routeId": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e>v3:0xbf0a0c12e7c0610002f6aa6e609755ede42d6a4d",
+        "protocols": [
+          "v4",
+          "v3"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "24392061950471561341895",
+        "intermediateAmounts": [
+          "110431545"
+        ],
+        "gasEstimate": "280022"
+      },
+      {
+        "routeId": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa>v2:0xb34380ba6a17b022782c7fc91e319c10c168fb98",
+        "protocols": [
+          "v3",
+          "v2"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x4200000000000000000000000000000000000006",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "20906175994009397947767",
+        "intermediateAmounts": [
+          "66011240619556890"
+        ]
+      },
+      {
+        "routeId": "v3:0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa>v3:0x36a46dff597c5a444bbc521d26787f57867d2214",
+        "protocols": [
+          "v3",
+          "v3"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x4200000000000000000000000000000000000006",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "16950526702770126519023",
+        "intermediateAmounts": [
+          "66011240619556890"
+        ],
+        "gasEstimate": "511145"
+      },
+      {
+        "routeId": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e>v4:0xafea197aa9b2f65f9efdb498f02ff2bf7fcccf22c189170137c4faccf7b8c948",
+        "protocols": [
+          "v4",
+          "v4"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "3128033891163238518536",
+        "intermediateAmounts": [
+          "110431545"
+        ],
+        "gasEstimate": "193595"
+      },
+      {
+        "routeId": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e>v2:0xe0b2d3a2c11794b65e4e5b20b3e3b670a4cbafb0",
+        "protocols": [
+          "v4",
+          "v2"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "33416578989384642358",
+        "intermediateAmounts": [
+          "110431545"
+        ]
+      },
+      {
+        "routeId": "v4:0xd57be5f05a6b382eb6ea8867dae4c18684fa1a8e2782ebb2d494a15bf11cc32e>v3:0xcfe206d9880c5f16b6822ce1b95be59d2fec6e77",
+        "protocols": [
+          "v4",
+          "v3"
+        ],
+        "path": [
+          "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "0x532f27101965dd16442e59d40670faf5ebb142e4"
+        ],
+        "amountIn": "100000000000000000000000",
+        "amountOut": "6129558547154981372",
+        "intermediateAmounts": [
+          "110431545"
+        ],
+        "gasEstimate": "617565"
+      }
+    ],
+    "report": {
+      "block": {
+        "number": "49824524",
+        "timestamp": "1786438395"
+      },
+      "discovery": {
+        "v2": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "6601915"
+        },
+        "v3": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "1371680"
+        },
+        "v4": {
+          "status": "partial",
+          "coveredRanges": [],
+          "demandFloor": "25350988"
+        }
+      },
+      "enumeration": {
+        "exhaustiveWithinMaxHops": false,
+        "intermediatesDiscovered": 2,
+        "intermediatesSelected": 2,
+        "intermediatesPruned": 0,
+        "legsMeasured": 45,
+        "pairCeilingHit": false
+      },
+      "quoting": {
+        "attempted": 45,
+        "succeeded": 22,
+        "failed": 23,
+        "transportFailed": 0,
+        "unattempted": 0
+      },
+      "aborted": false,
+      "verificationDegraded": false,
+      "headRegressed": false,
+      "verification": {
+        "preflightAttempted": 0,
+        "preflightBudgetExhausted": false
+      }
+    }
+  }
+}
