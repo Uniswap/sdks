@@ -1,8 +1,10 @@
 import { BigNumber } from 'ethers'
+import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { isAtLeastV2_1_1 } from './constants'
 import { encodeFee1e18, encodeFeeBips } from './numbers'
 import { NormalizedSwapSpecification } from '../types/encodeSwaps'
+import { toFlatFeeList, toPortionFeeList } from './normalizeEncodeSwapsSpec'
 
 // gross = pre-fee (what the swap routes must produce)
 // net = post-fee (what the recipient actually receives, used as the floor on the final SWEEP)
@@ -26,33 +28,46 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
       .mul(slippageDenominator.sub(slippageNumerator))
       .div(slippageDenominator)
 
-    if (spec.fee?.kind === 'portion') {
-      const feeAmount = isAtLeastV2_1_1(spec.urVersion)
-        ? grossMinOrExactAmountOut.mul(BigNumber.from(encodeFee1e18(spec.fee.fee))).div(BigNumber.from(10).pow(18))
-        : grossMinOrExactAmountOut.mul(BigNumber.from(encodeFeeBips(spec.fee.fee))).div(10_000)
-
-      return {
-        exactOrMaxAmountIn: routingAmount,
-        grossMinOrExactAmountOut,
-        netMinOrExactAmountOut: grossMinOrExactAmountOut.sub(feeAmount),
-      }
+    // One deduction per recipient, each floored on its own exactly as the single-fee case always
+    // has been, then summed. Every portion is measured against the same pre-fee gross amount,
+    // while on-chain each PAY_PORTION reads the router's *current* balance and so the portions
+    // compound downward — the sum is therefore an upper bound on what the recipients together
+    // take, which can only make the sweep floor more conservative, never short.
+    const useFullPrecision = isAtLeastV2_1_1(spec.urVersion)
+    let feeAmount = BigNumber.from(0)
+    for (const portionFee of toPortionFeeList(spec.fee)) {
+      feeAmount = feeAmount.add(
+        useFullPrecision
+          ? grossMinOrExactAmountOut.mul(BigNumber.from(encodeFee1e18(portionFee.fee))).div(BigNumber.from(10).pow(18))
+          : grossMinOrExactAmountOut.mul(BigNumber.from(encodeFeeBips(portionFee.fee))).div(10_000)
+      )
     }
+
+    // Several individually valid portions can sum past 100%. Without this the subtraction below
+    // goes negative and fails deep inside ABI encoding instead of at the call site.
+    invariant(feeAmount.lte(grossMinOrExactAmountOut), 'FEE_TOTAL_GT_AMOUNT_OUT')
 
     return {
       exactOrMaxAmountIn: routingAmount,
       grossMinOrExactAmountOut,
-      netMinOrExactAmountOut: grossMinOrExactAmountOut,
+      netMinOrExactAmountOut: grossMinOrExactAmountOut.sub(feeAmount),
     }
   }
 
   const exactOrMaxAmountIn = routingQuote.mul(slippageDenominator.add(slippageNumerator)).div(slippageDenominator)
   const grossMinOrExactAmountOut = routingAmount
-  const netMinOrExactAmountOut =
-    spec.fee?.kind === 'flat' ? grossMinOrExactAmountOut.sub(BigNumber.from(spec.fee.amount)) : grossMinOrExactAmountOut
+
+  // Flat fees are absolute TRANSFERs, so unlike portions the sum is exact rather than an upper
+  // bound; the router must hold every one of them on top of the settled amount.
+  let flatFeeTotal = BigNumber.from(0)
+  for (const flatFee of toFlatFeeList(spec.fee)) {
+    flatFeeTotal = flatFeeTotal.add(BigNumber.from(flatFee.amount))
+  }
+  invariant(flatFeeTotal.lte(grossMinOrExactAmountOut), 'FEE_TOTAL_GT_AMOUNT_OUT')
 
   return {
     exactOrMaxAmountIn,
     grossMinOrExactAmountOut,
-    netMinOrExactAmountOut,
+    netMinOrExactAmountOut: grossMinOrExactAmountOut.sub(flatFeeTotal),
   }
 }

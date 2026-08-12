@@ -1,7 +1,7 @@
 import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
-import { TokenTransferMode } from '../entities/actions/uniswap'
+import { MAX_FEE_RECIPIENTS, TokenTransferMode } from '../entities/actions/uniswap'
 import {
   MAX_UINT160,
   ROUTER_AS_RECIPIENT,
@@ -14,6 +14,11 @@ import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
 import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
 import { stepSpendsToken } from './routerBalanceSteps'
+import { toFeeList } from './normalizeEncodeSwapsSpec'
+
+function hasPortionFee(spec: NormalizedSwapSpecification): boolean {
+  return toFeeList(spec.fee).some((fee) => fee.kind === 'portion')
+}
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -52,7 +57,7 @@ function checkRecipient(spec: NormalizedSwapSpecification, recipient: string, ro
   invariant(typeof recipient === 'string', routerOnlyError)
   if (recipient === ROUTER_AS_RECIPIENT) return
   invariant(spec.allowDirectTransfers, routerOnlyError)
-  invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+  invariant(!hasPortionFee(spec), 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
   invariant(recipient.toLowerCase() === spec.recipient.toLowerCase(), 'STEP_RECIPIENT_NOT_ALLOWED')
 }
 
@@ -68,7 +73,7 @@ function validateV4Recipients(actions: V4Action[], spec: NormalizedSwapSpecifica
         // TAKE_ALL pays msgSender on-chain; any other spec recipient would be the
         // wrong payee while still reducing their sweep floor.
         invariant(spec.allowDirectTransfers, 'TAKE_ALL_REQUIRES_DIRECT_TRANSFERS')
-        invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        invariant(!hasPortionFee(spec), 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
         // strict equality: the all-numeric sentinel has no checksum variant; anything else fails closed
         invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
@@ -185,29 +190,42 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     })
   }
 
-  // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
-  invariant(
-    !(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT),
-    'INVALID_PORTION_FEE_TRADE_TYPE'
-  )
-  invariant(!(spec.fee?.kind === 'flat' && spec.tradeType !== TradeType.EXACT_OUTPUT), 'INVALID_FLAT_FEE_TRADE_TYPE')
-  invariant(
-    !(
-      spec.fee?.kind === 'flat' &&
-      BigNumber.from(spec.fee.amount).gt(BigNumber.from(spec.routing.amount.quotient.toString()))
-    ),
-    'FLAT_FEE_GT_AMOUNT'
-  )
+  // One command per fee entry, so the list is bounded. An empty array is rejected rather than read
+  // as "no fee": the caller clearly meant to pay someone, and silently paying nobody is the exact
+  // failure this surface exists to prevent.
+  const fees = toFeeList(spec.fee)
+  if (Array.isArray(spec.fee)) {
+    invariant(fees.length > 0, 'AT_LEAST_ONE_FEE_RECIPIENT_REQUIRED')
+    invariant(fees.length <= MAX_FEE_RECIPIENTS, 'TOO_MANY_FEE_RECIPIENTS')
+  }
 
-  // v2.0 PAY_PORTION takes whole bps; fractional bps need >=v2.1.1's PAY_PORTION_FULL_PRECISION
-  invariant(
-    !(
-      spec.fee?.kind === 'portion' &&
-      spec.urVersion === UniversalRouterVersion.V2_0 &&
-      !spec.fee.fee.multiply(10_000).remainder.equalTo(0)
-    ),
-    'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
-  )
+  // Applied per entry, so one bad recipient in a list is rejected rather than averaged away.
+  // These also make a mixed portion/flat array impossible: whichever kind does not match the
+  // trade type trips its own invariant.
+  let flatFeeTotal = BigNumber.from(0)
+  for (const fee of fees) {
+    // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
+    invariant(!(fee.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT), 'INVALID_PORTION_FEE_TRADE_TYPE')
+    invariant(!(fee.kind === 'flat' && spec.tradeType !== TradeType.EXACT_OUTPUT), 'INVALID_FLAT_FEE_TRADE_TYPE')
+
+    if (fee.kind === 'flat') {
+      flatFeeTotal = flatFeeTotal.add(BigNumber.from(fee.amount))
+    }
+
+    // v2.0 PAY_PORTION takes whole bps; fractional bps need >=v2.1.1's PAY_PORTION_FULL_PRECISION
+    invariant(
+      !(
+        fee.kind === 'portion' &&
+        spec.urVersion === UniversalRouterVersion.V2_0 &&
+        !fee.fee.multiply(10_000).remainder.equalTo(0)
+      ),
+      'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
+    )
+  }
+
+  // Flat fees are absolute transfers, so it is their *total* that has to fit inside the exact
+  // output; the router pays each one in full out of the same balance.
+  invariant(flatFeeTotal.lte(BigNumber.from(spec.routing.amount.quotient.toString())), 'FLAT_FEE_GT_AMOUNT')
 
   // per-step: capability-gate by UR version, recipients must be router custody (or the spec
   // recipient under allowDirectTransfers), per-hop arrays must match hop counts

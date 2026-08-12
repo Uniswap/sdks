@@ -37,7 +37,7 @@ import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
 import { applyNativeRouterBalanceInputToSteps, applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
-import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
+import { normalizeEncodeSwapsSpec, toFeeList } from './utils/normalizeEncodeSwapsSpec'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
@@ -251,29 +251,30 @@ export abstract class SwapRouter {
       }
     })
 
-    // Fee deducted from gross output before final settlement.
+    // Fee deducted from gross output before final settlement. One command per recipient, emitted
+    // in the caller's order, all of them ahead of the settlement SWEEP below.
     // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
-    if (normalizedSpec.fee?.kind === 'portion') {
-      const feeCommandType = isAtLeastV2_1_1(normalizedSpec.urVersion)
-        ? CommandType.PAY_PORTION_FULL_PRECISION
-        : CommandType.PAY_PORTION
-      const encodedFee = isAtLeastV2_1_1(normalizedSpec.urVersion)
-        ? encodeFee1e18(normalizedSpec.fee.fee)
-        : encodeFeeBips(normalizedSpec.fee.fee)
-
-      planner.addCommand(
-        feeCommandType,
-        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, encodedFee],
-        false,
-        normalizedSpec.urVersion
-      )
-    } else if (normalizedSpec.fee?.kind === 'flat') {
-      planner.addCommand(
-        CommandType.TRANSFER,
-        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, normalizedSpec.fee.amount],
-        false,
-        normalizedSpec.urVersion
-      )
+    const useFullPrecision = isAtLeastV2_1_1(normalizedSpec.urVersion)
+    for (const fee of toFeeList(normalizedSpec.fee)) {
+      if (fee.kind === 'portion') {
+        planner.addCommand(
+          useFullPrecision ? CommandType.PAY_PORTION_FULL_PRECISION : CommandType.PAY_PORTION,
+          [
+            getCurrencyAddress(outputToken),
+            fee.recipient,
+            useFullPrecision ? encodeFee1e18(fee.fee) : encodeFeeBips(fee.fee),
+          ],
+          false,
+          normalizedSpec.urVersion
+        )
+      } else {
+        planner.addCommand(
+          CommandType.TRANSFER,
+          [getCurrencyAddress(outputToken), fee.recipient, fee.amount],
+          false,
+          normalizedSpec.urVersion
+        )
+      }
     }
 
     // Assumes routers already normalized final gross output into `routing.outputToken`.

@@ -13,6 +13,23 @@ export type Fee =
   | { kind: 'portion'; recipient: string; fee: Percent }
   | { kind: 'flat'; recipient: string; amount: BigNumberish }
 
+export type PortionFee = Extract<Fee, { kind: 'portion' }>
+export type FlatFee = Extract<Fee, { kind: 'flat' }>
+
+/**
+ * Fee(s) taken out of the swap output before it is settled to `recipient`.
+ *
+ * A bare `Fee` is the original shape and encodes exactly as it always has. An array pays one
+ * recipient per entry, in the order given, and holds at most `MAX_FEE_RECIPIENTS` entries — each
+ * entry costs one command, so the list is bounded to keep calldata size and the gas of the fee
+ * tail predictable.
+ *
+ * Entries must all be the same `kind`, because `kind` is already pinned by the trade type:
+ * `portion` pairs with `EXACT_INPUT` and `flat` with `EXACT_OUTPUT`, so a mixed array is rejected
+ * by `INVALID_PORTION_FEE_TRADE_TYPE` / `INVALID_FLAT_FEE_TRADE_TYPE` whichever way the trade goes.
+ */
+export type FeeSpecification = Fee | Fee[]
+
 export type SwapSpecification = {
   tradeType: TradeType
   routing: {
@@ -23,7 +40,7 @@ export type SwapSpecification = {
   }
   slippageTolerance: Percent
   recipient?: string // defaults to SENDER_AS_RECIPIENT (0x01); ApproveProxy requires an explicit address
-  fee?: Fee
+  fee?: FeeSpecification
   tokenTransferMode?: TokenTransferMode
   permit?: Permit2Permit
   chainId?: number // required only for ApproveProxy

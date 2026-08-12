@@ -17,7 +17,7 @@ export {
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
-export { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
+export { normalizeEncodeSwapsSpec, toFeeList } from './utils/normalizeEncodeSwapsSpec'
 export { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 export type { EncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 export { validateEncodeSwaps } from './utils/validateEncodeSwaps'
