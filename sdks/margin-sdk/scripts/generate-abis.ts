@@ -40,7 +40,7 @@ const CONTRACTS: Array<{ exportName: string; contract: string }> = [
 // The venue-agnostic surface reads.ts binds to: the ILendingAdapter interface plus the two-step
 // ownership handoff and the shared errors every adapter carries (assembled from the compiled
 // Morpho adapter ABI so nothing is hand-written).
-const SHARED_ADAPTER_FUNCTIONS = ['owner', 'pendingOwner', 'transferOwnership', 'acceptOwnership']
+const SHARED_ADAPTER_FUNCTIONS = ['owner', 'pendingOwner', 'transferOwnership', 'acceptOwnership', 'resolveAmount']
 const SHARED_ADAPTER_ERRORS = ['MarketNotSupported', 'NotOwner', 'ZeroOwner', 'NotPendingOwner']
 
 type AbiItem = Record<string, unknown> & { type: string; name?: string }

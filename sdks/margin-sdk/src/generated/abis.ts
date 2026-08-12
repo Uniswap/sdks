@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit 62a514fe5e405bd61c7e116f99300c64b5d9bea3
- * (https://github.com/Uniswap/v4-periphery/commit/62a514fe5e405bd61c7e116f99300c64b5d9bea3)
+ * Pinned to v4-periphery commit 7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9
+ * (https://github.com/Uniswap/v4-periphery/commit/7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: '62a514fe5e405bd61c7e116f99300c64b5d9bea3',
+  commit: '7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -2069,6 +2069,23 @@ export const MORPHO_LENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'resolveAmount',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'bytes',
+        name: 'context',
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'setMarket',
     stateMutability: 'nonpayable',
     inputs: [
@@ -2640,6 +2657,23 @@ export const AAVE_LENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'resolveAmount',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'bytes',
+        name: 'context',
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'setMarket',
     stateMutability: 'nonpayable',
     inputs: [
@@ -3157,6 +3191,23 @@ export const AAVE_V4_LENDING_ADAPTER_ABI = [
       {
         type: 'uint256',
         name: 'debtAmount',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'resolveAmount',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'bytes',
+        name: 'context',
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'amount',
       },
     ],
   },
@@ -3794,6 +3845,23 @@ export const COMPOUND_V3_LENDING_ADAPTER_ABI = [
       {
         type: 'uint256',
         name: 'debtAmount',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'resolveAmount',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'bytes',
+        name: 'context',
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'amount',
       },
     ],
   },
@@ -4686,6 +4754,23 @@ export const LENDING_ADAPTER_ABI = [
       {
         type: 'address',
         name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'resolveAmount',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'bytes',
+        name: 'context',
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'amount',
       },
     ],
   },
