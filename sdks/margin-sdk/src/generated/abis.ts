@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit 4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43
- * (https://github.com/Uniswap/v4-periphery/commit/4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43)
+ * Pinned to v4-periphery commit 62a514fe5e405bd61c7e116f99300c64b5d9bea3
+ * (https://github.com/Uniswap/v4-periphery/commit/62a514fe5e405bd61c7e116f99300c64b5d9bea3)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: '4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43',
+  commit: '62a514fe5e405bd61c7e116f99300c64b5d9bea3',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
