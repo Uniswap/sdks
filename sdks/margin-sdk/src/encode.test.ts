@@ -30,7 +30,7 @@ import { type IncreaseParams } from './types.js'
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
-const ROUTER: Address = '0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0'
+const ROUTER: Address = '0x000000000075e82F7B7DdC5DD1B4984b560eF5D4'
 const UNIVERSAL_ROUTER: Address = '0x1111111111111111111111111111111111111111'
 const ZERO: Address = '0x0000000000000000000000000000000000000000'
 
@@ -62,7 +62,7 @@ const BASE_INCREASE: IncreaseParams = {
 /**
  * Ground-truth calldata generated with `cast calldata` from the deployed contract's signatures;
  * each selector was additionally confirmed against the live mainnet router at
- * 0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0 (an expired deadline reverts `DeadlinePassed(1)`,
+ * 0x000000000075e82F7B7DdC5DD1B4984b560eF5D4 (an expired deadline reverts `DeadlinePassed(1)`,
  * proving the selector dispatched).
  */
 const CAST_INCREASE_CALLDATA =

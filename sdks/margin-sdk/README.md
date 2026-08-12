@@ -374,12 +374,12 @@ Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
 
 | Contract                     | Address                                      |
 | ---------------------------- | -------------------------------------------- |
-| MarginRouter                 | `0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0` |
+| MarginRouter                 | `0x000000000075e82F7B7DdC5DD1B4984b560eF5D4` |
 | MarginAccount implementation | `0x36e5317CEE9F70c0A41A97A4676899Dfe9a10239` |
-| MorphoLendingAdapter         | `0x08e4C6b61D99B6f2AD472c16ECE641F63F5635D5` |
-| AaveLendingAdapter (v3)      | `0x2c0bDc6786D285665337Ce7d544C8bC80a23A55C` |
-| AaveV4LendingAdapter         | `0xaC98DBcdC8c9f665372BbBE68C6A9123A8CbA6Eb` |
-| CompoundV3LendingAdapter     | `0xAaD2B75B9557748a16216f991613deFE42134c36` |
+| MorphoLendingAdapter         | `0x70fD13dF8C827ab71AE300D24b771C19B67d178A` |
+| AaveLendingAdapter (v3)      | `0x79D243C83e2D351aBbe8010a7E95162998475719` |
+| AaveV4LendingAdapter         | `0x917D08052E2994B75cF82bDaF6314b07532f2556` |
+| CompoundV3LendingAdapter     | `0x3625D6F7ccA2e8F95aF2E6497075D1a3E32dC5C6` |
 
 The **Universal Router is deliberately not in this table**: it is a per-call parameter of the
 position flows, so callers pick the deployment their route targets. It must carry already-unlocked

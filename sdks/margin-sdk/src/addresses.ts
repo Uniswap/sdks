@@ -43,13 +43,13 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
  */
 export const MARGIN_ADDRESSES: Partial<Record<number, MarginAddresses>> = {
   [SupportedChainId.MAINNET]: {
-    marginRouter: getAddress('0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0'),
+    marginRouter: getAddress('0x000000000075e82F7B7DdC5DD1B4984b560eF5D4'),
     marginAccountImplementation: getAddress('0x36e5317CEE9F70c0A41A97A4676899Dfe9a10239'),
     lendingAdapters: {
-      morphoBlue: getAddress('0x08e4C6b61D99B6f2AD472c16ECE641F63F5635D5'),
-      aaveV3: getAddress('0x2c0bDc6786D285665337Ce7d544C8bC80a23A55C'),
-      aaveV4: getAddress('0xaC98DBcdC8c9f665372BbBE68C6A9123A8CbA6Eb'),
-      compoundV3: getAddress('0xAaD2B75B9557748a16216f991613deFE42134c36'),
+      morphoBlue: getAddress('0x70fD13dF8C827ab71AE300D24b771C19B67d178A'),
+      aaveV3: getAddress('0x79D243C83e2D351aBbe8010a7E95162998475719'),
+      aaveV4: getAddress('0x917D08052E2994B75cF82bDaF6314b07532f2556'),
+      compoundV3: getAddress('0x3625D6F7ccA2e8F95aF2E6497075D1a3E32dC5C6'),
     },
     permit2: PERMIT2,
     poolManager: getAddress('0x000000000004444c5dc75cB358380D2e3dE08A90'),
