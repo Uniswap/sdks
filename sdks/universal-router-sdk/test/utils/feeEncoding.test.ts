@@ -8,7 +8,7 @@ import { UniversalRouterVersion } from '../../src/utils/constants'
 import { encodeFeeBips, encodeFee1e18 } from '../../src/utils/numbers'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { CommandParser } from '../../src/utils/commandParser'
-import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../../src'
+import { SwapRouter, UniswapTrade, FlatFeeOptions, MAX_FEE_RECIPIENTS } from '../../src'
 import { buildTrade, swapOptions } from './uniswapData'
 import { TEST_FEE_RECIPIENT_ADDRESS } from './addresses'
 import { ZERO_ADDRESS } from '../../src/utils/constants'
@@ -303,6 +303,319 @@ describe('Fee Encoding', () => {
       expect(sweepCmd).to.not.be.undefined
       const sweepMinAmount = BigNumber.from(sweepCmd!.params[2].value)
       expect(sweepMinAmount.gt(0)).to.be.true
+    })
+  })
+
+  describe('UniswapTrade.encode multiple fee recipients', () => {
+    // deliberately not in ascending order, so an implementation that sorted or deduped would fail
+    const RECIPIENT_A = '0xcccccccccccccccccccccccccccccccccccccccc'
+    const RECIPIENT_B = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+    const RECIPIENT_C = '0xdddddddddddddddddddddddddddddddddddddddd'
+    const RECIPIENT_D = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2'
+
+    const FEE_A: FeeOptions = { fee: new Percent(25, 10_000), recipient: RECIPIENT_A } // 0.25%
+    const FEE_B: FeeOptions = { fee: new Percent(50, 10_000), recipient: RECIPIENT_B } // 0.50%
+    const FEE_C: FeeOptions = { fee: new Percent(75, 10_000), recipient: RECIPIENT_C } // 0.75%
+    const FEE_D: FeeOptions = { fee: new Percent(100, 10_000), recipient: RECIPIENT_D } // 1.00%
+
+    let ETH_USDC_V4: V4Pool
+
+    before(() => {
+      const liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
+      const tickSpacing = 60
+      const tickProviderMock = [
+        {
+          index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing),
+          liquidityNet: liquidity,
+          liquidityGross: liquidity,
+        },
+        {
+          index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
+          liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
+          liquidityGross: liquidity,
+        },
+      ]
+
+      ETH_USDC_V4 = new V4Pool(
+        ETHER,
+        USDC,
+        FeeAmount.MEDIUM,
+        tickSpacing,
+        ZERO_ADDRESS,
+        encodeSqrtRatioX96(1, 1),
+        liquidity,
+        0,
+        tickProviderMock
+      )
+    })
+
+    async function exactInputTrade(): Promise<V4Trade<Ether, Token, TradeType.EXACT_INPUT>> {
+      return V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        TradeType.EXACT_INPUT
+      )
+    }
+
+    async function exactOutputTrade(): Promise<V4Trade<Ether, Token, TradeType.EXACT_OUTPUT>> {
+      return V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, utils.parseUnits('1000', 6).toString()),
+        TradeType.EXACT_OUTPUT
+      )
+    }
+
+    function feeCommands(calldata: string) {
+      return CommandParser.parseCalldata(calldata).commands.filter(
+        (cmd) => cmd.commandName === 'PAY_PORTION' || cmd.commandName === 'PAY_PORTION_FULL_PRECISION'
+      )
+    }
+
+    function commandNames(calldata: string): string[] {
+      return CommandParser.parseCalldata(calldata).commands.map((cmd) => cmd.commandName)
+    }
+
+    function sweepFloor(calldata: string): BigNumber {
+      const sweepCmd = CommandParser.parseCalldata(calldata).commands.find((cmd) => cmd.commandName === 'SWEEP')
+      expect(sweepCmd, 'expected a SWEEP command').to.not.be.undefined
+      return BigNumber.from(sweepCmd!.params[2].value)
+    }
+
+    describe('one recipient is unchanged', () => {
+      it('a one-element array encodes byte-identically to the bare FeeOptions (V2_1_1)', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const single = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: FEE_A, urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+        const asArray = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [FEE_A], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(asArray.value).to.equal(single.value)
+        expect(feeCommands(asArray.calldata)).to.have.length(1)
+      })
+
+      it('a one-element array encodes byte-identically to the bare FeeOptions (V2_0 bips)', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const single = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: FEE_A, urVersion: UniversalRouterVersion.V2_0 })
+        )
+        const asArray = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [FEE_A], urVersion: UniversalRouterVersion.V2_0 })
+        )
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(feeCommands(asArray.calldata)[0].commandName).to.equal('PAY_PORTION')
+      })
+
+      it('a one-element array encodes byte-identically on exact output, where the fee is deducted', async () => {
+        const trade = buildTrade([await exactOutputTrade()])
+        const single = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: FEE_A, urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+        const asArray = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [FEE_A], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(sweepFloor(asArray.calldata).toString()).to.equal(sweepFloor(single.calldata).toString())
+      })
+    })
+
+    describe('command emission', () => {
+      it('emits one PAY_PORTION_FULL_PRECISION per recipient for two recipients', async () => {
+        const fees = [FEE_A, FEE_B]
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        const cmds = feeCommands(methodParameters.calldata)
+        expect(cmds).to.have.length(2)
+        expect(cmds.map((cmd) => cmd.commandName)).to.deep.equal([
+          'PAY_PORTION_FULL_PRECISION',
+          'PAY_PORTION_FULL_PRECISION',
+        ])
+        expect(cmds.map((cmd) => (cmd.params[1].value as string).toLowerCase())).to.deep.equal(
+          fees.map((fee) => fee.recipient.toLowerCase())
+        )
+        expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toString())).to.deep.equal(
+          fees.map((fee) => BigNumber.from(encodeFee1e18(fee.fee)).toString())
+        )
+      })
+
+      it('emits one PAY_PORTION per recipient for four recipients on V2_0 (bips)', async () => {
+        const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_0 })
+        )
+
+        const cmds = feeCommands(methodParameters.calldata)
+        expect(cmds).to.have.length(MAX_FEE_RECIPIENTS)
+        expect(cmds.map((cmd) => cmd.commandName)).to.deep.equal(new Array(4).fill('PAY_PORTION'))
+        expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toNumber())).to.deep.equal(
+          fees.map((fee) => BigNumber.from(encodeFeeBips(fee.fee)).toNumber())
+        )
+      })
+
+      it('preserves the caller ordering rather than sorting or deduping recipients', async () => {
+        const fees = [FEE_C, FEE_A, FEE_D, FEE_B]
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        expect(
+          feeCommands(methodParameters.calldata).map((cmd) => (cmd.params[1].value as string).toLowerCase())
+        ).to.deep.equal([RECIPIENT_C, RECIPIENT_A, RECIPIENT_D, RECIPIENT_B])
+      })
+
+      it('emits every fee command before the settlement command', async () => {
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: [FEE_A, FEE_B, FEE_C], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        const names = commandNames(methodParameters.calldata)
+        const lastFeeIndex = names.lastIndexOf('PAY_PORTION_FULL_PRECISION')
+        const sweepIndex = names.indexOf('SWEEP')
+        expect(lastFeeIndex).to.be.greaterThan(-1)
+        expect(sweepIndex).to.be.greaterThan(lastFeeIndex)
+      })
+    })
+
+    describe('summed fee deduction', () => {
+      it('subtracts the sum of every recipient from the exact-output sweep floor', async () => {
+        const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
+        const trade = buildTrade([await exactOutputTrade()])
+        const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        const expectedDeduction = fees.reduce(
+          (acc, fee) =>
+            acc.add(grossMinimumOut.mul(BigNumber.from(encodeFee1e18(fee.fee))).div(BigNumber.from(10).pow(18))),
+          BigNumber.from(0)
+        )
+
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal(
+          grossMinimumOut.sub(expectedDeduction).toString()
+        )
+      })
+
+      it('deducts strictly more for four recipients than for the first one alone', async () => {
+        const trade = buildTrade([await exactOutputTrade()])
+        const oneOpts = swapOptions({ fee: [FEE_A], urVersion: UniversalRouterVersion.V2_1_1 })
+        const fourOpts = swapOptions({ fee: [FEE_A, FEE_B, FEE_C, FEE_D], urVersion: UniversalRouterVersion.V2_1_1 })
+
+        const oneFloor = sweepFloor(SwapRouter.swapCallParameters(trade, oneOpts).calldata)
+        const fourFloor = sweepFloor(SwapRouter.swapCallParameters(trade, fourOpts).calldata)
+
+        expect(fourFloor.lt(oneFloor)).to.be.true
+      })
+
+      it('never under-estimates what the sequential on-chain PAY_PORTIONs actually take', async () => {
+        // Each PAY_PORTION reads the router's *current* balance, so the portions compound downward.
+        // The SDK sums every portion against the gross amount, which must therefore be an upper bound
+        // — an under-estimate would leave a sweep floor the router cannot meet.
+        const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
+        const trade = buildTrade([await exactOutputTrade()])
+        const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        const sdkDeduction = grossMinimumOut.sub(sweepFloor(methodParameters.calldata))
+
+        let balance = grossMinimumOut
+        let actuallyPaid = BigNumber.from(0)
+        for (const fee of fees) {
+          const paid = balance.mul(BigNumber.from(encodeFee1e18(fee.fee))).div(BigNumber.from(10).pow(18))
+          actuallyPaid = actuallyPaid.add(paid)
+          balance = balance.sub(paid)
+        }
+
+        expect(sdkDeduction.gte(actuallyPaid), 'sdk deduction must not under-estimate the on-chain total').to.be.true
+      })
+
+      it('leaves the exact-input sweep floor at the gross minimum, as with a single fee', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const opts = swapOptions({ fee: [FEE_A, FEE_B, FEE_C, FEE_D], urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal(
+          trade.minimumAmountOut(opts.slippageTolerance).quotient.toString()
+        )
+      })
+
+      it('rejects portions that together exceed the exact-output minimum', async () => {
+        const trade = buildTrade([await exactOutputTrade()])
+        const halves: FeeOptions[] = [
+          { fee: new Percent(60, 100), recipient: RECIPIENT_A },
+          { fee: new Percent(60, 100), recipient: RECIPIENT_B },
+        ]
+
+        expect(() =>
+          SwapRouter.swapCallParameters(trade, swapOptions({ fee: halves, urVersion: UniversalRouterVersion.V2_1_1 }))
+        ).to.throw('Fee amount greater than minimumAmountOut')
+      })
+    })
+
+    describe('validation', () => {
+      it(`rejects more than ${MAX_FEE_RECIPIENTS} recipients`, async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const fees = [
+          FEE_A,
+          FEE_B,
+          FEE_C,
+          FEE_D,
+          { fee: new Percent(1, 10_000), recipient: TEST_FEE_RECIPIENT_ADDRESS },
+        ]
+
+        expect(
+          () => new UniswapTrade(trade, swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 }))
+        ).to.throw(`At most ${MAX_FEE_RECIPIENTS} fee recipients permitted`)
+      })
+
+      it(`accepts exactly ${MAX_FEE_RECIPIENTS} recipients`, async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
+
+        expect(
+          () => new UniswapTrade(trade, swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 }))
+        ).to.not.throw()
+      })
+
+      it('rejects an empty fee array', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+
+        expect(() => new UniswapTrade(trade, swapOptions({ fee: [] }))).to.throw('At least one fee recipient required')
+      })
+
+      it('still rejects a fee array combined with a flat fee', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const flatFee: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+
+        expect(() => new UniswapTrade(trade, swapOptions({ fee: [FEE_A], flatFee }))).to.throw(
+          'Only one fee option permitted'
+        )
+      })
+
+      it('rejects fractional bips on a pre-V2_1_1 router for any recipient in the array', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const fees: FeeOptions[] = [FEE_A, { fee: new Percent(1, 3), recipient: RECIPIENT_B }]
+
+        expect(() =>
+          SwapRouter.swapCallParameters(trade, swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_0 }))
+        ).to.throw('Fractional fee bips require Universal Router version V2_1_1 or higher')
+      })
     })
   })
 })

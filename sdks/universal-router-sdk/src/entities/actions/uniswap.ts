@@ -1,7 +1,7 @@
 import invariant from 'tiny-invariant'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
-import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
+import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath, FeeOptions } from '@uniswap/v3-sdk'
 import {
   Route as V4Route,
   Trade as V4Trade,
@@ -48,6 +48,10 @@ export type FlatFeeOptions = {
   recipient: string
 }
 
+// Each portion-fee recipient costs one PAY_PORTION command, so the list is bounded to keep
+// calldata size (and the on-chain gas of the fee tail) predictable.
+export const MAX_FEE_RECIPIENTS = 4
+
 // the existing router permit object doesn't include enough data for permit2
 // so we extend swap options with the permit2 permit
 // when safe mode is enabled, the SDK will add an extra ETH sweep for security
@@ -70,7 +74,14 @@ export type RouterBalanceInput = {
   minimumAmount?: BigNumberish
 }
 
-export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
+export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & {
+  /**
+   * Portion fee(s) taken out of the swap output before it is forwarded to `recipient`.
+   * A single `FeeOptions` is the original shape and encodes exactly as it always has.
+   * An array pays one recipient per entry, in the order given, and may hold at most
+   * `MAX_FEE_RECIPIENTS` entries. Mutually exclusive with `flatFee`.
+   */
+  fee?: FeeOptions | FeeOptions[]
   useRouterBalance?: boolean
   /**
    * The input Token is the chain's native gas token exposed via an ERC20 predeploy whose balance
@@ -132,6 +143,15 @@ export class UniswapTrade implements Command {
   readonly payerIsUser: boolean
 
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
+    if (Array.isArray(options.fee)) {
+      // an empty array is rejected rather than read as "no fee": it would still make the router
+      // custody the output (see hasFeeOption) while paying nobody, which is never what a caller means
+      if (options.fee.length === 0) throw new Error('At least one fee recipient required')
+      if (options.fee.length > MAX_FEE_RECIPIENTS) {
+        throw new Error(`At most ${MAX_FEE_RECIPIENTS} fee recipients permitted`)
+      }
+    }
+
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
     if (options.nativeErc20Input) {
@@ -443,31 +463,37 @@ export class UniswapTrade implements Command {
 
       let feeDeduction = BigNumber.from(0)
 
-      // If there is a fee, that percentage is sent to the fee recipient
-      // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
-      if (!!this.options.fee) {
-        // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
-        // older versions only support PAY_PORTION (bips)
-        const useFullPrecision = isAtLeastV2_1_1(this.options.urVersion)
+      // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
+      // older versions only support PAY_PORTION (bips)
+      const useFullPrecision = isAtLeastV2_1_1(this.options.urVersion)
 
+      // If there is a fee, that percentage is sent to the fee recipient. One PAY_PORTION per
+      // recipient, emitted in the caller's order, ahead of the settlement command below.
+      // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
+      for (const portionFee of toFeeOptionsList(this.options.fee)) {
         // Reject fractional bips fees on older UR versions to prevent silent precision loss
-        if (!useFullPrecision && !this.options.fee.fee.multiply(10_000).remainder.equalTo(0)) {
+        if (!useFullPrecision && !portionFee.fee.multiply(10_000).remainder.equalTo(0)) {
           throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
         }
 
+        // Every deduction is taken against the same pre-fee minimumAmountOut. On-chain each
+        // PAY_PORTION reads the router's *current* balance, so the portions compound downward and
+        // the recipients together receive no more than this sum. Summing against the gross amount
+        // therefore over-estimates rather than under-estimates the total taken, which can only make
+        // the sweep floor below more conservative — it can never leave the sweep short.
         if (useFullPrecision) {
-          const fee1e18 = encodeFee1e18(this.options.fee.fee)
+          const fee1e18 = encodeFee1e18(portionFee.fee)
           planner.addCommand(
             CommandType.PAY_PORTION_FULL_PRECISION,
-            [pathOutputCurrencyAddress, this.options.fee.recipient, fee1e18],
+            [pathOutputCurrencyAddress, portionFee.recipient, fee1e18],
             false,
             this.options.urVersion
           )
-          feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
+          feeDeduction = feeDeduction.add(minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18)))
         } else {
-          const feeBips = encodeFeeBips(this.options.fee.fee)
-          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
-          feeDeduction = minimumAmountOut.mul(feeBips).div(10000)
+          const feeBips = encodeFeeBips(portionFee.fee)
+          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, portionFee.recipient, feeBips])
+          feeDeduction = feeDeduction.add(minimumAmountOut.mul(feeBips).div(10000))
         }
       }
 
@@ -484,6 +510,9 @@ export class UniswapTrade implements Command {
       // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
       // Otherwise we continue as expected with the trade's normal expected output
       if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
+        // Guards the subtraction below: several individually valid portions can sum past 100%,
+        // which would otherwise produce a negative sweep floor and fail deep in ABI encoding.
+        if (feeDeduction.gt(minimumAmountOut)) throw new Error('Fee amount greater than minimumAmountOut')
         minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 
@@ -891,6 +920,13 @@ function riskOfPartialFill(trade: RouterTrade<Currency, Currency, TradeType>): b
   return trade.priceImpact.greaterThan(REFUND_ETH_PRICE_IMPACT_THRESHOLD)
 }
 
+// Normalizes the single-or-array `fee` option into a list. A lone FeeOptions becomes a
+// one-element list, so the single-recipient path encodes exactly as it did before.
+function toFeeOptionsList(fee: SwapOptions['fee']): FeeOptions[] {
+  if (!fee) return []
+  return Array.isArray(fee) ? fee : [fee]
+}
+
 function hasFeeOption(swapOptions: SwapOptions): boolean {
-  return !!swapOptions.fee || !!swapOptions.flatFee
+  return toFeeOptionsList(swapOptions.fee).length > 0 || !!swapOptions.flatFee
 }
