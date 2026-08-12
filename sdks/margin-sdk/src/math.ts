@@ -207,9 +207,9 @@ export function sizeIncrease(p: {
 
 /**
  * Sizes the collateral cap for a `decreasePosition` swap that must buy `debtToRepay` of debt:
- * `maxCollateralIn = quote(debtToRepay) + slippage`. For a full close pass the position's current
- * debt (read via `describePosition`) plus an interest-accrual buffer in `slippageBps` — debt
- * accrues between the read and inclusion, and the close swap is sized onchain off the live total.
+ * `maxCollateralIn = quote(debtToRepay) + slippage`. For a full close prefer `sizeFullClose`,
+ * which prices the interest-accrual buffer separately (from a measured borrow rate) instead of
+ * folding it into `slippageBps`.
  */
 export function sizeDecrease(p: {
   /** The debt to repay, in the debt token's native decimals (current debt for a full close). */

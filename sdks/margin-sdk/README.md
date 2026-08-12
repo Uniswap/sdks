@@ -173,21 +173,27 @@ import {
   buildV4ExactOutRoute,
   closePositionCall,
   decreasePositionCall,
+  measureBorrowRatePerSecond,
   sizeDecrease,
-  withSlippageUp,
+  sizeFullClose,
 } from '@uniswap/margin-sdk'
 
 // Full close: repay all debt, withdraw all collateral, return the residual (realized PnL).
-// Size the collateral cap from the CURRENT debt plus headroom (debt accrues interest).
-const { maxCollateralIn } = sizeDecrease({
-  debtToRepay: position.debtAmount,
+// The close route must buy AT LEAST the live debt, and debt keeps accruing between the quote and
+// inclusion. Size the over-buy from the position's own realized accrual rather than a flat
+// haircut: measure the per-second growth from two positionOf reads, project it over the expected
+// inclusion horizon, and keep swap slippage as a separate cap. Over-bought debt is returned to
+// the caller after the unlock, so a tight buffer means less swapped and less returned.
+// Caveat: the measurement window must not contain a mutation of the position (see the docstring).
+const { ratePerSecondWad } = await measureBorrowRatePerSecond(publicClient, { adapter, account, market })
+const { debtToBuy, maxCollateralIn } = sizeFullClose({
+  debtAmount: position.debtAmount,
+  ratePerSecondWad,
+  horizonBlocks: 10n, // expected blocks until inclusion (12s mainnet blocks)
   priceCollateralPerDebtToken: parseUnits('0.000333333333333333', 18), // WETH per USDC quote
   debtDecimals: 6,
   slippageBps: 100,
 })
-// The close route must buy AT LEAST the live debt — buffer the read for interest accrual
-// (over-bought debt is returned to the caller after the unlock).
-const debtToBuy = withSlippageUp(position.debtAmount, 10)
 const closeRoute = buildV4ExactOutRoute({
   poolKey,
   input: WETH, // the collateral sold

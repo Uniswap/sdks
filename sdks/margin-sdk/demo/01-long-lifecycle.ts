@@ -27,6 +27,7 @@ import {
 import {
   FULL_CLOSE,
   addCollateralCall,
+  blocksToSeconds,
   closePositionCall,
   collateralToBuyForLeverage,
   decreasePositionCall,
@@ -38,8 +39,10 @@ import {
   isAccountDeployed,
   getIsAdapterAllowed,
   getIsSupportedMarket,
+  measureBorrowRatePerSecond,
   parseLeverageX18,
   predictMarginAccountAddress,
+  projectDebt,
   withSlippageUp,
 } from '../src'
 
@@ -227,9 +230,30 @@ export async function run(ctx: Ctx): Promise<void> {
   assert(afterDecrease.currentLtv < position.currentLtv, 'partial delever lowered the LTV')
 
   // -- 9. Full close: FULL_CLOSE sentinel, residual (realized PnL) returned to the caller --------
-  // A full-close route must buy AT LEAST the live debt: buffer the read for accrual between the
-  // quote and inclusion (over-bought debt is returned to the caller after the unlock).
-  const debtToBuy = withSlippageUp(afterDecrease.debtAmount, 10)
+  // A full-close route must buy AT LEAST the live debt, which keeps accruing between the quote
+  // and inclusion. Instead of a flat haircut, size the over-buy from the position's own realized
+  // accrual: let a clean window form (the measurement rejects windows containing the step-8
+  // repay), measure the per-second rate from two positionOf reads, and project it over the
+  // expected inclusion horizon. The over-buy shrinks from bps of the debt to wei of interest.
+  await ctx.testClient.mine({ blocks: 2, interval: 12 })
+  const closingPosition = await getPosition(ctx.publicClient, { adapter, account: predicted, market })
+  const rate = await measureBorrowRatePerSecond(ctx.publicClient, {
+    adapter,
+    account: predicted,
+    market,
+    lookbackBlocks: 2n,
+  })
+  note(`measured borrow rate: ${rate.ratePerSecondWad} wei/s over a ${rate.elapsedSeconds}s window`)
+  const projected = projectDebt({
+    debtAmount: closingPosition.debtAmount,
+    ratePerSecondWad: rate.ratePerSecondWad,
+    seconds: blocksToSeconds(10n), // generous inclusion horizon
+  })
+  const debtToBuy = withSlippageUp(projected, 1) // 1 bp for rate drift and wei-scale rounding
+  assert(
+    debtToBuy - closingPosition.debtAmount < (closingPosition.debtAmount * 10n) / 10_000n,
+    `measured-accrual buffer (${debtToBuy - closingPosition.debtAmount} wei) undercuts the old flat 10 bps haircut`
+  )
   const closeQuote = await quoteSwapInput(ctx, market, market.collateral, debtToBuy, 100)
   const wethBefore = await balanceOf(ctx, weth, deployer)
   const closeReceipt = await send(

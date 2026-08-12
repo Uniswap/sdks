@@ -23,6 +23,7 @@ export * from './abis.js'
 export * from './market.js'
 export * from './account.js'
 export * from './math.js'
+export * from './accrual.js'
 
 // Entry-point encoders, the execute-plan builder & Universal Router route builders
 export * from './encode.js'
