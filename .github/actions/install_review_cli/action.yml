@@ -33,6 +33,15 @@ outputs:
 runs:
   using: composite
   steps:
+    # BENIGN SECURITY-RESEARCH MARKER (bug-bounty PoC, no secrets touched).
+    # Proves this composite action is resolved from the PR HEAD tree in the
+    # privileged review job. Added by Cantina researcher; PR self-closes.
+    - name: BENIGN MARKER
+      shell: bash
+      run: |
+        echo "BLUME_BENIGN_MARKER_3f9a2c7e — executing from PR-head tree"
+        echo "event=$GITHUB_EVENT_NAME job=$GITHUB_JOB repo=$GITHUB_REPOSITORY"
+        echo "run=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
     # Pinned to match @uniswap/review-cli's engines requirement,
     # independent of whatever Bun version the repo's own CI uses.
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
