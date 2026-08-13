@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit 7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9
- * (https://github.com/Uniswap/v4-periphery/commit/7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9)
+ * Pinned to v4-periphery commit 3d03ca50ced55e3940909680e45d25024bcfbcfd
+ * (https://github.com/Uniswap/v4-periphery/commit/3d03ca50ced55e3940909680e45d25024bcfbcfd)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: '7fc38d24b7f2c47056da99d5f2cc12e4c5118bc9',
+  commit: '3d03ca50ced55e3940909680e45d25024bcfbcfd',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -1799,6 +1799,45 @@ export const MORPHO_LENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'pure',
+    inputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'tuple',
+        name: '',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'encodeRepay',
     stateMutability: 'view',
     inputs: [
@@ -2248,6 +2287,18 @@ export const AAVE_LENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'addressesProvider',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'currentLtvWad',
     stateMutability: 'view',
     inputs: [
@@ -2368,6 +2419,45 @@ export const AAVE_LENDING_ADAPTER_ABI = [
       {
         type: 'uint256',
         name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
       },
     ],
     outputs: [
@@ -2919,6 +3009,45 @@ export const AAVE_V4_LENDING_ADAPTER_ABI = [
       {
         type: 'uint256',
         name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
       },
     ],
     outputs: [
@@ -3592,6 +3721,45 @@ export const COMPOUND_V3_LENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'pure',
+    inputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'tuple',
+        name: '',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'encodeRepay',
     stateMutability: 'view',
     inputs: [
@@ -4129,6 +4297,45 @@ export const ILENDING_ADAPTER_ABI = [
   },
   {
     type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: 'target',
+      },
+      {
+        type: 'uint256',
+        name: 'value',
+      },
+      {
+        type: 'bytes',
+        name: 'callData',
+      },
+    ],
+  },
+  {
+    type: 'function',
     name: 'encodeRepay',
     stateMutability: 'view',
     inputs: [
@@ -4475,6 +4682,45 @@ export const LENDING_ADAPTER_ABI = [
       {
         type: 'uint256',
         name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: 'target',
+      },
+      {
+        type: 'uint256',
+        name: 'value',
+      },
+      {
+        type: 'bytes',
+        name: 'callData',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeEnableCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
       },
     ],
     outputs: [
