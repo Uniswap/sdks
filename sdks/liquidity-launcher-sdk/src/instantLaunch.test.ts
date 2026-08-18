@@ -4,6 +4,7 @@ import { decodeAbiParameters, decodeFunctionData, encodeFunctionData, getAddress
 import { LIQUIDITY_LAUNCHER_ABI, UERC20_FACTORY_ABI, V4_QUOTER_ABI } from './abis'
 import { getInstantLaunchDeployment, getInstantLaunchStrategy, getLauncherAddresses } from './addresses'
 import { SupportedChainId } from './chains'
+import { resolveNewPoolTickSpacing } from './config/fees'
 import { ZERO_ADDRESS } from './constants'
 import { isLauncherSdkError } from './errors'
 import {
@@ -275,6 +276,10 @@ describe('instant-launch pool tick spacing constants', () => {
   it('grandfathers every spacing pools were ever minted at — pools are permanent', () => {
     expect([...INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS]).toEqual([25, 60])
     expect(INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(INSTANT_LAUNCH_POOL_TICK_SPACING)
+  })
+
+  it('contains the spacing new pools are opened at, as resolved from the fee tier', () => {
+    expect(INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(resolveNewPoolTickSpacing(INSTANT_LAUNCH_POOL_LP_FEE))
   })
 })
 
