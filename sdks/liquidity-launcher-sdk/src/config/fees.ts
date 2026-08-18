@@ -6,6 +6,11 @@ import { formatFeePercent } from '../format'
  * Resolves the tick spacing a **new** v4 pool opened by this launcher is initialized with, from its
  * fee: `max(round(fee / 100), 1)` — one tick of spacing per bip of fee, floored at 1.
  *
+ * The governing rule: a new pool's tick spacing equals its LP fee expressed in basis points — the
+ * `fee` field is denominated in hundredths of a basis point, so `fee / 100` is that conversion.
+ * Fees that are not a whole number of basis points round to the nearest integer, and the result is
+ * floored at 1.
+ *
  * v4 has no protocol-level fee→tickSpacing map, so each caller picks a spacing when it initializes a
  * pool; this derivation is the launcher's single source of truth for that choice (2500 → 25,
  * 3000 → 30, 10000 → 100). It deliberately does not consult the v3 `TICK_SPACINGS` table: v3's
