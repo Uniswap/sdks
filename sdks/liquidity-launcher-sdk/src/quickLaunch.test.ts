@@ -4,6 +4,7 @@ import { getAddress, zeroAddress } from 'viem'
 import { isCreatorFeesPositionRecipient } from './addresses'
 import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
+import { resolveNewPoolTickSpacing } from './config/fees'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
@@ -15,6 +16,7 @@ import {
   QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   QUICK_LAUNCH_GRADUATION_FDV_USD,
   QUICK_LAUNCH_GRADUATION_RAISE_USD,
+  QUICK_LAUNCH_LP_FEE,
   QUICK_LAUNCH_POOL_TICK_SPACING,
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
@@ -444,10 +446,11 @@ describe('FDV -> price-per-token request derivation', () => {
 })
 
 describe('graduation-pool tick spacing constants', () => {
-  it('states the observed post-redeploy spacing, not the feeToTickSpacing derivation', () => {
-    // The 2026-08-05 chain-4663 redeploy mints graduation pools at spacing 25; the generic
-    // fee->spacing formula would say 50 for the 2500 tier. The preset states on-chain reality.
+  it('matches the canonical derivation for the quick-launch fee tier', () => {
+    // The 2026-08-05 chain-4663 redeploy mints graduation pools at spacing 25, and
+    // `resolveNewPoolTickSpacing` maps the 2500 tier to 25, so the preset and the derivation agree.
     expect(QUICK_LAUNCH_POOL_TICK_SPACING).toBe(25)
+    expect(QUICK_LAUNCH_POOL_TICK_SPACING).toBe(resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE))
     expect(QUICK_LAUNCH_PRESET.lp.tickSpacing).toBe(QUICK_LAUNCH_POOL_TICK_SPACING)
   })
 
@@ -455,6 +458,17 @@ describe('graduation-pool tick spacing constants', () => {
     expect([...QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS]).toEqual([25, 50])
     // The current preset value is in the allowed set.
     expect(QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(QUICK_LAUNCH_POOL_TICK_SPACING)
+  })
+
+  it('contains the spacing new pools are opened at, as resolved from the fee tier', () => {
+    expect(QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE))
+  })
+
+  it('keeps 50: pre-redeploy graduation pools on chain 4663 are only routable through that entry when the served pool key is absent', () => {
+    // 50 is not the spacing of any pool opened today, but pools are permanent: a consumer that has
+    // only a token address, and no stored/served/on-chain pool key, reaches every pre-redeploy
+    // graduation pool by racing this entry. Removing it makes those pools unreachable on that path.
+    expect(QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(50)
   })
 })
 

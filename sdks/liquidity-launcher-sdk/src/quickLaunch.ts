@@ -1,6 +1,7 @@
 import { type Address } from 'viem'
 
 import { getBlockTimeSeconds } from './config/blocks'
+import { resolveNewPoolTickSpacing } from './config/fees'
 import type { PriceRangeKind } from './config/positions'
 import { fdvUsdToPricePerToken } from './config/price'
 import {
@@ -101,13 +102,17 @@ export const QUICK_LAUNCH_LP_FEE = 2_500
 
 /**
  * V4 graduation-pool tick spacing, as passed in `MigratorParameters.poolParameters` since the
- * 2026-08-05 chain-4663 full redeploy. Deliberately NOT the generic {@link feeToTickSpacing}
- * derivation, which yields 50 for the {@link QUICK_LAUNCH_LP_FEE} tier: the post-redeploy
- * Initialize census shows every quick-launch graduation pool minted at spacing 25 (295 pools in
- * the redeploy's first day, zero new pools at 50), so the preset states the observed value rather
- * than a formula the launch flow no longer follows.
+ * 2026-08-05 chain-4663 full redeploy. Derived from {@link resolveNewPoolTickSpacing}, which is now
+ * the single source of truth for the spacing a new launcher pool is opened with and maps the
+ * {@link QUICK_LAUNCH_LP_FEE} tier to 25 — the value the launch flow actually passes. The preset and
+ * the derivation therefore agree, and a future change to the tier's canonical spacing moves both
+ * together instead of leaving the preset to be updated by hand.
+ *
+ * This is the spacing NEW graduation pools are opened with. Pools minted by an earlier generation
+ * keep the spacing they were initialized with — see
+ * {@link QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS}.
  */
-export const QUICK_LAUNCH_POOL_TICK_SPACING = 25
+export const QUICK_LAUNCH_POOL_TICK_SPACING = resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE)
 
 /**
  * Every tick spacing a quick-launch graduation pool has ever been minted at, newest first — the
@@ -116,8 +121,9 @@ export const QUICK_LAUNCH_POOL_TICK_SPACING = 25
  * deriving a token's candidate launch pools must race a `(QUICK_LAUNCH_LP_FEE, spacing)` key for
  * EVERY entry, because the token address alone cannot say which generation minted the pool.
  * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link QUICK_LAUNCH_POOL_TICK_SPACING}).
- * - 50: every earlier generation — the {@link feeToTickSpacing} derivation of the fee, kept as a
- *   literal so a future change to that formula cannot rewrite the historical record.
+ * - 50: every earlier generation, kept as a literal so a change to
+ *   {@link resolveNewPoolTickSpacing} cannot rewrite the historical record. Pre-redeploy graduation
+ *   pools on chain 4663 are reachable only through this entry when no served pool key is available.
  */
 export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [QUICK_LAUNCH_POOL_TICK_SPACING, 50] as const
 
