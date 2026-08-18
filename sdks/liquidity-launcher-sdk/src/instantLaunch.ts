@@ -279,10 +279,13 @@ export const INSTANT_LAUNCH_POOL_TICK_SPACING = 25
  * candidate launch pools must race a `(INSTANT_LAUNCH_POOL_LP_FEE, spacing)` key for EVERY entry
  * ({@link getInstantLaunchPoolKeys}), because the token address alone cannot say which generation
  * minted the pool.
+ * Every entry is a pinned literal: if a future generation changes
+ * {@link INSTANT_LAUNCH_POOL_TICK_SPACING}, the new spacing must be APPENDED here rather than a
+ * derived entry silently replacing 25 — the tests asserting this set's contents force that append.
  * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link INSTANT_LAUNCH_POOL_TICK_SPACING}).
  * - 60: every earlier generation.
  */
-export const INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [INSTANT_LAUNCH_POOL_TICK_SPACING, 60] as const
+export const INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [25, 60] as const
 
 /** The launch pool is hookless. */
 export const INSTANT_LAUNCH_POOL_HOOKS: Address = ZERO_ADDRESS
