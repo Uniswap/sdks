@@ -19,6 +19,7 @@ import { TEST_RECIPIENT_ADDRESS } from './addresses'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { ZERO_ADDRESS } from '../../src/utils/constants'
 import { SwapRouter } from '../../src/swapRouter'
+import { ALLOW_REVERT_FLAG } from '../../src/utils/routerCommands'
 
 const V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 const V2_ABI = [
@@ -211,7 +212,7 @@ export function parseCommands(calldata: string) {
   const cmdHex = commands.slice(2)
   const commandTypes: number[] = []
   for (let j = 0; j < cmdHex.length; j += 2) {
-    commandTypes.push(parseInt(cmdHex.slice(j, j + 2), 16) & 0x3f)
+    commandTypes.push(parseInt(cmdHex.slice(j, j + 2), 16) & ~ALLOW_REVERT_FLAG)
   }
   return { commandTypes, inputs }
 }
