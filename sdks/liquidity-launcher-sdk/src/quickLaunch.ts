@@ -120,12 +120,15 @@ export const QUICK_LAUNCH_POOL_TICK_SPACING = resolveNewPoolTickSpacing(QUICK_LA
  * Pools are permanent, so a superseded spacing never leaves this list; routing/discovery consumers
  * deriving a token's candidate launch pools must race a `(QUICK_LAUNCH_LP_FEE, spacing)` key for
  * EVERY entry, because the token address alone cannot say which generation minted the pool.
+ * Every entry is a pinned literal: if the fee tier (and with it {@link
+ * QUICK_LAUNCH_POOL_TICK_SPACING}) ever changes, the new spacing must be APPENDED here rather than
+ * a derived entry silently replacing 25 — the test asserting this set contains
+ * `resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE)` forces that append.
  * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link QUICK_LAUNCH_POOL_TICK_SPACING}).
- * - 50: every earlier generation, kept as a literal so a change to
- *   {@link resolveNewPoolTickSpacing} cannot rewrite the historical record. Pre-redeploy graduation
- *   pools on chain 4663 are reachable only through this entry when no served pool key is available.
+ * - 50: every earlier generation. Pre-redeploy graduation pools on chain 4663 are reachable only
+ *   through this entry when no served pool key is available.
  */
-export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [QUICK_LAUNCH_POOL_TICK_SPACING, 50] as const
+export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [25, 50] as const
 
 /** V4 LP price-range strategy: full-range + concentrated. */
 export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
