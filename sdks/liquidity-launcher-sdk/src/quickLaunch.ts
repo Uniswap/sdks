@@ -145,14 +145,9 @@ export const QUICK_LAUNCH_LOCK_MODE: QuickLaunchLockMode = 'buybackBurn'
 // ---------------------------------------------------------------------------
 // Permanence: the ONE definition of a "permanent" lock
 // ---------------------------------------------------------------------------
-// "Permanent" used to be defined independently in three places — the create
-// flow's requested horizon, the data-api classifier's threshold
-// (`PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS`), and this SDK's bare
-// `permanentTimelock: true` declaration —
-// plus a fourth, chain-agnostic raw-block sentinel serving `lockedForever`
-// (data-api's `PERMANENT_UNLOCK_BLOCK_THRESHOLD`). They now all live here,
-// next to {@link QUICK_LAUNCH_LOCK_MODE}, and every consumer imports them:
-// changing one in isolation is no longer possible.
+// "Permanent" used to be defined independently across the create flow, the
+// data-api classifier and this SDK. It is one horizon now, judged past the
+// auction end, and every consumer imports it.
 
 /**
  * Minimum lock horizon past the auction end, in real seconds, for a timelock to count as
@@ -177,20 +172,6 @@ export const PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS = 1000 * 365 * 86_400
  * never be classified finite, on any plausible block-time table.
  */
 export const PERMANENT_TIMELOCK_REQUEST_SECONDS = 365n * 100_000n * 86_400n
-
-/**
- * Chain-AGNOSTIC approximation: a raw unlock block at or past this threshold counts as permanent
- * without consulting the chain's block time (previously data-api's serving-side
- * `PERMANENT_UNLOCK_BLOCK_THRESHOLD`, gating the `lockedForever` proto field).
- *
- * Use the chain-aware forms of {@link isPermanentTimelock} whenever the chain id and auction end
- * are available — a single block count cannot express "1000 years" on every chain (on a 0.1s
- * chain this threshold is only ~600 years). This form exists for call sites that only have the
- * stored unlock block, and it still catches every real permanent lock: the create flow's ~100k-year
- * request converts to far more than 2e11 blocks on any chain, and legacy max-uint sentinel unlock
- * blocks trivially exceed it.
- */
-export const PERMANENT_UNLOCK_BLOCK_THRESHOLD = 200_000_000_000n
 
 /**
  * Buyback-&-burn searcher threshold: a searcher burns ~0.05% of supply to claim the accrued ETH
@@ -359,9 +340,6 @@ export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): stri
  * 2. **Timestamp form** (`{endTimeSeconds, unlockTimeSeconds}`) — the same horizon rule over real
  *    seconds, for the create flow, which reasons in unix time *before* the liquidity service
  *    converts its request to a block number.
- * 3. **Raw-block sentinel form** (`{unlockBlock}` alone) — the chain-agnostic
- *    {@link PERMANENT_UNLOCK_BLOCK_THRESHOLD} approximation, for serving-side call sites that have
- *    only the stored unlock block. Prefer the chain-aware forms when possible.
  *
  * `lockMode` may accompany any form: `'burn'` and `'creatorFees'` are *structurally* permanent
  * (see {@link STRUCTURALLY_PERMANENT_LOCK_MODES}; such rows carry `unlock_block = 0`), so they
@@ -373,7 +351,6 @@ export type PermanentTimelockParams = {
 } & (
   | { chainId: number; endBlock: bigint; unlockBlock: bigint }
   | { endTimeSeconds: bigint | number; unlockTimeSeconds: bigint | number }
-  | { chainId?: undefined; endBlock?: undefined; unlockBlock: bigint }
 )
 
 /**
@@ -394,12 +371,8 @@ export function isPermanentTimelock(params: PermanentTimelockParams): boolean {
     return Number(params.unlockTimeSeconds) - Number(params.endTimeSeconds) >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
   }
   // Block form: chain-aware horizon via the chain block time.
-  if (params.chainId !== undefined && params.endBlock !== undefined) {
-    const horizonSeconds = Number(params.unlockBlock - params.endBlock) * getBlockTimeSeconds(params.chainId)
-    return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
-  }
-  // Sentinel form: chain-agnostic raw-block approximation.
-  return params.unlockBlock >= PERMANENT_UNLOCK_BLOCK_THRESHOLD
+  const horizonSeconds = Number(params.unlockBlock - params.endBlock) * getBlockTimeSeconds(params.chainId)
+  return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
 }
 
 // ---------------------------------------------------------------------------
