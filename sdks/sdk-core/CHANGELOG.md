@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.1
+
+### Patch Changes
+
+- 4600c8d: Update permissioned pools deployment addresses for mainnet and Sepolia
+
 ## 7.19.0
 
 ### Minor Changes

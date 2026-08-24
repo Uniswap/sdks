@@ -25,7 +25,8 @@ import type { Uerc20Metadata } from './types'
  *   2. `distributeToken(token, { strategy, amount: 1e27,
  *      configData: abi.encode(InstantLaunchConfig{feeBeneficiary}) }, salt)`
  *      — the strategy pulls the full supply, initializes the hookless native-ETH v4 pool
- *      (LP_FEE=2500, TICK_SPACING=60, price fixed by the strategy's immutable initialTick),
+ *      (LP_FEE=2500; TICK_SPACING and the price-fixing `initialTick` are per-generation — 25 and
+ *      198,050 since the 2026-08-05 redeploy, 60 and 198,060 on every earlier generation),
  *      optionally registers `feeBeneficiary` with the beneficiary vault (minting the transferable
  *      beneficiary ERC721, keyed by the LP position's tokenId) and parks the single-sided LP NFT in
  *      the strategy's FeeSplitter forever. `msg.value` is always 0.
@@ -124,10 +125,10 @@ export const INSTANT_LAUNCH_TOTAL_SUPPLY_RAW =
  * one, where the value goes unused (its `beneficiaryVault` immutable is zero, so registration is
  * skipped entirely) — and the strategy reverts on a zero or launcher beneficiary either way. So the
  * placeholder must be a non-zero address that is not the LiquidityLauncher; it is deliberately a
- * protocol-owned contract (the deployed 4663 CompoundingClaimRecipient) rather than a user address,
- * since it must never be mistaken for a creator claim.
+ * protocol-owned contract (the current 4663 CompoundingClaimRecipient — the 2026-08-05 full
+ * redeploy) rather than a user address, since it must never be mistaken for a creator claim.
  */
-export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x666DA63451A502A323677C2Ef5F763181358be9b'
+export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'
 
 export interface PredictInstantLaunchTokenParams {
   chainId: number
@@ -260,8 +261,31 @@ export function buildInstantLaunchTransaction(params: BuildInstantLaunchParams):
 /** InstantLaunchStrategy's compile-time pool LP fee (pips) — `LP_FEE`, unchanged across deploys. */
 export const INSTANT_LAUNCH_POOL_LP_FEE = 2500
 
-/** InstantLaunchStrategy's compile-time pool tick spacing — `TICK_SPACING`, unchanged across deploys. */
-export const INSTANT_LAUNCH_POOL_TICK_SPACING = 60
+/**
+ * InstantLaunchStrategy's compile-time pool tick spacing — `TICK_SPACING`. Per-generation since the
+ * 2026-08-05 chain-4663 full redeploy recompiled the strategy at 25 (every earlier generation is
+ * 60; both values read back from the deployed strategies' `TICK_SPACING()` getters). This constant
+ * is the CURRENT generation's value — the authoritative value for any strategy instance is
+ * {@link InstantLaunchDeployment.tickSpacing} in the deployment registry, and a token's launch pool
+ * keeps its minting generation's spacing forever (see
+ * {@link INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS}).
+ */
+export const INSTANT_LAUNCH_POOL_TICK_SPACING = 25
+
+/**
+ * Every tick spacing an Instant Launch pool has ever been minted at, newest first — the append-only
+ * grandfather set (same shape as `QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS`). Pools are permanent,
+ * so a superseded spacing never leaves this list; routing/discovery consumers deriving a token's
+ * candidate launch pools must race a `(INSTANT_LAUNCH_POOL_LP_FEE, spacing)` key for EVERY entry
+ * ({@link getInstantLaunchPoolKeys}), because the token address alone cannot say which generation
+ * minted the pool.
+ * Every entry is a pinned literal: if a future generation changes
+ * {@link INSTANT_LAUNCH_POOL_TICK_SPACING}, the new spacing must be APPENDED here rather than a
+ * derived entry silently replacing 25 — the tests asserting this set's contents force that append.
+ * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link INSTANT_LAUNCH_POOL_TICK_SPACING}).
+ * - 60: every earlier generation.
+ */
+export const INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [25, 60] as const
 
 /** The launch pool is hookless. */
 export const INSTANT_LAUNCH_POOL_HOOKS: Address = ZERO_ADDRESS
@@ -271,17 +295,22 @@ export const INSTANT_LAUNCH_POOL_CURRENCY0: Address = ZERO_ADDRESS
 
 /**
  * InstantLaunchStrategy's compile-time lower tick of every launch position (`MIN_LAUNCH_TICK`) and
- * the exclusive floor for `initialTick`.
+ * the exclusive floor for `initialTick`. Per-generation since the 2026-08-05 chain-4663 full
+ * redeploy recompiled the strategy at -160,100 (every earlier generation is -208,980, the OZ H01
+ * floor; both values read back from the deployed strategies' `MIN_LAUNCH_TICK()` getters). This
+ * constant is the CURRENT generation's value — the authoritative value for any strategy instance is
+ * {@link InstantLaunchDeployment.minLaunchTick} in the deployment registry.
  */
-export const INSTANT_LAUNCH_MIN_LAUNCH_TICK = -208_980
+export const INSTANT_LAUNCH_MIN_LAUNCH_TICK = -160_100
 
 /**
  * The current 4663 deployments' immutable `initialTick` — the aligned tick the launch pool opens at
- * (highest price; the launch position's upper bound). A per-deployment immutable, not a compile-time
- * constant: the authoritative value for any strategy instance is
- * {@link InstantLaunchDeployment.initialTick} in the deployment registry.
+ * (highest price; the launch position's upper bound). 198,050 since the 2026-08-05 full redeploy
+ * (aligned to the new spacing 25; every earlier generation opened at 198,060, aligned to 60). A
+ * per-deployment immutable, not a compile-time constant: the authoritative value for any strategy
+ * instance is {@link InstantLaunchDeployment.initialTick} in the deployment registry.
  */
-export const INSTANT_LAUNCH_INITIAL_TICK = 198_060
+export const INSTANT_LAUNCH_INITIAL_TICK = 198_050
 
 /** A Uniswap v4 `PoolKey` struct mirror (currencies sorted ascending, as the PoolManager requires). */
 export interface V4PoolKey {
@@ -293,27 +322,46 @@ export interface V4PoolKey {
 }
 
 /**
- * The one v4 pool an Instant Launch token trades in: hookless native-ETH pool at the strategy's
- * compile-time fee/spacing. Native ETH (address(0)) sorts below every token, so `currency0` is
- * always ETH and an ETH→token swap is always `zeroForOne`. The token address is EIP-55 normalized.
- * Identical for both creator-fee variants (the pool parameters are compile-time constants).
+ * The v4 pool an Instant Launch token trades in: hookless native-ETH pool at the strategy's
+ * fee/spacing. Native ETH (address(0)) sorts below every token, so `currency0` is always ETH and an
+ * ETH→token swap is always `zeroForOne`. The token address is EIP-55 normalized. Identical for both
+ * creator-fee variants — but NOT across generations: `tickSpacing` defaults to the current
+ * generation's {@link INSTANT_LAUNCH_POOL_TICK_SPACING}, so for a token launched before the
+ * 2026-08-05 redeploy pass its minting generation's spacing (from
+ * {@link InstantLaunchDeployment.tickSpacing} when the strategy is known, or race every candidate
+ * via {@link getInstantLaunchPoolKeys}).
  */
-export function getInstantLaunchPoolKey(token: Address): V4PoolKey {
+export function getInstantLaunchPoolKey(
+  token: Address,
+  tickSpacing: number = INSTANT_LAUNCH_POOL_TICK_SPACING
+): V4PoolKey {
   return {
     currency0: INSTANT_LAUNCH_POOL_CURRENCY0,
     currency1: normalizeInstantLaunchToken(token),
     fee: INSTANT_LAUNCH_POOL_LP_FEE,
-    tickSpacing: INSTANT_LAUNCH_POOL_TICK_SPACING,
+    tickSpacing,
     hooks: INSTANT_LAUNCH_POOL_HOOKS,
   }
 }
 
 /**
+ * Every launch pool the token COULD trade in, newest generation first — one candidate per
+ * {@link INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS} entry. Exactly one is initialized on-chain (the
+ * minting generation's); when the minting strategy is unknown, quote/probe all of them and keep the
+ * one that answers — the token address alone cannot say which generation minted the pool.
+ */
+export function getInstantLaunchPoolKeys(token: Address): readonly V4PoolKey[] {
+  return INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS.map((tickSpacing) => getInstantLaunchPoolKey(token, tickSpacing))
+}
+
+/**
  * The launch pool's v4 PoolId — `keccak256(abi.encode(poolKey))`, matching the on-chain
  * `PoolKey.toId()`. Use it with `slot0Call` / `isV4PoolInitialized` or any StateView read.
+ * `tickSpacing` defaults to the current generation — same caveat as {@link getInstantLaunchPoolKey}
+ * for tokens launched before the 2026-08-05 redeploy.
  */
-export function getInstantLaunchPoolId(token: Address): Hex {
-  const key = getInstantLaunchPoolKey(token)
+export function getInstantLaunchPoolId(token: Address, tickSpacing?: number): Hex {
+  const key = getInstantLaunchPoolKey(token, tickSpacing)
   return computeLbpPoolId(key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks)
 }
 
@@ -324,6 +372,13 @@ export interface QuoteInstantLaunchBuyParams {
   token: Address
   /** Exact ETH input, in wei. */
   exactAmountInWei: bigint
+  /**
+   * The launch pool's tick spacing — the minting generation's value. Defaults to the current
+   * generation ({@link INSTANT_LAUNCH_POOL_TICK_SPACING}); pass 60 (or race every
+   * {@link INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS} entry) for tokens launched before the
+   * 2026-08-05 redeploy.
+   */
+  tickSpacing?: number
 }
 
 /**
@@ -339,7 +394,7 @@ export function quoteInstantLaunchBuyCall(params: QuoteInstantLaunchBuyParams): 
     functionName: 'quoteExactInputSingle',
     args: [
       {
-        poolKey: getInstantLaunchPoolKey(params.token),
+        poolKey: getInstantLaunchPoolKey(params.token, params.tickSpacing),
         zeroForOne: true,
         exactAmount: params.exactAmountInWei,
         hookData: '0x',

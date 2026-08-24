@@ -40,10 +40,10 @@ type Call = {
   callData: string;
 };
 
-// Perform multiple on-chain calls in a single http request
-// return all results including errors
+// Call one function on one contract once per entry in `functionParams`, in a
+// single http request, returning all results including errors.
 // Uses deployless method to function properly even on chains with no multicall contract deployed
-export async function multicallSameContractManyFunctions<
+export async function multicallSameContractManyCalls<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TFunctionParams extends any[] | undefined
 >(
@@ -72,6 +72,75 @@ export async function multicallSameContractManyFunctions<
   });
 
   return multicall(provider, calls, stateOverrrides, blockOverrides);
+}
+
+/**
+ * @deprecated Renamed to {@link multicallSameContractManyCalls}. This helper calls a
+ * single function once per entry in `functionParams` -- it varies the arguments, not
+ * the function, which `functionName` being a lone string already implies. To call
+ * different functions in one request, build the calls yourself and use {@link multicall}.
+ */
+export const multicallSameContractManyFunctions =
+  multicallSameContractManyCalls;
+
+/// Structurally matches the SignedOrder / SignedV4Order shapes without importing
+/// them, which would create a cycle with OrderQuoter
+export type OrderWithBlockOverrides = {
+  order: { blockOverrides: BlockOverrides };
+};
+
+// Multicall a batch of orders, returning results in the SAME order as `orders`.
+//
+// A block override applies to an entire eth_call, so orders carrying one cannot
+// share a call with orders quoted at a different block. Each is dispatched on its
+// own while the remaining orders share a single batched call. Results are then
+// scattered back into their original input positions: callers index results by
+// input position, and the quoters additionally cross-reference `orders[i]` when
+// classifying validation errors and checking terminal states.
+export async function multicallOrdersPreservingOrder<
+  TOrder extends OrderWithBlockOverrides,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  TFunctionParams extends any[]
+>(
+  provider: StaticJsonRpcProvider,
+  params: MulticallParams & { address: string },
+  orders: TOrder[],
+  buildParams: (order: TOrder) => TFunctionParams
+): Promise<MulticallResult[]> {
+  const overrideIndices: number[] = [];
+  const plainIndices: number[] = [];
+  orders.forEach((order, i) => {
+    (order.order.blockOverrides ? overrideIndices : plainIndices).push(i);
+  });
+
+  const batches: Promise<{ indices: number[]; results: MulticallResult[] }>[] =
+    overrideIndices.map((i) =>
+      multicallSameContractManyCalls(
+        provider,
+        { ...params, functionParams: [buildParams(orders[i])] },
+        undefined,
+        orders[i].order.blockOverrides
+      ).then((results) => ({ indices: [i], results }))
+    );
+
+  // Skip the batched call entirely when every order carries an override,
+  // otherwise it costs a round trip to quote nothing
+  if (plainIndices.length > 0) {
+    batches.push(
+      multicallSameContractManyCalls(provider, {
+        ...params,
+        functionParams: plainIndices.map((i) => buildParams(orders[i])),
+      }).then((results) => ({ indices: plainIndices, results }))
+    );
+  }
+
+  const ordered = new Array<MulticallResult>(orders.length);
+  for (const { indices, results } of await Promise.all(batches)) {
+    indices.forEach((inputIndex, j) => {
+      ordered[inputIndex] = results[j];
+    });
+  }
+  return ordered;
 }
 
 export async function multicallSameFunctionManyContracts<

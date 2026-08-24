@@ -4,6 +4,7 @@ import { decodeAbiParameters, decodeFunctionData, encodeFunctionData, getAddress
 import { LIQUIDITY_LAUNCHER_ABI, UERC20_FACTORY_ABI, V4_QUOTER_ABI } from './abis'
 import { getInstantLaunchDeployment, getInstantLaunchStrategy, getLauncherAddresses } from './addresses'
 import { SupportedChainId } from './chains'
+import { resolveNewPoolTickSpacing } from './config/fees'
 import { ZERO_ADDRESS } from './constants'
 import { isLauncherSdkError } from './errors'
 import {
@@ -12,6 +13,10 @@ import {
   getInstantLaunchAddresses,
   getInstantLaunchPoolId,
   getInstantLaunchPoolKey,
+  getInstantLaunchPoolKeys,
+  INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS,
+  INSTANT_LAUNCH_INITIAL_TICK,
+  INSTANT_LAUNCH_MIN_LAUNCH_TICK,
   INSTANT_LAUNCH_POOL_LP_FEE,
   INSTANT_LAUNCH_POOL_TICK_SPACING,
   INSTANT_LAUNCH_TOKEN_DECIMALS,
@@ -42,18 +47,18 @@ const BUILD_PARAMS = {
 describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-on Robinhood (4663) stack from the canonical dev-README deployment', () => {
     const addresses = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
-    expect(addresses?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
-    expect(addresses?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
-    expect(addresses?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
-    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
+    expect(addresses?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
+    expect(addresses?.feeSplitter).toBe(getAddress('0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf'))
+    expect(addresses?.beneficiaryVault).toBe(getAddress('0xd35E9CA72F64C7F93BE30fad67524323396B36D7'))
+    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
     expect(addresses?.creatorFeesEnabled).toBe(true)
   })
 
   it('resolves the fees-off Robinhood stack to its own strategy + splitter, same singletons', () => {
     const on = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
-    expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
+    expect(off?.feeSplitter).toBe(getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359'))
     expect(off?.strategy).not.toBe(on!.strategy)
     expect(off?.feeSplitter).not.toBe(on!.feeSplitter)
     expect(off?.beneficiaryVault).toBe(on!.beneficiaryVault)
@@ -179,8 +184,10 @@ describe('buildInstantLaunchTransaction', () => {
       distribution.configData
     )
     // The config field is mandatory on-chain even though the fees-off instance ignores it; the
-    // placeholder must be non-zero and not the launcher.
+    // placeholder must be non-zero and not the launcher. Independent literal pin: the current 4663
+    // CompoundingClaimRecipient (2026-08-05 full redeploy).
     expect(config.feeBeneficiary).toBe(DISABLED_CREATOR_FEE_BENEFICIARY)
+    expect(DISABLED_CREATOR_FEE_BENEFICIARY).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
     expect(DISABLED_CREATOR_FEE_BENEFICIARY).not.toBe(ZERO_ADDRESS)
     expect(DISABLED_CREATOR_FEE_BENEFICIARY).not.toBe(offStack!.liquidityLauncher)
   })
@@ -224,10 +231,10 @@ describe('deployment registry selectors', () => {
   it('getInstantLaunchStrategy keys the variant by creatorFeesEnabled', () => {
     const on = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(on?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
+    expect(on?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
     expect(on?.creatorFeeNativeBps).toBe(4000)
     expect(on?.creatorFeeTokenBps).toBe(0)
-    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
+    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
     expect(off?.creatorFeeNativeBps).toBe(0)
   })
 
@@ -246,23 +253,54 @@ describe('deployment registry selectors', () => {
 })
 
 // A real 4663 Instant Launch token ("TTT"); its pool id and slot0 were read back on-chain 2026-07-26
-// (StateView.getSlot0 → lpFee 2500). Launched via an earlier strategy deploy, but the pool-key
-// derivation (hookless native-ETH pool at LP_FEE/TICK_SPACING) is identical across deploys, so it
-// stays a valid golden vector for the PoolKey/PoolId math.
+// (StateView.getSlot0 → lpFee 2500). Launched via a PRE-redeploy strategy generation, so its pool
+// lives at the legacy spacing 60 forever — its derivations pin `tickSpacing: 60` explicitly.
 const LAUNCHED_TOKEN = getAddress('0xFb12A16F5842bA4886130cAA6664aB5db2D2F2fb')
 const LAUNCHED_TOKEN_POOL_ID = '0xacab50a30661df2dd6bff53c7ba773a20a0efe0eea8b4216efd08caf557c73a3'
+// A real 4663 token launched by the 2026-08-05 full-redeploy fees-on strategy (`0x23f82095…`):
+// poolId and key (fee 2500, spacing 25, hookless) taken from its on-chain `TokenLaunched` event at
+// block 28,897,813 (2026-08-05). Golden vector for the CURRENT generation's default derivation.
+const REDEPLOY_LAUNCHED_TOKEN = getAddress('0x91F1c022645602ca83Fd1adcBa5a5019F54D5f1f')
+const REDEPLOY_LAUNCHED_TOKEN_POOL_ID = '0x2d5e17e0b164b9b3401c124a3aa58da2ba71695e4e6e85b16e280497835e2bea'
+
+describe('instant-launch pool tick spacing constants', () => {
+  it('states the post-redeploy pool shape, read back from the deployed strategies', () => {
+    // The 2026-08-05 chain-4663 full redeploy recompiled InstantLaunchStrategy: TICK_SPACING()
+    // returns 25, initialTick() 198,050 and MIN_LAUNCH_TICK() -160,100 on both current strategies
+    // (60 / 198,060 / -208,980 on every earlier generation).
+    expect(INSTANT_LAUNCH_POOL_TICK_SPACING).toBe(25)
+    expect(INSTANT_LAUNCH_INITIAL_TICK).toBe(198_050)
+    expect(INSTANT_LAUNCH_MIN_LAUNCH_TICK).toBe(-160_100)
+  })
+
+  it('grandfathers every spacing pools were ever minted at — pools are permanent', () => {
+    expect([...INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS]).toEqual([25, 60])
+    expect(INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(INSTANT_LAUNCH_POOL_TICK_SPACING)
+  })
+
+  it('contains the spacing new pools are opened at, as resolved from the fee tier', () => {
+    expect(INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(resolveNewPoolTickSpacing(INSTANT_LAUNCH_POOL_LP_FEE))
+  })
+})
 
 describe('getInstantLaunchPoolKey', () => {
-  it('derives the hookless native-ETH pool at the strategy immutables, ETH always currency0', () => {
-    expect(getInstantLaunchPoolKey(LAUNCHED_TOKEN)).toEqual({
+  it('derives the hookless native-ETH pool at the current generation by default, ETH always currency0', () => {
+    expect(getInstantLaunchPoolKey(REDEPLOY_LAUNCHED_TOKEN)).toEqual({
       currency0: ZERO_ADDRESS,
-      currency1: LAUNCHED_TOKEN,
+      currency1: REDEPLOY_LAUNCHED_TOKEN,
       fee: INSTANT_LAUNCH_POOL_LP_FEE,
-      tickSpacing: INSTANT_LAUNCH_POOL_TICK_SPACING,
+      tickSpacing: 25,
       hooks: ZERO_ADDRESS,
     })
     expect(INSTANT_LAUNCH_POOL_LP_FEE).toBe(2500)
-    expect(INSTANT_LAUNCH_POOL_TICK_SPACING).toBe(60)
+  })
+
+  it('accepts an explicit spacing for tokens launched by earlier generations', () => {
+    expect(getInstantLaunchPoolKey(LAUNCHED_TOKEN, 60).tickSpacing).toBe(60)
+  })
+
+  it('derives one candidate key per grandfathered spacing, newest first', () => {
+    expect(getInstantLaunchPoolKeys(LAUNCHED_TOKEN).map((key) => key.tickSpacing)).toEqual([25, 60])
   })
 
   it('EIP-55 normalizes a lowercase token address', () => {
@@ -284,19 +322,23 @@ describe('getInstantLaunchPoolKey', () => {
 })
 
 describe('getInstantLaunchPoolId', () => {
-  it('matches the on-chain pool id for the real launched token (golden vector)', () => {
-    expect(getInstantLaunchPoolId(LAUNCHED_TOKEN)).toBe(LAUNCHED_TOKEN_POOL_ID)
+  it('matches the on-chain pool id of the post-redeploy token at the default spacing (golden vector)', () => {
+    expect(getInstantLaunchPoolId(REDEPLOY_LAUNCHED_TOKEN)).toBe(REDEPLOY_LAUNCHED_TOKEN_POOL_ID)
+  })
+
+  it('matches the on-chain pool id of the pre-redeploy token at its legacy spacing (golden vector)', () => {
+    expect(getInstantLaunchPoolId(LAUNCHED_TOKEN, 60)).toBe(LAUNCHED_TOKEN_POOL_ID)
   })
 
   it('is casing-independent (lowercase input → same pool id)', () => {
-    expect(getInstantLaunchPoolId(LAUNCHED_TOKEN.toLowerCase() as `0x${string}`)).toBe(LAUNCHED_TOKEN_POOL_ID)
+    expect(getInstantLaunchPoolId(LAUNCHED_TOKEN.toLowerCase() as `0x${string}`, 60)).toBe(LAUNCHED_TOKEN_POOL_ID)
   })
 
   it('agrees with the generic computeLbpPoolId derivation', () => {
-    expect(getInstantLaunchPoolId(LAUNCHED_TOKEN)).toBe(
+    expect(getInstantLaunchPoolId(REDEPLOY_LAUNCHED_TOKEN)).toBe(
       computeLbpPoolId(
         ZERO_ADDRESS,
-        LAUNCHED_TOKEN,
+        REDEPLOY_LAUNCHED_TOKEN,
         INSTANT_LAUNCH_POOL_LP_FEE,
         INSTANT_LAUNCH_POOL_TICK_SPACING,
         ZERO_ADDRESS
@@ -308,14 +350,18 @@ describe('getInstantLaunchPoolId', () => {
 describe('quoteInstantLaunchBuyCall', () => {
   const V4_QUOTER = getAddress('0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94') // 4663
 
-  it('describes an exact-in ETH→token quoteExactInputSingle on the launch pool', () => {
-    const call = quoteInstantLaunchBuyCall({ v4Quoter: V4_QUOTER, token: LAUNCHED_TOKEN, exactAmountInWei: 10n ** 15n })
+  it('describes an exact-in ETH→token quoteExactInputSingle on the launch pool (default = current generation)', () => {
+    const call = quoteInstantLaunchBuyCall({
+      v4Quoter: V4_QUOTER,
+      token: REDEPLOY_LAUNCHED_TOKEN,
+      exactAmountInWei: 10n ** 15n,
+    })
     expect(call.address).toBe(V4_QUOTER)
     expect(call.abi).toBe(V4_QUOTER_ABI)
     expect(call.functionName).toBe('quoteExactInputSingle')
     expect(call.args).toEqual([
       {
-        poolKey: getInstantLaunchPoolKey(LAUNCHED_TOKEN),
+        poolKey: getInstantLaunchPoolKey(REDEPLOY_LAUNCHED_TOKEN),
         zeroForOne: true,
         exactAmount: 10n ** 15n,
         hookData: '0x',
@@ -324,9 +370,15 @@ describe('quoteInstantLaunchBuyCall', () => {
   })
 
   it('encodes to the live-verified calldata (selector + argument layout golden vector)', () => {
-    // This exact eth_call quoted 0.001 ETH → 197.775299 TTT on 4663 (2026-07-26).
+    // This exact eth_call quoted 0.001 ETH → 197.775299 TTT on 4663 (2026-07-26) — a pre-redeploy
+    // token, so the quote pins its legacy spacing 60.
     expect(toFunctionSelector(V4_QUOTER_ABI[0])).toBe('0xaa9d21cb')
-    const call = quoteInstantLaunchBuyCall({ v4Quoter: V4_QUOTER, token: LAUNCHED_TOKEN, exactAmountInWei: 10n ** 15n })
+    const call = quoteInstantLaunchBuyCall({
+      v4Quoter: V4_QUOTER,
+      token: LAUNCHED_TOKEN,
+      exactAmountInWei: 10n ** 15n,
+      tickSpacing: 60,
+    })
     const data = encodeFunctionData({ abi: call.abi, functionName: 'quoteExactInputSingle', args: call.args as never })
     expect(data).toBe(
       '0xaa9d21cb' +

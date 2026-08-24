@@ -5,6 +5,23 @@ import { type Abi } from 'viem'
  * argument and return types. Only the functions the SDK needs are included.
  */
 
+/**
+ * LiquidityLauncher. Tracks the tip of liquidity-launcher#227 (`fix: remove sweepNative and the
+ * batch native invariant`, itself stacked on #223 `UniversalRouterStrategy`), which is what the
+ * current chain-4663 launcher was deployed from.
+ *
+ * Every entry point is `payable`: `multicall` self-`delegatecall`s, so `msg.value` is inherited by
+ * every frame and a non-payable callee would revert on solc's `callvalue` check inside a
+ * value-carrying batch. Selectors are unchanged — `payable` is not part of a selector — but viem and
+ * ethers refuse to attach `value` to a `nonpayable` entry, so this is what makes a native-carrying
+ * launch expressible at all.
+ *
+ * Note there is deliberately no `sweepNative`: #223 added it and #227 removed it again (it was
+ * unauthenticated and reachable mid-batch, so a contract gaining execution inside the transaction
+ * could divert the launcher's un-forwarded native). #227 dropped the `NativeNotSwept` multicall
+ * guard with it. The rule for callers is now that the `nativeAmount`s forwarded across a batch must
+ * add up to `msg.value`: there is no refund path, and any excess is stranded in the launcher.
+ */
 export const LIQUIDITY_LAUNCHER_ABI = [
   {
     type: 'event',
@@ -23,7 +40,7 @@ export const LIQUIDITY_LAUNCHER_ABI = [
   {
     type: 'function',
     name: 'createToken',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [
       { name: 'factory', type: 'address' },
       { name: 'name', type: 'string' },
@@ -38,7 +55,7 @@ export const LIQUIDITY_LAUNCHER_ABI = [
   {
     type: 'function',
     name: 'distributeToken',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [
       { name: 'token', type: 'address' },
       {
@@ -57,7 +74,7 @@ export const LIQUIDITY_LAUNCHER_ABI = [
   {
     type: 'function',
     name: 'depositToken',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint160' },
@@ -65,9 +82,24 @@ export const LIQUIDITY_LAUNCHER_ABI = [
     outputs: [],
   },
   {
+    // Hands `nativeAmount` of the batch's `msg.value` to a strategy implementing `INativeStrategy`.
+    // The amount is an explicit parameter rather than `msg.value` because `msg.value` is identical
+    // in every delegatecall frame, so reading it would let one payment fund two hand-offs.
+    type: 'function',
+    name: 'distributeWithNative',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'strategy', type: 'address' },
+      { name: 'configData', type: 'bytes' },
+      { name: 'salt', type: 'bytes32' },
+      { name: 'nativeAmount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
     type: 'function',
     name: 'multicall',
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
     inputs: [{ name: 'data', type: 'bytes[]' }],
     outputs: [{ name: 'results', type: 'bytes[]' }],
   },

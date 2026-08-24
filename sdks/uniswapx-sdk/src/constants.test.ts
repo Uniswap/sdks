@@ -11,14 +11,17 @@ const CANONICAL_PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 const CANONICAL_QUOTER = "0x00000000a3db63Df9078cBF3dF88B4CAdD5a7F58";
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-// DutchV3 rollout to Robinhood (4663) and Arc (5042). These guard against the
-// two ways the mappings would otherwise silently misresolve: the quoter
-// falling through to the legacy default (0x5453…) and the exclusive-filler
-// validator falling through to 0x8A66… (a contract that doesn't exist on
-// either chain).
+// DutchV3 rollout to Robinhood (4663), Arc (5042), and Ink (57073).
+// constructSameAddressMap only seeds the five NETWORKS_WITH_SAME_ADDRESS
+// chains, so a chain with no explicit entry reads back `undefined` rather than
+// a wrong-but-plausible default. These guard the two consequences: the quoter
+// lookup makes UniswapXOrderQuoter's constructor throw MissingConfiguration,
+// and the exclusive-filler lookup silently puts `undefined` into the
+// ValidationInfo that encodeExclusiveFillerData returns.
 describe.each([
   { name: "Robinhood", chainId: 4663, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA" },
   { name: "Arc", chainId: 5042, reactor: "0x0000000015134054eA82AE0bb9fda66b36402C36" },
+  { name: "Ink", chainId: 57073, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA" },
 ])("DutchV3 rollout: $name ($chainId)", ({ chainId, reactor }) => {
   it("getReactor resolves the deployed Dutch_V3 reactor", () => {
     expect(getReactor(chainId, OrderType.Dutch_V3).toLowerCase()).toEqual(reactor.toLowerCase());
@@ -121,6 +124,9 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         },
         "56": {
           "Dutch_V3": "0x00000000a55e50C71b70Db3C8B58749cd1E18eB2",
+        },
+        "57073": {
+          "Dutch_V3": "0x000000007A1C8e570011EeDF86A2A35593013cBA",
         },
         "7777777": {
           "Dutch_V3": "0x000000002C9A3812e15cf233190992E9a57EDB56",

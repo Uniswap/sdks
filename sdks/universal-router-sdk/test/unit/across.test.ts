@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
+import { BigNumber, utils } from 'ethers'
 import { AcrossV4DepositV3Params, CONTRACT_BALANCE } from '../../src/entities/actions/across'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 
@@ -174,6 +174,63 @@ describe('Across Bridge Integration', () => {
       // Verify both bridge commands were added
       expect(planner.commands).to.equal('0x4040') // Two ACROSS_V4_DEPOSIT_V3 commands
       expect(planner.inputs.length).to.equal(2)
+    })
+  })
+  describe('command input encoding matches the contract decoder', () => {
+    // ChainedActions.sol reads the command input with
+    // `abi.decode(input, (AcrossV4DepositV3Params))` — a SINGLE tuple with a
+    // dynamic member (`bytes message`), so the encoding must be
+    // offset-prefixed. A flat 13-value encoding of the same fields does not
+    // decode (the dispatcher reverts with empty data). This decode mirrors
+    // the contract exactly and is the regression test for that bug.
+    const ACROSS_V4_DEPOSIT_V3_TUPLE =
+      'tuple(address depositor,address recipient,address inputToken,address outputToken,uint256 inputAmount,uint256 outputAmount,uint256 destinationChainId,address exclusiveRelayer,uint32 quoteTimestamp,uint32 fillDeadline,uint32 exclusivityDeadline,bytes message,bool useNative)'
+
+    const params: AcrossV4DepositV3Params = {
+      depositor: '0x0000000000000000000000000000000000000001',
+      recipient: '0x0000000000000000000000000000000000000002',
+      inputToken: WETH_MAINNET,
+      outputToken: WETH_OPTIMISM,
+      inputAmount: CONTRACT_BALANCE,
+      outputAmount: BigNumber.from('990000000000000000'),
+      destinationChainId: 10,
+      exclusiveRelayer: '0x0000000000000000000000000000000000000000',
+      quoteTimestamp: 1700000000,
+      fillDeadline: 1700003600,
+      exclusivityDeadline: 0,
+      message: '0x1234',
+      useNative: false,
+    }
+
+    it('decodes with abi.decode(input, (AcrossV4DepositV3Params)) semantics', () => {
+      const planner = new RoutePlanner()
+      planner.addAcrossBridge(params)
+
+      const [decoded] = utils.defaultAbiCoder.decode([ACROSS_V4_DEPOSIT_V3_TUPLE], planner.inputs[0])
+
+      expect(decoded.depositor).to.equal(params.depositor)
+      expect(decoded.recipient).to.equal(params.recipient)
+      expect(decoded.inputToken).to.equal(params.inputToken)
+      expect(decoded.outputToken).to.equal(params.outputToken)
+      expect(decoded.inputAmount.toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(decoded.outputAmount.toString()).to.equal('990000000000000000')
+      expect(decoded.destinationChainId.toNumber()).to.equal(10)
+      expect(decoded.exclusiveRelayer).to.equal(params.exclusiveRelayer)
+      expect(decoded.quoteTimestamp).to.equal(params.quoteTimestamp)
+      expect(decoded.fillDeadline).to.equal(params.fillDeadline)
+      expect(decoded.exclusivityDeadline).to.equal(params.exclusivityDeadline)
+      expect(decoded.message).to.equal(params.message)
+      expect(decoded.useNative).to.equal(params.useNative)
+    })
+
+    it('is offset-prefixed (single dynamic tuple), not a flat parameter list', () => {
+      const planner = new RoutePlanner()
+      planner.addAcrossBridge(params)
+
+      // Word 0 of a single dynamic-tuple encoding is the offset to the tuple
+      // body (0x20). The old flat encoding put the depositor address here.
+      const word0 = utils.hexDataSlice(planner.inputs[0], 0, 32)
+      expect(BigNumber.from(word0).toNumber()).to.equal(32)
     })
   })
 })

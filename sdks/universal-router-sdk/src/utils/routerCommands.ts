@@ -80,6 +80,14 @@ const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 t
 const PERMIT2_TRANSFER_FROM_STRUCT = '(address from,address to,uint160 amount,address token)'
 const PERMIT2_TRANSFER_FROM_BATCH_STRUCT = PERMIT2_TRANSFER_FROM_STRUCT + '[]'
 
+// Must be encoded as a SINGLE tuple: ChainedActions.sol decodes the command
+// input with `abi.decode(input, (AcrossV4DepositV3Params))`, and because the
+// struct has a dynamic member (`bytes message`) that encoding is
+// offset-prefixed — a flat 13-value encoding of the same fields does not
+// decode and makes the router revert with empty data.
+const ACROSS_V4_DEPOSIT_V3_STRUCT =
+  '(address depositor,address recipient,address inputToken,address outputToken,uint256 inputAmount,uint256 outputAmount,uint256 destinationChainId,address exclusiveRelayer,uint32 quoteTimestamp,uint32 fillDeadline,uint32 exclusivityDeadline,bytes message,bool useNative)'
+
 export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   // Batch Reverts
   [CommandType.EXECUTE_SUB_PLAN]: {
@@ -237,21 +245,7 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   // 3rd Party Integrations
   [CommandType.ACROSS_V4_DEPOSIT_V3]: {
     parser: Parser.Abi,
-    params: [
-      { name: 'depositor', type: 'address' },
-      { name: 'recipient', type: 'address' },
-      { name: 'inputToken', type: 'address' },
-      { name: 'outputToken', type: 'address' },
-      { name: 'inputAmount', type: 'uint256' },
-      { name: 'outputAmount', type: 'uint256' },
-      { name: 'destinationChainId', type: 'uint256' },
-      { name: 'exclusiveRelayer', type: 'address' },
-      { name: 'quoteTimestamp', type: 'uint32' },
-      { name: 'fillDeadline', type: 'uint32' },
-      { name: 'exclusivityDeadline', type: 'uint32' },
-      { name: 'message', type: 'bytes' },
-      { name: 'useNative', type: 'bool' },
-    ],
+    params: [{ name: 'params', type: ACROSS_V4_DEPOSIT_V3_STRUCT }],
   },
 }
 
@@ -342,20 +336,25 @@ export class RoutePlanner {
    * @returns RoutePlanner instance for chaining
    */
   addAcrossBridge(params: AcrossV4DepositV3Params): RoutePlanner {
+    // One value, not thirteen: the command input is a single offset-prefixed
+    // tuple (ACROSS_V4_DEPOSIT_V3_STRUCT) so the contract's
+    // `abi.decode(input, (AcrossV4DepositV3Params))` can read it.
     this.addCommand(CommandType.ACROSS_V4_DEPOSIT_V3, [
-      params.depositor,
-      params.recipient,
-      params.inputToken,
-      params.outputToken,
-      params.inputAmount,
-      params.outputAmount,
-      params.destinationChainId,
-      params.exclusiveRelayer,
-      params.quoteTimestamp,
-      params.fillDeadline,
-      params.exclusivityDeadline,
-      params.message,
-      params.useNative,
+      [
+        params.depositor,
+        params.recipient,
+        params.inputToken,
+        params.outputToken,
+        params.inputAmount,
+        params.outputAmount,
+        params.destinationChainId,
+        params.exclusiveRelayer,
+        params.quoteTimestamp,
+        params.fillDeadline,
+        params.exclusivityDeadline,
+        params.message,
+        params.useNative,
+      ],
     ])
     return this
   }
