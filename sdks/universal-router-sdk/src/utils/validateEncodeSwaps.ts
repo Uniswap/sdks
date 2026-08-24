@@ -7,6 +7,7 @@ import {
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
+  isAtLeastV2_1_1,
   ZERO_ADDRESS,
 } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
@@ -198,6 +199,15 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     invariant(fees.length > 0, 'AT_LEAST_ONE_FEE_RECIPIENT_REQUIRED')
     invariant(fees.length <= MAX_FEE_RECIPIENTS, 'TOO_MANY_FEE_RECIPIENTS')
   }
+
+  // Each portion fee means a fraction of the *gross* output, so later entries are rescaled
+  // against the router's shrinking balance at encode time. The rescaled portions are fractional
+  // bips, which only PAY_PORTION_FULL_PRECISION (>= v2.1.1) can represent, so multiple portion
+  // fees are therefore rejected on older router versions.
+  invariant(
+    fees.filter((fee) => fee.kind === 'portion').length <= 1 || isAtLeastV2_1_1(spec.urVersion),
+    'MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1'
+  )
 
   // Applied per entry, so one bad recipient in a list is rejected rather than averaged away.
   // These also make a mixed portion/flat array impossible: whichever kind does not match the

@@ -37,7 +37,8 @@ import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
 import { applyNativeRouterBalanceInputToSteps, applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
-import { normalizeEncodeSwapsSpec, toFeeList } from './utils/normalizeEncodeSwapsSpec'
+import { normalizeEncodeSwapsSpec, toFeeList, toPortionFeeList } from './utils/normalizeEncodeSwapsSpec'
+import { scalePortionFees } from './utils/portionFees'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
@@ -253,16 +254,24 @@ export abstract class SwapRouter {
 
     // Fee deducted from gross output before final settlement. One command per recipient, emitted
     // in the caller's order, all of them ahead of the settlement SWEEP below.
-    // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
+    // Each portion fee means "this fraction of the *gross* output". On-chain PAY_PORTION pays a
+    // portion of the router's remaining balance, so scalePortionFees rescales fee i to
+    // f_i / (1 - sum(f_0..f_{i-1})); every recipient then receives exactly their stated fraction
+    // of gross. The rescaled portions are fractional bips, so multiple portion fees require the
+    // 1e18-precision command (validateEncodeSwaps enforces urVersion >= 2.1.1); a single portion
+    // is unscaled and keeps the legacy bips encoding on v2.0. Flat is a plain TRANSFER.
     const useFullPrecision = isAtLeastV2_1_1(normalizedSpec.urVersion)
+    const scaledPortions = scalePortionFees(toPortionFeeList(normalizedSpec.fee))
+    let portionIndex = 0
     for (const fee of toFeeList(normalizedSpec.fee)) {
       if (fee.kind === 'portion') {
+        const scaledFee = scaledPortions[portionIndex++].scaledFee
         planner.addCommand(
           useFullPrecision ? CommandType.PAY_PORTION_FULL_PRECISION : CommandType.PAY_PORTION,
           [
             getCurrencyAddress(outputToken),
             fee.recipient,
-            useFullPrecision ? encodeFee1e18(fee.fee) : encodeFeeBips(fee.fee),
+            useFullPrecision ? encodeFee1e18(scaledFee) : encodeFeeBips(scaledFee),
           ],
           false,
           normalizedSpec.urVersion

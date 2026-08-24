@@ -1,0 +1,29 @@
+{
+  "../permit2-sdk/lib/forge-std": {
+    "rev": "2a2ce3692b8c1523b29de3ec9d961ee9fbbc43a6"
+  },
+  "../permit2-sdk/lib/solmate": {
+    "rev": "8d910d876f51c3b2585c9109409d601f600e68e1"
+  },
+  "../permit2-sdk/permit2": {
+    "rev": "0ded3a98b83ccce4cf4eda7f7d4c974b1d6f09f9"
+  },
+  "lib/forge-std": {
+    "rev": "e8e3dbfb870c8457ca77343173509f6d899df63d"
+  },
+  "lib/openzeppelin-contracts": {
+    "branch": {
+      "name": "v4.8.0",
+      "rev": "d693d89d99325f395182e4f547dbf5ff8e5c3c87"
+    }
+  },
+  "lib/permit2": {
+    "rev": "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219"
+  },
+  "lib/solmate": {
+    "rev": "f2833c7cc951c50e0b5fd7e505571fddc10c8f77"
+  },
+  "lib/universal-router": {
+    "rev": "e092073c31702335b0639cfb8a258b79553a6417"
+  }
+}
