@@ -40,6 +40,7 @@ import {
 } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
+import { scalePortionFees } from '../../utils/portionFees'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
@@ -79,7 +80,11 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & 
    * Portion fee(s) taken out of the swap output before it is forwarded to `recipient`.
    * A single `FeeOptions` is the original shape and encodes exactly as it always has.
    * An array pays one recipient per entry, in the order given, and may hold at most
-   * `MAX_FEE_RECIPIENTS` entries. Mutually exclusive with `flatFee`.
+   * `MAX_FEE_RECIPIENTS` entries. Each entry's fee means "this fraction of the gross swap
+   * output": the SDK rescales later entries against the router's shrinking balance so every
+   * recipient receives exactly their stated fraction of gross. Because the rescaled portions
+   * are fractional bips, more than one entry requires `urVersion` >= V2_1_1
+   * (PAY_PORTION_FULL_PRECISION). Mutually exclusive with `flatFee`.
    */
   fee?: FeeOptions | FeeOptions[]
   useRouterBalance?: boolean
@@ -470,31 +475,39 @@ export class UniswapTrade implements Command {
       // If there is a fee, that percentage is sent to the fee recipient. One PAY_PORTION per
       // recipient, emitted in the caller's order, ahead of the settlement command below.
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
-      for (const portionFee of toFeeOptionsList(this.options.fee)) {
-        // Reject fractional bips fees on older UR versions to prevent silent precision loss
-        if (!useFullPrecision && !portionFee.fee.multiply(10_000).remainder.equalTo(0)) {
-          throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
-        }
+      const feeList = toFeeOptionsList(this.options.fee)
+      // Multiple fees require the 1e18-precision command: each fee means "this fraction of the
+      // gross output", and encoding that against the router's shrinking balance produces
+      // fractional-bips portions that PAY_PORTION (bips) cannot represent.
+      invariant(
+        feeList.length <= 1 || useFullPrecision,
+        'Multiple fee recipients require Universal Router version V2_1_1 or higher'
+      )
 
-        // Every deduction is taken against the same pre-fee minimumAmountOut. On-chain each
-        // PAY_PORTION reads the router's *current* balance, so the portions compound downward and
-        // the recipients together receive no more than this sum. Summing against the gross amount
-        // therefore over-estimates rather than under-estimates the total taken, which can only make
-        // the sweep floor below more conservative — it can never leave the sweep short.
+      // Each fee is a fraction of the *gross* output. On-chain, each PAY_PORTION pays a portion
+      // of the router's remaining balance, so scalePortionFees rescales fee i to
+      // f_i / (1 - sum(f_0..f_{i-1})): every recipient then receives exactly their stated
+      // fraction of gross, and the deduction below can sum the gross-based fees exactly.
+      for (const { recipient, grossFee, scaledFee } of scalePortionFees(feeList)) {
         if (useFullPrecision) {
-          const fee1e18 = encodeFee1e18(portionFee.fee)
           planner.addCommand(
             CommandType.PAY_PORTION_FULL_PRECISION,
-            [pathOutputCurrencyAddress, portionFee.recipient, fee1e18],
+            [pathOutputCurrencyAddress, recipient, encodeFee1e18(scaledFee)],
             false,
             this.options.urVersion
           )
-          feeDeduction = feeDeduction.add(minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18)))
         } else {
-          const feeBips = encodeFeeBips(portionFee.fee)
-          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, portionFee.recipient, feeBips])
-          feeDeduction = feeDeduction.add(minimumAmountOut.mul(feeBips).div(10000))
+          // Reject fractional bips fees on older UR versions to prevent silent precision loss
+          if (!grossFee.multiply(10_000).remainder.equalTo(0)) {
+            throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
+          }
+          // single fee: scaled == gross, so the legacy bips encoding is unchanged
+          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, recipient, encodeFeeBips(grossFee)])
         }
+        // exact gross-based deduction: floor(minimumAmountOut * f_i)
+        feeDeduction = feeDeduction.add(
+          minimumAmountOut.mul(grossFee.numerator.toString()).div(grossFee.denominator.toString())
+        )
       }
 
       // If there is a flat fee, that absolute amount is sent to the fee recipient

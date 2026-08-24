@@ -6,6 +6,7 @@ import { FeeOptions, encodeSqrtRatioX96, nearestUsableTick, TickMath, FeeAmount 
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion } from '../../src/utils/constants'
 import { encodeFeeBips, encodeFee1e18 } from '../../src/utils/numbers'
+import { scalePortionFees } from '../../src/utils/portionFees'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { CommandParser } from '../../src/utils/commandParser'
 import { SwapRouter, UniswapTrade, FlatFeeOptions, MAX_FEE_RECIPIENTS } from '../../src'
@@ -78,6 +79,66 @@ describe('Fee Encoding', () => {
       // 1/3 in 1e18: 333333333333333333 out of 1e18 = 0.333333333333333333
       expect(BigNumber.from(encoded1e18).toString()).to.equal('333333333333333333')
       expect(BigNumber.from(encodedBips).toNumber()).to.equal(3333)
+    })
+  })
+
+  describe('scalePortionFees (precise gross-output semantics)', () => {
+    const A = '0x000000000000000000000000000000000000000a'
+    const B = '0x000000000000000000000000000000000000000b'
+    const C = '0x000000000000000000000000000000000000000c'
+
+    function simulateSequentialPayments(gross: BigNumber, portions1e18: BigNumber[]): BigNumber[] {
+      let balance = gross
+      return portions1e18.map((portion) => {
+        const paid = balance.mul(portion).div(BigNumber.from(10).pow(18))
+        balance = balance.sub(paid)
+        return paid
+      })
+    }
+
+    it('two 2000-bps fees on a 100-unit output pay 20 and 20 (second encoded as 25% of remaining)', () => {
+      const scaled = scalePortionFees([
+        { fee: new Percent(2000, 10_000), recipient: A },
+        { fee: new Percent(2000, 10_000), recipient: B },
+      ])
+
+      const encoded = scaled.map((s) => BigNumber.from(encodeFee1e18(s.scaledFee)))
+      // first fee unscaled: 20%; second rescaled to 20% / 80% = 25% of the remaining balance
+      expect(encoded[0].toString()).to.equal(BigNumber.from(10).pow(17).mul(2).toString())
+      expect(encoded[1].toString()).to.equal(BigNumber.from(10).pow(17).mul(25).div(10).toString())
+
+      const paid = simulateSequentialPayments(BigNumber.from(100), encoded)
+      expect(paid.map((p) => p.toNumber())).to.deep.equal([20, 20])
+    })
+
+    it('5/10/5 bps fees each pay their bps of gross when applied sequentially', () => {
+      const scaled = scalePortionFees([
+        { fee: new Percent(5, 10_000), recipient: A },
+        { fee: new Percent(10, 10_000), recipient: B },
+        { fee: new Percent(5, 10_000), recipient: C },
+      ])
+
+      // scaled fractions: 5/10000, then 10/9995, then 5/9985
+      expect(scaled[1].scaledFee.equalTo(new Percent(10, 9995))).to.be.true
+      expect(scaled[2].scaledFee.equalTo(new Percent(5, 9985))).to.be.true
+
+      const gross = BigNumber.from(10).pow(18) // 1e18-unit output
+      const encoded = scaled.map((s) => BigNumber.from(encodeFee1e18(s.scaledFee)))
+      const paid = simulateSequentialPayments(gross, encoded)
+
+      const expected = [5, 10, 5].map((bps) => gross.mul(bps).div(10_000))
+      paid.forEach((p, i) => {
+        expect(expected[i].sub(p).abs().lte(2), `recipient ${i} gets its bps of gross (dust only)`).to.be.true
+      })
+    })
+
+    it('throws when the fees together exceed 100% of the output', () => {
+      expect(() =>
+        scalePortionFees([
+          { fee: new Percent(60, 100), recipient: A },
+          { fee: new Percent(60, 100), recipient: B },
+        ])
+      ).to.throw('Portion fees together exceed 100% of the swap output')
     })
   })
 
@@ -446,24 +507,21 @@ describe('Fee Encoding', () => {
         expect(cmds.map((cmd) => (cmd.params[1].value as string).toLowerCase())).to.deep.equal(
           fees.map((fee) => fee.recipient.toLowerCase())
         )
-        expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toString())).to.deep.equal(
-          fees.map((fee) => BigNumber.from(encodeFee1e18(fee.fee)).toString())
-        )
+        // The first fee is unscaled (nothing has been paid yet); the second is rescaled against
+        // the remaining balance: 0.50% / (1 - 0.25%) = 50/9975.
+        expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toString())).to.deep.equal([
+          BigNumber.from(encodeFee1e18(FEE_A.fee)).toString(),
+          BigNumber.from(10).pow(18).mul(50).div(9975).toString(),
+        ])
       })
 
-      it('emits one PAY_PORTION per recipient for four recipients on V2_0 (bips)', async () => {
+      it('rejects multiple recipients on V2_0, which lacks PAY_PORTION_FULL_PRECISION', async () => {
         const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
-        const methodParameters = SwapRouter.swapCallParameters(
-          buildTrade([await exactInputTrade()]),
-          swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_0 })
-        )
+        const trade = buildTrade([await exactInputTrade()])
 
-        const cmds = feeCommands(methodParameters.calldata)
-        expect(cmds).to.have.length(MAX_FEE_RECIPIENTS)
-        expect(cmds.map((cmd) => cmd.commandName)).to.deep.equal(new Array(4).fill('PAY_PORTION'))
-        expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toNumber())).to.deep.equal(
-          fees.map((fee) => BigNumber.from(encodeFeeBips(fee.fee)).toNumber())
-        )
+        expect(() =>
+          SwapRouter.swapCallParameters(trade, swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_0 }))
+        ).to.throw('Multiple fee recipients require Universal Router version V2_1_1 or higher')
       })
 
       it('preserves the caller ordering rather than sorting or deduping recipients', async () => {
@@ -500,9 +558,10 @@ describe('Fee Encoding', () => {
         const methodParameters = SwapRouter.swapCallParameters(trade, opts)
 
         const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        // each fee is a fraction of gross output, so the deduction is exactly sum(floor(gross * f_i))
         const expectedDeduction = fees.reduce(
           (acc, fee) =>
-            acc.add(grossMinimumOut.mul(BigNumber.from(encodeFee1e18(fee.fee))).div(BigNumber.from(10).pow(18))),
+            acc.add(grossMinimumOut.mul(fee.fee.numerator.toString()).div(fee.fee.denominator.toString())),
           BigNumber.from(0)
         )
 
@@ -522,27 +581,30 @@ describe('Fee Encoding', () => {
         expect(fourFloor.lt(oneFloor)).to.be.true
       })
 
-      it('never under-estimates what the sequential on-chain PAY_PORTIONs actually take', async () => {
-        // Each PAY_PORTION reads the router's *current* balance, so the portions compound downward.
-        // The SDK sums every portion against the gross amount, which must therefore be an upper bound
-        // — an under-estimate would leave a sweep floor the router cannot meet.
+      it('the encoded (rescaled) portions pay each recipient their fraction of gross on-chain', async () => {
+        // Each PAY_PORTION_FULL_PRECISION reads the router's *current* balance. The SDK rescales
+        // fee i to f_i / (1 - sum of earlier fees), so simulating the sequential on-chain payments
+        // with the *encoded* portions must give every recipient their stated fraction of gross
+        // (up to flooring dust).
         const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
         const trade = buildTrade([await exactOutputTrade()])
         const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
         const methodParameters = SwapRouter.swapCallParameters(trade, opts)
 
         const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
-        const sdkDeduction = grossMinimumOut.sub(sweepFloor(methodParameters.calldata))
+        const encodedPortions = feeCommands(methodParameters.calldata).map((cmd) =>
+          BigNumber.from(cmd.params[2].value)
+        )
 
         let balance = grossMinimumOut
-        let actuallyPaid = BigNumber.from(0)
-        for (const fee of fees) {
-          const paid = balance.mul(BigNumber.from(encodeFee1e18(fee.fee))).div(BigNumber.from(10).pow(18))
-          actuallyPaid = actuallyPaid.add(paid)
+        encodedPortions.forEach((portion, i) => {
+          const paid = balance.mul(portion).div(BigNumber.from(10).pow(18))
           balance = balance.sub(paid)
-        }
-
-        expect(sdkDeduction.gte(actuallyPaid), 'sdk deduction must not under-estimate the on-chain total').to.be.true
+          const idealPaid = grossMinimumOut
+            .mul(fees[i].fee.numerator.toString())
+            .div(fees[i].fee.denominator.toString())
+          expect(idealPaid.sub(paid).abs().lte(4), `recipient ${i} must receive its fraction of gross`).to.be.true
+        })
       })
 
       it('leaves the exact-input sweep floor at the gross minimum, as with a single fee', async () => {
@@ -564,7 +626,7 @@ describe('Fee Encoding', () => {
 
         expect(() =>
           SwapRouter.swapCallParameters(trade, swapOptions({ fee: halves, urVersion: UniversalRouterVersion.V2_1_1 }))
-        ).to.throw('Fee amount greater than minimumAmountOut')
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
     })
 
@@ -608,13 +670,24 @@ describe('Fee Encoding', () => {
         )
       })
 
-      it('rejects fractional bips on a pre-V2_1_1 router for any recipient in the array', async () => {
+      it('rejects a fractional-bips single fee on a pre-V2_1_1 router', async () => {
         const trade = buildTrade([await exactInputTrade()])
-        const fees: FeeOptions[] = [FEE_A, { fee: new Percent(1, 3), recipient: RECIPIENT_B }]
+        const fees: FeeOptions[] = [{ fee: new Percent(1, 3), recipient: RECIPIENT_B }]
 
         expect(() =>
           SwapRouter.swapCallParameters(trade, swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_0 }))
         ).to.throw('Fractional fee bips require Universal Router version V2_1_1 or higher')
+      })
+
+      it('rejects multiple recipients on a pre-V2_1_1 router even when every fee is whole bips', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+
+        expect(() =>
+          SwapRouter.swapCallParameters(
+            trade,
+            swapOptions({ fee: [FEE_A, FEE_B], urVersion: UniversalRouterVersion.V2_0 })
+          )
+        ).to.throw('Multiple fee recipients require Universal Router version V2_1_1 or higher')
       })
     })
   })
