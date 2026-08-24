@@ -560,8 +560,7 @@ describe('Fee Encoding', () => {
         const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
         // each fee is a fraction of gross output, so the deduction is exactly sum(floor(gross * f_i))
         const expectedDeduction = fees.reduce(
-          (acc, fee) =>
-            acc.add(grossMinimumOut.mul(fee.fee.numerator.toString()).div(fee.fee.denominator.toString())),
+          (acc, fee) => acc.add(grossMinimumOut.mul(fee.fee.numerator.toString()).div(fee.fee.denominator.toString())),
           BigNumber.from(0)
         )
 
@@ -592,9 +591,7 @@ describe('Fee Encoding', () => {
         const methodParameters = SwapRouter.swapCallParameters(trade, opts)
 
         const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
-        const encodedPortions = feeCommands(methodParameters.calldata).map((cmd) =>
-          BigNumber.from(cmd.params[2].value)
-        )
+        const encodedPortions = feeCommands(methodParameters.calldata).map((cmd) => BigNumber.from(cmd.params[2].value))
 
         let balance = grossMinimumOut
         encodedPortions.forEach((portion, i) => {
