@@ -32,9 +32,7 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
     let feeAmount = BigNumber.from(0)
     for (const portionFee of toPortionFeeList(spec.fee)) {
       feeAmount = feeAmount.add(
-        grossMinOrExactAmountOut
-          .mul(portionFee.fee.numerator.toString())
-          .div(portionFee.fee.denominator.toString())
+        grossMinOrExactAmountOut.mul(portionFee.fee.numerator.toString()).div(portionFee.fee.denominator.toString())
       )
     }
 
