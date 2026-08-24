@@ -8,7 +8,15 @@ import {
 import { BigNumber, ethers } from "ethers";
 
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
-import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
+import { decayInput, decayOutput } from "../utils/dutchBlockDecay";
+import { applyExclusivityOverride } from "../utils/exclusivity";
+import {
+    boundedAdd,
+    boundedSub,
+    mulDivDown,
+    mulDivUp,
+    UINT256_MAX,
+} from "../utils/mathExt";
 import { originalIfZero } from "../utils/order";
 
 import {
@@ -77,6 +85,9 @@ type V3WitnessInfo = {
 
 const COSIGNER_DATA_TUPLE_ABI =
     "tuple(uint256,address,uint256,uint256,uint256[])";
+
+// adjustmentPerGweiBaseFee is denominated per gwei of base fee delta
+const ONE_GWEI = BigNumber.from(10).pow(9);
 
 export const V3_DUTCH_ORDER_TYPES = {
     V3DutchOrder: [
@@ -581,42 +592,180 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
         return ethers.utils.recoverAddress(messageHash, signature);
     }
 
+    /**
+     * Resolves the amounts this order settles with, mirroring
+     * V3DutchOrderReactor._resolve: cosigner overrides are applied to the base
+     * amounts, then the base fee adjustment, then the bounded decay curve, then
+     * the exclusivity override.
+     *
+     * @param options resolution context. `blockBaseFee` is required when the
+     * order carries a nonzero adjustmentPerGweiBaseFee. `filler` is required to
+     * claim exclusive filling rights; without it the order resolves for an
+     * arbitrary filler.
+     * @return the input and outputs the reactor would transfer
+     * @throws when the reactor would reject the order outright, rather than
+     * reporting amounts it would never settle
+     */
     resolve(options: V3OrderResolutionOptions): ResolvedUniswapXOrder {
-        return {
-            input: {
-                token: this.info.input.token,
-                amount: getBlockDecayedAmount(
-                    {
-                        decayStartBlock: this.info.cosignerData.decayStartBlock,
-                        startAmount: originalIfZero(
-                            this.info.cosignerData.inputOverride,
-                            this.info.input.startAmount
-                        ),
-                        relativeBlocks: this.info.input.curve.relativeBlocks,
-                        relativeAmounts: this.info.input.curve.relativeAmounts,
-                    },
+        const {
+            decayStartBlock,
+            exclusiveFiller,
+            exclusivityOverrideBps,
+            inputOverride,
+            outputOverrides,
+        } = this.info.cosignerData;
+
+        this.validateCosignerAmounts();
+        const gasDeltaWei = this.gasDeltaWei(options.blockBaseFee);
+
+        const input: V3DutchInput = {
+            ...this.info.input,
+            startAmount: gasAdjustedInputStartAmount(
+                this.info.input,
+                originalIfZero(inputOverride, this.info.input.startAmount),
+                gasDeltaWei
+            ),
+        };
+
+        const outputs = this.info.outputs.map((baseOutput, idx) => {
+            const output: V3DutchOutput = {
+                ...baseOutput,
+                startAmount: gasAdjustedOutputStartAmount(
+                    baseOutput,
+                    originalIfZero(outputOverrides[idx], baseOutput.startAmount),
+                    gasDeltaWei
+                ),
+            };
+            return {
+                token: output.token,
+                amount: decayOutput(
+                    output,
+                    decayStartBlock,
                     options.currentBlock
                 ),
+            };
+        });
+
+        return {
+            input: {
+                token: input.token,
+                amount: decayInput(input, decayStartBlock, options.currentBlock),
             },
-            outputs: this.info.outputs.map((output, idx) => {
-                return {
-                    token: output.token,
-                    amount: getBlockDecayedAmount(
-                        {
-                            decayStartBlock: this.info.cosignerData.decayStartBlock,
-                            startAmount: originalIfZero(
-                                this.info.cosignerData.outputOverrides[idx],
-                                output.startAmount
-                            ),
-                            relativeBlocks: output.curve.relativeBlocks,
-                            relativeAmounts: output.curve.relativeAmounts,
-                        },
-                        options.currentBlock
-                    ),
-                };
+            // only outputs are scaled by the exclusivity override
+            outputs: applyExclusivityOverride(outputs, {
+                exclusiveFiller,
+                exclusivityEnd: decayStartBlock,
+                exclusivityOverrideBps,
+                currentPosition: options.currentBlock,
+                filler: options.filler,
             }),
         };
     }
+
+    /**
+     * Mirrors V3DutchOrderReactor._updateWithCosignerAmounts: a cosigner
+     * override may only improve the order for the swapper, and the reactor
+     * rejects the order outright when it does not.
+     */
+    private validateCosignerAmounts(): void {
+        const { inputOverride, outputOverrides } = this.info.cosignerData;
+
+        if (inputOverride.gt(this.info.input.startAmount)) {
+            throw new Error(
+                `InvalidCosignerInput: inputOverride ${inputOverride.toString()} exceeds startAmount ${this.info.input.startAmount.toString()}`
+            );
+        }
+
+        if (outputOverrides.length !== this.info.outputs.length) {
+            throw new Error(
+                `InvalidCosignerOutput: ${outputOverrides.length} outputOverrides for ${this.info.outputs.length} outputs`
+            );
+        }
+
+        this.info.outputs.forEach((output, idx) => {
+            const override = outputOverrides[idx];
+            if (!override.isZero() && override.lt(output.startAmount)) {
+                throw new Error(
+                    `InvalidCosignerOutput: outputOverride ${override.toString()} is below startAmount ${output.startAmount.toString()}`
+                );
+            }
+        });
+    }
+
+    /**
+     * The signed difference between the fill block's base fee and the order's
+     * startingBaseFee, which the reactor uses to adjust the base amounts.
+     * Returns zero when the order opts out of gas adjustment entirely, so that
+     * callers only need to supply a base fee for orders that use the feature.
+     */
+    private gasDeltaWei(blockBaseFee?: BigNumber): BigNumber {
+        const usesGasAdjustment =
+            !this.info.input.adjustmentPerGweiBaseFee.isZero() ||
+            this.info.outputs.some(
+                (output) => !output.adjustmentPerGweiBaseFee.isZero()
+            );
+        if (!usesGasAdjustment) {
+            return BigNumber.from(0);
+        }
+        if (blockBaseFee === undefined) {
+            throw new Error(
+                "Cannot resolve a V3 order with a nonzero adjustmentPerGweiBaseFee without options.blockBaseFee"
+            );
+        }
+        return blockBaseFee.sub(this.info.startingBaseFee);
+    }
+}
+
+/**
+ * Mirrors V3DutchOrderReactor._computeDelta, rounding the adjustment in favor
+ * of the swapper: down on a gas increase, up on a gas decrease.
+ */
+function computeGasDelta(
+    adjustmentPerGweiBaseFee: BigNumber,
+    gasDeltaWei: BigNumber
+): BigNumber {
+    if (!gasDeltaWei.isNegative()) {
+        return mulDivDown(adjustmentPerGweiBaseFee, gasDeltaWei, ONE_GWEI);
+    }
+    return mulDivUp(
+        adjustmentPerGweiBaseFee,
+        gasDeltaWei.mul(-1),
+        ONE_GWEI
+    ).mul(-1);
+}
+
+/** A gas increase increases the input, bounded by maxAmount. */
+function gasAdjustedInputStartAmount(
+    input: V3DutchInput,
+    startAmount: BigNumber,
+    gasDeltaWei: BigNumber
+): BigNumber {
+    if (input.adjustmentPerGweiBaseFee.isZero()) {
+        return startAmount;
+    }
+    return boundedAdd(
+        startAmount,
+        computeGasDelta(input.adjustmentPerGweiBaseFee, gasDeltaWei),
+        BigNumber.from(0),
+        input.maxAmount
+    );
+}
+
+/** A gas increase decreases the output, bounded by minAmount. */
+function gasAdjustedOutputStartAmount(
+    output: V3DutchOutput,
+    startAmount: BigNumber,
+    gasDeltaWei: BigNumber
+): BigNumber {
+    if (output.adjustmentPerGweiBaseFee.isZero()) {
+        return startAmount;
+    }
+    return boundedSub(
+        startAmount,
+        computeGasDelta(output.adjustmentPerGweiBaseFee, gasDeltaWei),
+        output.minAmount,
+        UINT256_MAX
+    );
 }
 
 function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
