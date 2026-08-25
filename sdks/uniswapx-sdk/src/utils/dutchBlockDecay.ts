@@ -244,6 +244,10 @@ export function getEndAmount(
   if (!startAmount || !relativeAmounts) {
     throw new Error("Invalid config for getting V3 decay end amount");
   }
+  // an empty curve is a no-op, so the end amount is just the start amount
+  if (relativeAmounts.length === 0) {
+    return startAmount;
+  }
   return startAmount.sub(
     relativeAmounts[relativeAmounts.length - 1].toString()
   );

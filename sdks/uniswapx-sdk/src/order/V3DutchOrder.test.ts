@@ -3,7 +3,7 @@ import { BigNumber, ethers } from "ethers";
 
 import { getEndAmount } from "../utils/dutchBlockDecay";
 
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, encodeRelativeBlocks, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 
 const TIME= 1725379823;
 const BLOCK_NUMBER = 20671221;
@@ -496,6 +496,52 @@ describe("V3DutchOrder", () => {
                     order.resolve({ currentBlock: BLOCK_NUMBER })
                 ).to.throw("InvalidCosignerOutput");
             });
+        });
+    });
+
+    // relativeBlocks are packed one uint16 per slot. Both directions of that
+    // packing had range bugs: encoding a value above uint16 silently overwrote
+    // the neighbouring slot, and decoding called toNumber() on the whole packed
+    // value before masking, which overflows the JS safe integer range.
+    describe("relativeBlocks packing", () => {
+        it("rejects a relativeBlock that does not fit in a uint16", () => {
+            // 65536 would shift into the next slot and silently replace it
+            expect(() => encodeRelativeBlocks([65536, 5])).to.throw(
+                "out of uint16 range"
+            );
+        });
+
+        it("accepts the largest valid uint16", () => {
+            expect(encodeRelativeBlocks([65535]).toString()).to.eq("65535");
+        });
+
+        it("round-trips a full 16-point curve", () => {
+            const relativeBlocks = Array.from(
+                { length: 16 },
+                (_, i) => (i + 1) * 4
+            );
+            const relativeAmounts = relativeBlocks.map((_, i) => BigInt(i + 1));
+            const orderInfo = getFullOrderInfo({
+                cosignerData: COSIGNER_DATA_WITHOUT_OVERRIDES,
+                outputs: [
+                    {
+                        token: OUTPUT_TOKEN,
+                        startAmount: RAW_AMOUNT,
+                        curve: { relativeBlocks, relativeAmounts },
+                        recipient: ethers.constants.AddressZero,
+                        minAmount: RAW_AMOUNT.sub(16),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
+                    },
+                ],
+            });
+            const order = new CosignedV3DutchOrder(orderInfo, CHAIN_ID);
+            const parsed = CosignedV3DutchOrder.parse(
+                order.serialize(),
+                CHAIN_ID
+            );
+            expect(parsed.info.outputs[0].curve.relativeBlocks).to.deep.eq(
+                relativeBlocks
+            );
         });
     });
 });

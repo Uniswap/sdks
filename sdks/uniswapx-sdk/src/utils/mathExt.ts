@@ -8,6 +8,7 @@ the reactor settles with.
 */
 
 export const UINT256_MAX = BigNumber.from(2).pow(256).sub(1);
+export const INT256_MAX = BigNumber.from(2).pow(255).sub(1);
 
 /**
  * Bounds a value to [min, max].
@@ -65,13 +66,37 @@ export function boundedAdd(
   return boundedSub(a, b.mul(-1), min, max);
 }
 
+/**
+ * Multiplies with the same guards solmate's FixedPointMathLib applies: it
+ * reverts on a zero denominator or when `x * y` would exceed uint256. Onchain
+ * these are checked in assembly; here `x` and `y` are non-negative amounts and
+ * block/gwei factors, so a full-precision product compared against uint256 max
+ * reproduces the overflow revert. Throwing keeps resolution faithful - a filler
+ * sees a thrown error where the reactor would revert, instead of a bogus amount
+ * from arbitrary-precision math for a transaction that can only revert.
+ */
+function mulOrRevert(
+  x: BigNumber,
+  y: BigNumber,
+  denominator: BigNumber
+): BigNumber {
+  if (denominator.isZero()) {
+    throw new Error("mulDiv: division by zero");
+  }
+  const product = x.mul(y);
+  if (product.gt(UINT256_MAX)) {
+    throw new Error("mulDiv: uint256 overflow");
+  }
+  return product;
+}
+
 /** Mirrors solmate's FixedPointMathLib.mulDivDown. */
 export function mulDivDown(
   x: BigNumber,
   y: BigNumber,
   denominator: BigNumber
 ): BigNumber {
-  return x.mul(y).div(denominator);
+  return mulOrRevert(x, y, denominator).div(denominator);
 }
 
 /** Mirrors solmate's FixedPointMathLib.mulDivUp. */
@@ -80,7 +105,21 @@ export function mulDivUp(
   y: BigNumber,
   denominator: BigNumber
 ): BigNumber {
-  const product = x.mul(y);
+  const product = mulOrRevert(x, y, denominator);
   const quotient = product.div(denominator);
   return product.mod(denominator).isZero() ? quotient : quotient.add(1);
+}
+
+/**
+ * Subtracts two unsigned values into a signed result, mirroring
+ * MathExt.sub(uint256, uint256). The reactor casts the magnitude with
+ * SafeCast.toInt256, which reverts once it exceeds int256 max; this reproduces
+ * that revert rather than returning a value the reactor never would.
+ */
+export function subToInt256(a: BigNumber, b: BigNumber): BigNumber {
+  const magnitude = a.gt(b) ? a.sub(b) : b.sub(a);
+  if (magnitude.gt(INT256_MAX)) {
+    throw new Error("SafeCast: int256 overflow");
+  }
+  return a.lt(b) ? magnitude.mul(-1) : magnitude;
 }

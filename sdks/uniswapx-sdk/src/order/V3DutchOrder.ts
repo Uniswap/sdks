@@ -15,6 +15,7 @@ import {
     boundedSub,
     mulDivDown,
     mulDivUp,
+    subToInt256,
     UINT256_MAX,
 } from "../utils/mathExt";
 import { originalIfZero } from "../utils/order";
@@ -598,13 +599,21 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
      * amounts, then the base fee adjustment, then the bounded decay curve, then
      * the exclusivity override.
      *
+     * This is a pricing function, not a validity check. It does not verify the
+     * deadline or the cosignature, both of which the reactor checks before it
+     * touches any amounts, so an expired or badly cosigned order still returns
+     * amounts here while reverting on chain. Use `UniswapXOrderQuoter` or
+     * `OrderValidator` for full validity.
+     *
      * @param options resolution context. `blockBaseFee` is required when the
      * order carries a nonzero adjustmentPerGweiBaseFee. `filler` is required to
      * claim exclusive filling rights; without it the order resolves for an
      * arbitrary filler.
      * @return the input and outputs the reactor would transfer
-     * @throws when the reactor would reject the order outright, rather than
-     * reporting amounts it would never settle
+     * @throws when the amount resolution itself cannot produce what the reactor
+     * would settle: a cosigner override outside the signed bounds, a strictly
+     * exclusive order this filler cannot fill, or a missing `blockBaseFee` for a
+     * gas-adjusted order.
      */
     resolve(options: V3OrderResolutionOptions): ResolvedUniswapXOrder {
         const {
@@ -712,7 +721,9 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                 "Cannot resolve a V3 order with a nonzero adjustmentPerGweiBaseFee without options.blockBaseFee"
             );
         }
-        return blockBaseFee.sub(this.info.startingBaseFee);
+        // mirrors MathExt.sub(uint256, uint256): the reactor casts the
+        // magnitude with SafeCast.toInt256, which reverts past int256 max
+        return subToInt256(blockBaseFee, this.info.startingBaseFee);
     }
 }
 
@@ -869,10 +880,21 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
     };
 }
 
+// each relative block occupies one uint16 slot in the packed representation
+const RELATIVE_BLOCK_MASK = 0xffff;
+
 export function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     let packedData = BigNumber.from(0);
     for (let i = 0; i < relativeBlocks.length; i++) {
-        packedData = packedData.or(BigNumber.from(relativeBlocks[i]).shl(i * 16));
+        const block = relativeBlocks[i];
+        // each slot is a uint16; a larger value would silently overflow into
+        // the next slot, so reject it rather than corrupt an adjacent block
+        if (!Number.isInteger(block) || block < 0 || block > RELATIVE_BLOCK_MASK) {
+            throw new Error(
+                `relativeBlock out of uint16 range: ${block}`
+            );
+        }
+        packedData = packedData.or(BigNumber.from(block).shl(i * 16));
     }
     return packedData;
 }
@@ -883,7 +905,10 @@ function decodeRelativeBlocks(
 ): number[] {
     const relativeBlocks: number[] = [];
     for (let i = 0; i < relativeAmountsLength; i++) {
-        const block = packedData.shr(i * 16).toNumber() & 0xffff;
+        // mask to the uint16 slot before converting to a JS number: the full
+        // packed value exceeds Number.MAX_SAFE_INTEGER once past ~4 points, so
+        // calling toNumber() on it first would throw NUMERIC_FAULT
+        const block = packedData.shr(i * 16).and(RELATIVE_BLOCK_MASK).toNumber();
         relativeBlocks.push(block);
     }
     return relativeBlocks;

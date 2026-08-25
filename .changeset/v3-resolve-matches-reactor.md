@@ -1,8 +1,10 @@
 ---
-'@uniswap/uniswapx-sdk': minor
+'@uniswap/uniswapx-sdk': major
 ---
 
 Make `CosignedV3DutchOrder.resolve()` match `V3DutchOrderReactor` settlement.
+
+Marked `major`: three of the four behavioral changes below make `resolve()` throw where it previously returned, which is breaking under strict semver even though the public export surface is unchanged. It is safe to release today, though — the parameterization API never cosigns a strictly exclusive V3 order (the RFQ path sets `exclusivityOverrideBps` to a nonzero value and the open-order path sets `exclusiveFiller` to the zero address, which `hasFillingRights` short-circuits), so nothing published can reach the `NoExclusiveOverride` throw.
 
 The local V3 resolver decayed the raw curve and ignored the rest of the signed order, so it could report amounts that differ from — and in the worst case invert — the ones the reactor settles with. A filler pricing an order with `resolve()` and then calling `execute()` would pay the reactor's amounts, not the ones it was shown.
 
@@ -19,4 +21,10 @@ Five divergences are fixed:
 
 `MathExt.sol` is ported to `utils/mathExt.ts` (`bound`, `boundedSub`, `boundedAdd`, `mulDivDown`, `mulDivUp`) and `ExclusivityLib.sol` to `utils/exclusivity.ts` (`hasFillingRights`, `applyExclusivityOverride`). The exclusivity helper is deliberately generic over the output shape and over position (timestamp or block), so V1 and V2 — which have the same omission — can adopt it without an import cycle. The internal `getBlockDecayedAmount` is replaced by `decayInput`/`decayOutput`, which take the signed input/output so the bounds cannot be dropped at the call site; none of these are exported from the package root.
 
-`resolve()` still does not check the deadline or verify the cosignature, which `_validateOrder` does before resolving. Those are order-validity concerns rather than amount resolution: the deadline is a timestamp and `resolve()` takes a block, and cosignature recovery is already exposed as `recoverCosigner()`.
+`resolve()` still does not check the deadline or verify the cosignature, which `_validateOrder` does before resolving. Those are order-validity concerns rather than amount resolution: the deadline is a timestamp and `resolve()` takes a block, and cosignature recovery is already exposed as `recoverCosigner()`. The method's own documentation now says so explicitly, so it no longer implies it rejects everything the reactor would.
+
+Equivalence is now pinned by a differential integration test rather than by hand-written expectations. `integration/test/V3DutchOrderDifferential.spec.ts` asserts `resolve()` equals the on-chain `OrderQuoter` across curve shapes (empty, single-point, increasing, multi-point, a full 16 points), block positions, cosigner overrides, base fee adjustments, exclusivity, and clamp-crossing bounds, plus one case compared against the balance deltas of a real `execute()`. The quoter runs the real reactor and returns the resolved order through the callback revert, so it is an independent oracle. Each of the four divergences above was re-introduced individually to confirm the suite catches it.
+
+Two pre-existing bugs in the packed `relativeBlocks` representation are fixed alongside, since the differential test needs multi-point curves to round-trip. `encodeRelativeBlocks` or'd each value in at `i * 16` with no range check, so a value above `uint16` silently overwrote the neighbouring slot; it now rejects out-of-range values. `decodeRelativeBlocks` called `.toNumber()` on the whole packed value before masking, which threw `NUMERIC_FAULT` past roughly four curve points, making most multi-point curves unparseable; it now masks before converting. Neither could mislead a filler through the order feed — the decoder's mask matches `Uint16ArrayLibrary.getElement`, so bytes arriving as `encodedOrder` resolve identically on both sides.
+
+`mulDivDown`, `mulDivUp` and the base fee delta now reproduce the overflow behaviour of the Solidity they mirror — solmate reverts once `x * y` exceeds `uint256`, and `SafeCast.toInt256` reverts past `int256` max — rather than silently continuing at arbitrary precision. No wrong settlement was possible either way, since the reactor reverts atomically; the gain is that a filler sees an error instead of pricing an order whose fill can only revert.
