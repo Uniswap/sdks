@@ -13,7 +13,16 @@ export enum UniversalRouterVersion {
  * to avoid coupling universal-router-sdk's version logic to v4-sdk.
  */
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
-  return !!version && version.localeCompare(UniversalRouterVersion.V2_1_1, undefined, { numeric: true }) >= 0
+  // Explicit enum ordering rather than string comparison: the versions are a closed set, and
+  // string ordering would let an unexpected value (e.g. '2.1.1-rc.1' forced past the type
+  // system) sort as >= 2.1.1. Unknown values are index -1 and therefore rejected.
+  const order: readonly UniversalRouterVersion[] = [
+    UniversalRouterVersion.V1_2,
+    UniversalRouterVersion.V2_0,
+    UniversalRouterVersion.V2_1_1,
+    UniversalRouterVersion.V2_2_0,
+  ]
+  return !!version && order.indexOf(version) >= order.indexOf(UniversalRouterVersion.V2_1_1)
 }
 
 export type RouterConfig = {
