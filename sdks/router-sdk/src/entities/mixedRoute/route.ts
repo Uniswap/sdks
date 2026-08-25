@@ -109,15 +109,35 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
 
     const price = this.pools.slice(1).reduce(
       ({ nextInput, price }, pool) => {
-        return nextInput.equals(pool.token0)
-          ? {
-              nextInput: pool.token1,
-              price: price.multiply(pool.token0Price.asFraction),
-            }
-          : {
-              nextInput: pool.token0,
-              price: price.multiply(pool.token1Price.asFraction),
-            }
+        if (nextInput.equals(pool.token0)) {
+          return {
+            nextInput: pool.token1,
+            price: price.multiply(pool.token0Price.asFraction),
+          }
+        }
+
+        if (nextInput.equals(pool.token1)) {
+          return {
+            nextInput: pool.token0,
+            price: price.multiply(pool.token1Price.asFraction),
+          }
+        }
+
+        if (nextInput.wrapped.equals(pool.token0.wrapped)) {
+          return {
+            nextInput: pool.token1,
+            price: price.multiply(pool.token0Price.asFraction),
+          }
+        }
+
+        if (nextInput.wrapped.equals(pool.token1.wrapped)) {
+          return {
+            nextInput: pool.token0,
+            price: price.multiply(pool.token1Price.asFraction),
+          }
+        }
+
+        return invariant(false, 'PRICE_PATH') as never
       },
 
       this.pools[0].token0.equals(this.pathInput)
