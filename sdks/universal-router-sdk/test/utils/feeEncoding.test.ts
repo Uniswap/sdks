@@ -6,7 +6,7 @@ import { FeeOptions, encodeSqrtRatioX96, nearestUsableTick, TickMath, FeeAmount 
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion, isAtLeastV2_1_1 } from '../../src/utils/constants'
 import { encodeFeeBips, encodeFee1e18 } from '../../src/utils/numbers'
-import { scalePortionFees } from '../../src/utils/portionFees'
+import { scalePortionFees, simulatePortionFeeDeduction } from '../../src/utils/portionFees'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { CommandParser } from '../../src/utils/commandParser'
 import { SwapRouter, UniswapTrade, FlatFeeOptions, MAX_FEE_RECIPIENTS } from '../../src'
@@ -140,6 +140,101 @@ describe('Fee Encoding', () => {
           { fee: new Percent(60, 100), recipient: B },
         ])
       ).to.throw('Portion fees together exceed 100% of the swap output')
+    })
+  })
+
+  describe('simulatePortionFeeDeduction property fuzz (sweep floor is always meetable)', () => {
+    // Deterministic PRNG (mulberry32) so failures reproduce; change the seed only on purpose.
+    function mulberry32(seed: number): () => number {
+      let a = seed >>> 0
+      return () => {
+        a = (a + 0x6d2b79f5) >>> 0
+        let t = a
+        t = Math.imul(t ^ (t >>> 15), t | 1)
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    // On-chain semantics of the encoded fee tail: each PAY_PORTION(_FULL_PRECISION) pays
+    // floor(runningBalance * encodedPortion / SCALE) out of the router's running balance.
+    function onchainRemaining(startingBalance: BigNumber, fees: FeeOptions[], useFullPrecision: boolean): BigNumber {
+      const scale = useFullPrecision ? BigNumber.from(10).pow(18) : BigNumber.from(10_000)
+      let balance = startingBalance
+      for (const { scaledFee } of scalePortionFees(fees)) {
+        const encoded = BigNumber.from(useFullPrecision ? encodeFee1e18(scaledFee) : encodeFeeBips(scaledFee))
+        balance = balance.sub(balance.mul(encoded).div(scale))
+      }
+      return balance
+    }
+
+    it('floor == remaining at an exact-gross fill, and floor <= remaining for any larger fill', () => {
+      const rand = mulberry32(0xfee5)
+      const recipients = [
+        '0x000000000000000000000000000000000000000a',
+        '0x000000000000000000000000000000000000000b',
+        '0x000000000000000000000000000000000000000c',
+        '0x000000000000000000000000000000000000000d',
+      ]
+
+      for (let run = 0; run < 500; run++) {
+        const useFullPrecision = run % 4 !== 3 // mix in the bips (V2_0 single-fee) encoding too
+        const count = useFullPrecision ? 1 + Math.floor(rand() * MAX_FEE_RECIPIENTS) : 1
+
+        // fractional-bps fees: numerator/denominator chosen so each fee is in (0, 25%]
+        const fees: FeeOptions[] = []
+        for (let i = 0; i < count; i++) {
+          const denominator = 10_000 + Math.floor(rand() * 9_999_999)
+          const numerator = 1 + Math.floor(rand() * Math.floor(denominator / 4))
+          fees.push({ fee: new Percent(numerator, denominator), recipient: recipients[i] })
+        }
+
+        // gross outputs from dust (1 wei) up to ~1e27
+        const gross = BigNumber.from(Math.floor(1 + rand() * Number.MAX_SAFE_INTEGER)).mul(
+          BigNumber.from(10).pow(Math.floor(rand() * 12))
+        )
+
+        const scaled = scalePortionFees(fees)
+        const floor = gross.sub(simulatePortionFeeDeduction(gross, scaled, useFullPrecision))
+        const label = `run ${run}: gross=${gross.toString()} fees=${fees
+          .map((f) => `${f.fee.numerator.toString()}/${f.fee.denominator.toString()}`)
+          .join(',')}`
+
+        // exact-gross fill: the floor must be exactly what the encoded cascade leaves
+        expect(floor.toString(), `${label} (exact fill)`).to.equal(
+          onchainRemaining(gross, fees, useFullPrecision).toString()
+        )
+        // any over-fill (each step's remainder is nondecreasing in balance) still meets the floor
+        for (const bonus of [1, 2, 7]) {
+          const remaining = onchainRemaining(gross.add(bonus), fees, useFullPrecision)
+          expect(remaining.gte(floor), `${label} (fill +${bonus} wei leaves ${remaining.toString()})`).to.be.true
+        }
+        // the deduction never exceeds the gross amount (floor never underflows)
+        expect(floor.gte(0), `${label} (floor is non-negative)`).to.be.true
+      }
+    })
+
+    it('known adversarial case: [216, 519, 917, 3292] bps on gross 533206710', () => {
+      // Naive sum(floor(gross * f_i)) gives 263617395 but the encoded cascade pays 263617396:
+      // the fixed deduction must match the cascade exactly.
+      const fees: FeeOptions[] = [216, 519, 917, 3292].map((bps, i) => ({
+        fee: new Percent(bps, 10_000),
+        recipient: `0x000000000000000000000000000000000000000${i + 1}`,
+      }))
+      const gross = BigNumber.from(533206710)
+
+      const deduction = simulatePortionFeeDeduction(gross, scalePortionFees(fees), true)
+      expect(deduction.toString()).to.equal('263617396')
+      expect(deduction.toString()).to.equal(gross.sub(onchainRemaining(gross, fees, true)).toString())
+    })
+
+    it('known adversarial case: 100% total on non-divisible gross 101 deducts everything', () => {
+      const fees: FeeOptions[] = [
+        { fee: new Percent(60, 100), recipient: '0x0000000000000000000000000000000000000001' },
+        { fee: new Percent(40, 100), recipient: '0x0000000000000000000000000000000000000002' },
+      ]
+      const gross = BigNumber.from(101)
+      expect(simulatePortionFeeDeduction(gross, scalePortionFees(fees), true).toString()).to.equal('101')
     })
   })
 

@@ -50,7 +50,9 @@ export type FlatFeeOptions = {
 }
 
 // Each portion-fee recipient costs one PAY_PORTION command, so the list is bounded to keep
-// calldata size (and the on-chain gas of the fee tail) predictable.
+// calldata size (and the on-chain gas of the fee tail) predictable. Why 4: a product decision,
+// the most recipients any current fee arrangement needs (e.g. interface + partner + integrator
+// + referrer), not a protocol limit; raising it is safe but should be a deliberate choice.
 export const MAX_FEE_RECIPIENTS = 4
 
 // the existing router permit object doesn't include enough data for permit2
