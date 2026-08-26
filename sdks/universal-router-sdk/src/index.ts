@@ -17,7 +17,8 @@ export {
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
-export { normalizeEncodeSwapsSpec, toFeeList } from './utils/normalizeEncodeSwapsSpec'
+// toFeeList and friends stay internal: they are encoding helpers, not part of the package API
+export { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
 export { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 export type { EncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 export { validateEncodeSwaps } from './utils/validateEncodeSwaps'

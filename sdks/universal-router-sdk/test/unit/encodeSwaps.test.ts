@@ -1788,6 +1788,58 @@ describe('encodeSwaps', () => {
         expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('269589314')
       })
 
+      it('property fuzz: the encoded sweep floor is met by the encoded cascade for random fee sets', () => {
+        // Deterministic PRNG (mulberry32) so failures reproduce; end-to-end oracle: encode with
+        // the SDK, decode the ABI-encoded portions from the calldata, replay them against the
+        // gross minimum, and require the SWEEP floor in that same calldata to be exactly what
+        // the replay leaves — and still met when the fill lands a few wei above the minimum.
+        let seed = 0x5eed >>> 0
+        const rand = () => {
+          seed = (seed + 0x6d2b79f5) >>> 0
+          let t = seed
+          t = Math.imul(t ^ (t >>> 15), t | 1)
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+        const recipients = [RECIPIENT_A, RECIPIENT_B, RECIPIENT_C, RECIPIENT_D]
+
+        for (let run = 0; run < 150; run++) {
+          const count = 1 + Math.floor(rand() * MAX_FEE_RECIPIENTS)
+          const fees: Fee[] = []
+          for (let i = 0; i < count; i++) {
+            // fractional-bps fees in (0, 25%]
+            const denominator = 10_000 + Math.floor(rand() * 9_999_999)
+            const numerator = 1 + Math.floor(rand() * Math.floor(denominator / 4))
+            fees.push({ kind: 'portion', recipient: recipients[i], fee: new Percent(numerator, denominator) })
+          }
+          const quote = BigNumber.from(Math.floor(1 + rand() * Number.MAX_SAFE_INTEGER)).mul(
+            BigNumber.from(10).pow(Math.floor(rand() * 8))
+          )
+          const spec = buildSpec(
+            { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+            { quote: CurrencyAmount.fromRawAmount(WETH, quote.toString()) }
+          )
+
+          const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+          const { commandTypes, inputs } = parseCommands(result.calldata)
+          const floor = BigNumber.from(settlementSweep(commandTypes, inputs).decoded[2])
+          const label = `run ${run}: gross=${quote.toString()} fees=${fees
+            .map((fee) => {
+              const f = (fee as { fee: Percent }).fee
+              return `${f.numerator.toString()}/${f.denominator.toString()}`
+            })
+            .join(',')}`
+
+          expect(floor.toString(), `${label} (exact fill)`).to.equal(
+            replayEncodedCascade(quote, result.calldata).toString()
+          )
+          for (const bonus of [1, 3]) {
+            const remaining = replayEncodedCascade(quote.add(bonus), result.calldata)
+            expect(remaining.gte(floor), `${label} (fill +${bonus} wei leaves ${remaining.toString()})`).to.be.true
+          }
+        }
+      })
+
       it('computeEncodeSwapsAmounts floors the net min-out at what the encoded cascade leaves', () => {
         const fees = [
           portion(216, RECIPIENT_A),
