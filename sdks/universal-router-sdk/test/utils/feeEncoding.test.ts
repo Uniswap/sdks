@@ -551,23 +551,61 @@ describe('Fee Encoding', () => {
       })
     })
 
-    describe('summed fee deduction', () => {
-      it('subtracts the sum of every recipient from the exact-output sweep floor', async () => {
+    describe('cascade fee deduction', () => {
+      // oracle for the on-chain behavior: each PAY_PORTION_FULL_PRECISION floors against the
+      // router's *running* balance using the encoded portion, independent of how the SDK
+      // computed its deduction
+      function replayEncodedCascade(gross: BigNumber, calldata: string): BigNumber {
+        let balance = gross
+        for (const cmd of feeCommands(calldata)) {
+          balance = balance.sub(balance.mul(BigNumber.from(cmd.params[2].value)).div(BigNumber.from(10).pow(18)))
+        }
+        return balance
+      }
+
+      it('sets the exact-output sweep floor to exactly what the sequential encoded portions leave', async () => {
         const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
         const trade = buildTrade([await exactOutputTrade()])
         const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
         const methodParameters = SwapRouter.swapCallParameters(trade, opts)
 
         const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
-        // each fee is a fraction of gross output, so the deduction is exactly sum(floor(gross * f_i))
-        const expectedDeduction = fees.reduce(
-          (acc, fee) => acc.add(grossMinimumOut.mul(fee.fee.numerator.toString()).div(fee.fee.denominator.toString())),
-          BigNumber.from(0)
-        )
-
         expect(sweepFloor(methodParameters.calldata).toString()).to.equal(
-          grossMinimumOut.sub(expectedDeduction).toString()
+          replayEncodedCascade(grossMinimumOut, methodParameters.calldata).toString()
         )
+        // gross is 1e9; sum(floor(gross * f_i)) would be 25000000, but the encoded cascade only
+        // pays 24999999 — the floor is one wei tighter than the naive sum, never looser
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal('975000001')
+      })
+
+      it('keeps the exact-output sweep floor satisfiable when later rescaled portions capture earlier flooring dust', async () => {
+        // [216, 519, 917, 3292] bps on gross 533206710: the sequential rescaled payments total
+        // 263617396 — one wei MORE than sum(floor(gross * f_i)) = 263617395, because dust left
+        // by an earlier fee's floor is captured by a later (rescaled-larger) portion. A sweep
+        // floor of 533206710 - 263617395 = 269589315 would revert on-chain: exact output
+        // delivers exactly the gross minimum, and only 269589314 remains after the fees.
+        const fees: FeeOptions[] = [
+          { fee: new Percent(216, 10_000), recipient: RECIPIENT_A },
+          { fee: new Percent(519, 10_000), recipient: RECIPIENT_B },
+          { fee: new Percent(917, 10_000), recipient: RECIPIENT_C },
+          { fee: new Percent(3292, 10_000), recipient: RECIPIENT_D },
+        ]
+        const trade = buildTrade([
+          await V4Trade.fromRoute(
+            new V4Route([ETH_USDC_V4], ETHER, USDC),
+            CurrencyAmount.fromRawAmount(USDC, '533206710'),
+            TradeType.EXACT_OUTPUT
+          ),
+        ])
+        const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        const grossMinimumOut = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        expect(grossMinimumOut.toString()).to.equal('533206710')
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal(
+          replayEncodedCascade(grossMinimumOut, methodParameters.calldata).toString()
+        )
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal('269589314')
       })
 
       it('deducts strictly more for four recipients than for the first one alone', async () => {
@@ -661,6 +699,29 @@ describe('Fee Encoding', () => {
         expect(mp.value).to.equal(LEGACY_GOLDEN.portionExactOutV2_1_1.value)
       })
 
+      it('single fractional-1e18 fee (1/3), exact output keeps the quantized deduction: byte-identical to main', async () => {
+        // Percent(1, 3) is not representable in 1e18 precision, so main's deduction
+        // floor(gross * floor(1e18/3) / 1e18) differs from the exact floor(gross / 3): on a
+        // 3-wei gross the quantized deduction is 0 (sweep floor 3), the exact one is 1. The
+        // sweep floor must track the quantized payment the encoded command actually makes.
+        const trade = buildTrade([
+          await V4Trade.fromRoute(
+            new V4Route([ETH_USDC_V4], ETHER, USDC),
+            CurrencyAmount.fromRawAmount(USDC, '3'),
+            TradeType.EXACT_OUTPUT
+          ),
+        ])
+        const mp = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({
+            fee: { fee: new Percent(1, 3), recipient: TEST_FEE_RECIPIENT_ADDRESS },
+            urVersion: UniversalRouterVersion.V2_1_1,
+          })
+        )
+        expect(mp.calldata).to.equal(LEGACY_GOLDEN.portionThirdExactOutV2_1_1.calldata)
+        expect(mp.value).to.equal(LEGACY_GOLDEN.portionThirdExactOutV2_1_1.value)
+      })
+
       it('single flat fee, exact output is byte-identical to main', async () => {
         const flatFee: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
         const mp = SwapRouter.swapCallParameters(
@@ -714,6 +775,25 @@ describe('Fee Encoding', () => {
 
       it('exact output at exactly 100% deducts the full minimum: sweep floor is zero, no underflow', async () => {
         const trade = buildTrade([await exactOutputTrade()])
+        const methodParameters = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        expect(sweepFloor(methodParameters.calldata).toString()).to.equal('0')
+      })
+
+      it('exact output at exactly 100% sweeps floor zero even when the gross does not divide evenly', async () => {
+        // 60% + 40% of gross 101: the encoded cascade pays 60 and then the full remaining 41,
+        // leaving 0. Sum-of-floors would deduct only 100 and demand a floor of 1 from an empty
+        // router, so every non-divisible gross at a 100% total would revert.
+        const trade = buildTrade([
+          await V4Trade.fromRoute(
+            new V4Route([ETH_USDC_V4], ETHER, USDC),
+            CurrencyAmount.fromRawAmount(USDC, '101'),
+            TradeType.EXACT_OUTPUT
+          ),
+        ])
         const methodParameters = SwapRouter.swapCallParameters(
           trade,
           swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })

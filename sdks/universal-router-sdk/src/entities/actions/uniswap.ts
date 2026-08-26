@@ -40,7 +40,7 @@ import {
 } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
-import { scalePortionFees } from '../../utils/portionFees'
+import { scalePortionFees, simulatePortionFeeDeduction } from '../../utils/portionFees'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
@@ -466,8 +466,6 @@ export class UniswapTrade implements Command {
         getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
       )
 
-      let feeDeduction = BigNumber.from(0)
-
       // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
       // older versions only support PAY_PORTION (bips)
       const useFullPrecision = isAtLeastV2_1_1(this.options.urVersion)
@@ -486,9 +484,10 @@ export class UniswapTrade implements Command {
 
       // Each fee is a fraction of the *gross* output. On-chain, each PAY_PORTION pays a portion
       // of the router's remaining balance, so scalePortionFees rescales fee i to
-      // f_i / (1 - sum(f_0..f_{i-1})): every recipient then receives exactly their stated
-      // fraction of gross, and the deduction below can sum the gross-based fees exactly.
-      for (const { recipient, grossFee, scaledFee } of scalePortionFees(feeList)) {
+      // f_i / (1 - sum(f_0..f_{i-1})): every recipient then receives their stated fraction of
+      // gross (to within the flooring dust of the encoded precision).
+      const scaledFees = scalePortionFees(feeList)
+      for (const { recipient, grossFee, scaledFee } of scaledFees) {
         if (useFullPrecision) {
           planner.addCommand(
             CommandType.PAY_PORTION_FULL_PRECISION,
@@ -504,11 +503,12 @@ export class UniswapTrade implements Command {
           // single fee: scaled == gross, so the legacy bips encoding is unchanged
           planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, recipient, encodeFeeBips(grossFee)])
         }
-        // exact gross-based deduction: floor(minimumAmountOut * f_i)
-        feeDeduction = feeDeduction.add(
-          minimumAmountOut.mul(grossFee.numerator.toString()).div(grossFee.denominator.toString())
-        )
       }
+
+      // The exact-output sweep floor must expect exactly what the commands above leave behind,
+      // so the deduction replays their cascade against the gross minimum. Never more than
+      // minimumAmountOut by construction, so the subtraction below cannot underflow.
+      let feeDeduction = simulatePortionFeeDeduction(minimumAmountOut, scaledFees, useFullPrecision)
 
       // If there is a flat fee, that absolute amount is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
@@ -523,9 +523,6 @@ export class UniswapTrade implements Command {
       // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
       // Otherwise we continue as expected with the trade's normal expected output
       if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-        // Guards the subtraction below: several individually valid portions can sum past 100%,
-        // which would otherwise produce a negative sweep floor and fail deep in ABI encoding.
-        if (feeDeduction.gt(minimumAmountOut)) throw new Error('Fee amount greater than minimumAmountOut')
         minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 

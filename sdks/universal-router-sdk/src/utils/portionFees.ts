@@ -1,5 +1,7 @@
+import { BigNumber } from 'ethers'
 import { Fraction, Percent } from '@uniswap/sdk-core'
 import { FeeOptions } from '@uniswap/v3-sdk'
+import { encodeFee1e18, encodeFeeBips } from './numbers'
 
 export interface ScaledPortionFee {
   recipient: string
@@ -41,4 +43,40 @@ export function scalePortionFees(fees: FeeOptions[]): ScaledPortionFee[] {
       scaledFee: new Percent(scaled.numerator, scaled.denominator),
     }
   })
+}
+
+const FEE_1E18_DENOMINATOR = BigNumber.from(10).pow(18)
+const FEE_BIPS_DENOMINATOR = BigNumber.from(10_000)
+
+/**
+ * Computes the total the encoded fee commands actually pay when the router holds exactly
+ * `grossAmount` of the output token.
+ *
+ * On-chain, each PAY_PORTION floors against the router's *running* balance using the portion
+ * value that gets ABI-encoded (the fraction truncated to 1e18 or bips precision), so dust left
+ * by an earlier fee's floor can be captured by a later (rescaled-larger) portion. Summing
+ * floor(grossAmount * f_i) over the caller-supplied fractions can therefore differ from the
+ * on-chain payments by a few wei in either direction — understating them makes a sweep floor
+ * derived from it unmeetable. Replaying the cascade with the encoded values is exact.
+ *
+ * For a single fee this reduces to floor(grossAmount * encodedFee / SCALE), the quantized
+ * deduction the single-fee path has always used, keeping its calldata byte-identical.
+ *
+ * Every payment is at most the running balance, so the result never exceeds `grossAmount`; and
+ * because each step leaves a (weakly) larger remainder from a larger balance, a router holding
+ * more than `grossAmount` keeps at least `grossAmount` minus this deduction — the floor also
+ * holds for any fill above `grossAmount`.
+ */
+export function simulatePortionFeeDeduction(
+  grossAmount: BigNumber,
+  scaledFees: ScaledPortionFee[],
+  useFullPrecision: boolean
+): BigNumber {
+  let remainingBalance = grossAmount
+  for (const { scaledFee } of scaledFees) {
+    const encodedPortion = BigNumber.from(useFullPrecision ? encodeFee1e18(scaledFee) : encodeFeeBips(scaledFee))
+    const portionDenominator = useFullPrecision ? FEE_1E18_DENOMINATOR : FEE_BIPS_DENOMINATOR
+    remainingBalance = remainingBalance.sub(remainingBalance.mul(encodedPortion).div(portionDenominator))
+  }
+  return grossAmount.sub(remainingBalance)
 }

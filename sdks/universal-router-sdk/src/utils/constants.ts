@@ -1,5 +1,7 @@
 import { BigNumber } from 'ethers'
 
+// Members must stay declared oldest-to-newest: isAtLeastV2_1_1 derives its version ordering
+// from this declaration order.
 export enum UniversalRouterVersion {
   V1_2 = '1.2',
   V2_0 = '2.0',
@@ -15,13 +17,10 @@ export enum UniversalRouterVersion {
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
   // Explicit enum ordering rather than string comparison: the versions are a closed set, and
   // string ordering would let an unexpected value (e.g. '2.1.1-rc.1' forced past the type
-  // system) sort as >= 2.1.1. Unknown values are index -1 and therefore rejected.
-  const order: readonly UniversalRouterVersion[] = [
-    UniversalRouterVersion.V1_2,
-    UniversalRouterVersion.V2_0,
-    UniversalRouterVersion.V2_1_1,
-    UniversalRouterVersion.V2_2_0,
-  ]
+  // system) sort as >= 2.1.1. Unknown values are index -1 and therefore rejected. The order is
+  // derived from the enum, whose members are declared oldest-to-newest, so a newly added
+  // version cannot be omitted here and silently gate as pre-2.1.1.
+  const order: readonly UniversalRouterVersion[] = Object.values(UniversalRouterVersion)
   return !!version && order.indexOf(version) >= order.indexOf(UniversalRouterVersion.V2_1_1)
 }
 
