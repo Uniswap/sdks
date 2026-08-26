@@ -256,8 +256,9 @@ export abstract class SwapRouter {
     // in the caller's order, all of them ahead of the settlement SWEEP below.
     // Each portion fee means "this fraction of the *gross* output". On-chain PAY_PORTION pays a
     // portion of the router's remaining balance, so scalePortionFees rescales fee i to
-    // f_i / (1 - sum(f_0..f_{i-1})); every recipient then receives exactly their stated fraction
-    // of gross. The rescaled portions are fractional bips, so multiple portion fees require the
+    // f_i / (1 - sum(f_0..f_{i-1})); every recipient then receives their stated fraction of
+    // gross to within encoding dust (computeEncodeSwapsAmounts replays the same cascade so the
+    // sweep floor matches). The rescaled portions are fractional bips, so multiple portion fees require the
     // 1e18-precision command (validateEncodeSwaps enforces urVersion >= 2.1.1); a single portion
     // is unscaled and keeps the legacy bips encoding on v2.0. Flat is a plain TRANSFER.
     const useFullPrecision = isAtLeastV2_1_1(normalizedSpec.urVersion)

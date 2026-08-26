@@ -2,7 +2,9 @@ import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { NormalizedSwapSpecification } from '../types/encodeSwaps'
+import { isAtLeastV2_1_1 } from './constants'
 import { toFlatFeeList, toPortionFeeList } from './normalizeEncodeSwapsSpec'
+import { scalePortionFees, simulatePortionFeeDeduction } from './portionFees'
 
 // gross = pre-fee (what the swap routes must produce)
 // net = post-fee (what the recipient actually receives, used as the floor on the final SWEEP)
@@ -26,19 +28,16 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
       .mul(slippageDenominator.sub(slippageNumerator))
       .div(slippageDenominator)
 
-    // Each portion fee is a fraction of the *gross* output (the encoder rescales later entries
-    // against the router's shrinking balance so recipients receive exactly this), so the total
-    // deduction is exactly the sum of the gross-based fees: sum(floor(gross * f_i)).
-    let feeAmount = BigNumber.from(0)
-    for (const portionFee of toPortionFeeList(spec.fee)) {
-      feeAmount = feeAmount.add(
-        grossMinOrExactAmountOut.mul(portionFee.fee.numerator.toString()).div(portionFee.fee.denominator.toString())
-      )
-    }
-
-    // Several individually valid portions can sum past 100%. Without this the subtraction below
-    // goes negative and fails deep inside ABI encoding instead of at the call site.
-    invariant(feeAmount.lte(grossMinOrExactAmountOut), 'FEE_TOTAL_GT_AMOUNT_OUT')
+    // The sweep floor must expect exactly what the encoded fee commands leave behind when the
+    // router holds the gross minimum, so the deduction replays their cascade — same scaled
+    // portions, same encoded precision as the encoder emits. It never exceeds the gross by
+    // construction (each payment floors against the running balance), and portions that
+    // together exceed 100% throw inside scalePortionFees before any subtraction can underflow.
+    const feeAmount = simulatePortionFeeDeduction(
+      grossMinOrExactAmountOut,
+      scalePortionFees(toPortionFeeList(spec.fee)),
+      isAtLeastV2_1_1(spec.urVersion)
+    )
 
     return {
       exactOrMaxAmountIn: routingAmount,

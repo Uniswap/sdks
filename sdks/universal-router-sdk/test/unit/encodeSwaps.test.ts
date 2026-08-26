@@ -1218,9 +1218,7 @@ describe('encodeSwaps', () => {
       const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
       const { commands, inputs } = decodeExecute(result.calldata)
       const fee1e18 = BigNumber.from(encodeFee1e18(feePercent))
-      // the command quantizes to 1e18 precision, but the sweep floor deducts the exact
-      // gross-based fee: floor(3 * 1/3) = 1, so the floor is 2
-      const expectedSettlement = BigNumber.from(2)
+      const expectedSettlement = BigNumber.from(3).sub(BigNumber.from(3).mul(fee1e18).div(BigNumber.from(10).pow(18)))
 
       expect(commands).to.equal('0x02000704')
 
@@ -1229,6 +1227,7 @@ describe('encodeSwaps', () => {
 
       const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
       expect(settlement[2].toString()).to.equal(expectedSettlement.toString())
+      expect(settlement[2].toString()).not.to.equal('2')
     })
 
     it('uses flat exact-output fees against the gross routed output and settles the net amount', () => {
@@ -1737,29 +1736,80 @@ describe('encodeSwaps', () => {
       })
     })
 
-    describe('summed sweep floor', () => {
-      it('subtracts the sum of every recipient from the exact-input sweep floor', () => {
+    describe('cascade sweep floor', () => {
+      // oracle for the on-chain behavior: each PAY_PORTION_FULL_PRECISION floors against the
+      // router's *running* balance using the encoded portion, independent of how the SDK
+      // computed its deduction
+      function replayEncodedCascade(gross: BigNumber, calldata: string): BigNumber {
+        let balance = gross
+        for (const cmd of decodeFeeCommands(calldata)) {
+          balance = balance.sub(balance.mul(BigNumber.from(cmd.params[2])).div(BigNumber.from(10).pow(18)))
+        }
+        return balance
+      }
+
+      it('sets the exact-input sweep floor to exactly what the sequential encoded portions leave', () => {
         const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
         const spec = exactInSpec(fees, UniversalRouterVersion.V2_1_1)
         const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
 
         const grossMin = exactInputGrossMin(BigNumber.from(spec.routing.quote.quotient.toString()), SLIPPAGE)
-        // each fee is a fraction of gross output, so the deduction is exactly sum(floor(gross * f_i))
-        const expectedDeduction = fees.reduce((acc, fee) => {
-          const f = (fee as { fee: Percent }).fee
-          return acc.add(grossMin.mul(f.numerator.toString()).div(f.denominator.toString()))
-        }, BigNumber.from(0))
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal(
+          replayEncodedCascade(grossMin, result.calldata).toString()
+        )
+        // gross is 4875e14; sum(floor(gross * f_i)) would deduct 12187500000000000, but the
+        // encoded cascade only pays 12187499999999997 — the floor is three wei tighter than the
+        // naive sum, never looser
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('475312500000000003')
+      })
+
+      it('keeps the exact-input sweep floor satisfiable when later rescaled portions capture earlier flooring dust', () => {
+        // [216, 519, 917, 3292] bps on gross 533206710: the sequential rescaled payments total
+        // 263617396 — one wei MORE than sum(floor(gross * f_i)) = 263617395. A sweep floor of
+        // 533206710 - 263617395 = 269589315 would revert a fill at (or within a wei above) the
+        // gross minimum even though it satisfied the user's slippage: only 269589314 remains.
+        const fees = [
+          portion(216, RECIPIENT_A),
+          portion(519, RECIPIENT_B),
+          portion(917, RECIPIENT_C),
+          portion(3292, RECIPIENT_D),
+        ]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '533206710') }
+        )
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
 
         const { commandTypes, inputs } = parseCommands(result.calldata)
         expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal(
-          grossMin.sub(expectedDeduction).toString()
+          replayEncodedCascade(BigNumber.from('533206710'), result.calldata).toString()
         )
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('269589314')
+      })
+
+      it('computeEncodeSwapsAmounts floors the net min-out at what the encoded cascade leaves', () => {
+        const fees = [
+          portion(216, RECIPIENT_A),
+          portion(519, RECIPIENT_B),
+          portion(917, RECIPIENT_C),
+          portion(3292, RECIPIENT_D),
+        ]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '533206710') }
+        )
+
+        const amounts = computeEncodeSwapsAmounts(spec)
+        expect(amounts.grossMinOrExactAmountOut.toString()).to.equal('533206710')
+        expect(amounts.netMinOrExactAmountOut.toString()).to.equal('269589314')
       })
 
       it('rescales three 1/3 portions to 1/3, 1/2, and 1 of the remaining balance', () => {
         // three fees of 1/3 of gross each consume the whole output: the encoder rescales them to
-        // 1/3, then (1/3)/(2/3) = 1/2, then (1/3)/(1/3) = 1 of the shrinking balance, and the
-        // exact deduction floor(3 * 1/3) per fee empties the 3-wei sweep floor.
+        // 1/3, then (1/3)/(2/3) = 1/2, then (1/3)/(1/3) = 1 of the shrinking balance. On the
+        // 3-wei gross the encoded cascade pays 0, 1, then the full remaining 2, so the sweep
+        // floor is 0.
         const third = new Percent(1, 3)
         const fees: Fee[] = [
           { kind: 'portion', recipient: RECIPIENT_A, fee: third },
@@ -1826,7 +1876,7 @@ describe('encodeSwaps', () => {
         const fees = [portion(6000, RECIPIENT_A), portion(6000, RECIPIENT_B)]
         expect(() =>
           SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
-        ).to.throw('FEE_TOTAL_GT_AMOUNT_OUT')
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
     })
 
@@ -1848,12 +1898,26 @@ describe('encodeSwaps', () => {
         expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('0')
       })
 
+      it('sweeps floor zero at exactly 100% even when the gross does not divide evenly', () => {
+        // 60% + 40% of gross 101: the encoded cascade pays 60 and then the full remaining 41,
+        // leaving 0. Sum-of-floors would deduct only 100 and demand a floor of 1 from an empty
+        // router, so every non-divisible gross at a 100% total would revert on-chain.
+        const spec = buildSpec(
+          { fee: [P60, P40], urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '101') }
+        )
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('0')
+      })
+
       it('throws just over 100% (100% + 1 bps)', () => {
         expect(() =>
           SwapRouter.encodeSwaps(exactInSpec([P60, P40_PLUS_1BPS], UniversalRouterVersion.V2_1_1), [
             buildV3ExactInStep(),
           ])
-        ).to.throw('FEE_TOTAL_GT_AMOUNT_OUT')
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
       it('computeEncodeSwapsAmounts returns a zero net output at exactly 100% without underflowing', () => {
@@ -1870,7 +1934,7 @@ describe('encodeSwaps', () => {
 
       it('computeEncodeSwapsAmounts throws just over 100% instead of underflowing', () => {
         const spec = buildSpec({ fee: [P60, P40_PLUS_1BPS], urVersion: UniversalRouterVersion.V2_1_1 })
-        expect(() => computeEncodeSwapsAmounts(spec)).to.throw('FEE_TOTAL_GT_AMOUNT_OUT')
+        expect(() => computeEncodeSwapsAmounts(spec)).to.throw('Portion fees together exceed 100% of the swap output')
       })
     })
 
