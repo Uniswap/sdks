@@ -410,9 +410,13 @@ Beyond the unit suite (`bun test`), three gates validate what unit tests structu
   v4-periphery at the pin. viem encodes tuples positionally, so this closes the
   silent-wrong-calldata risk of a contract field reorder. When the contracts move, re-pin with
   `bun scripts/generate-abis.ts --update-pin` against the new checkout.
-- **`bun run test:fork`** — the end-to-end demo suite against an anvil mainnet fork (see below);
-  runs inside `test` when `FORK_URL` (or `MARGIN_DEMO_RPC`) is set and skips cleanly otherwise,
-  so CI with the `FORK_URL` secret exercises the SDK against the live deployment on every run.
+- **`bun run test:fork`** — the end-to-end demo suite against an anvil mainnet fork (see below).
+  Not part of `test`: it needs foundry plus a v4-periphery build to deploy the post-#491 Universal
+  Router the demo flows route through (`V4_PERIPHERY_PATH`, default `~/dev/v4-periphery`), or an
+  existing post-#491 deployment in `MARGIN_DEMO_UNIVERSAL_ROUTER`. It skips cleanly when neither
+  `FORK_URL` nor `MARGIN_DEMO_RPC` is set. The `margin-sdk-fork-tests` CI workflow runs it on every
+  PR touching the package, cloning and building v4-periphery at the same pin as the ABI gate, so
+  the SDK is exercised against the live deployment on every change.
 
 ## End-to-end demos
 
