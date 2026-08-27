@@ -507,16 +507,23 @@ describe('MixedRoute', () => {
 
       it('prefers the exact currency match when a genuine ETH/WETH v4 pool receives WETH', () => {
         // pool token0Price (WETH per ETH) = 0.5, token1Price (ETH per WETH) = 2
-        // WETH must match token1 exactly; the wrapped fallback alone would pick token0 and invert
+        // WETH must match token1 exactly; matching by wrapped equivalence alone would pick token0 and invert
         const route = new MixedRouteSDK([pair_0_weth, pool_v4_eth_weth_genuine], token0, ETHER)
 
         expect(route.midPrice.toFixed(4)).toEqual('2.0000')
       })
 
-      it('resolves a genuine ETH/WETH v4 pool at the route start via the exact seed match', () => {
+      it('prices a genuine ETH/WETH v4 pool at the route start when the route begins with WETH', () => {
         const route = new MixedRouteSDK([pool_v4_eth_weth_genuine, pair_0_weth], weth, token0)
 
         expect(route.midPrice.toFixed(4)).toEqual('2.0000')
+      })
+
+      it('prices a genuine ETH/WETH v4 pool at the route start when the route begins with native ETH', () => {
+        // pool token0Price (WETH per ETH) = 0.5, then pair_weth_high 300/100 = 3
+        const route = new MixedRouteSDK([pool_v4_eth_weth_genuine, pair_weth_high], ETHER, tokenHigh)
+
+        expect(route.midPrice.toFixed(4)).toEqual('1.5000')
       })
 
       it('correct for 0 -[V3]-> 1 -[V2]-> 2', () => {

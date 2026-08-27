@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { Currency, Price, Token } from '@uniswap/sdk-core'
+import { Currency, Fraction, Price, Token } from '@uniswap/sdk-core'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { TPool } from '../../utils/TPool'
@@ -107,49 +107,14 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public get midPrice(): Price<TInput, TOutput> {
     if (this._midPrice !== null) return this._midPrice
 
-    const price = this.pools.slice(1).reduce(
-      ({ nextInput, price }, pool) => {
-        if (nextInput.equals(pool.token0)) {
-          return {
-            nextInput: pool.token1,
-            price: price.multiply(pool.token0Price.asFraction),
-          }
-        }
-
-        if (nextInput.equals(pool.token1)) {
-          return {
-            nextInput: pool.token0,
-            price: price.multiply(pool.token1Price.asFraction),
-          }
-        }
-
-        if (nextInput.wrapped.equals(pool.token0.wrapped)) {
-          return {
-            nextInput: pool.token1,
-            price: price.multiply(pool.token0Price.asFraction),
-          }
-        }
-
-        if (nextInput.wrapped.equals(pool.token1.wrapped)) {
-          return {
-            nextInput: pool.token0,
-            price: price.multiply(pool.token1Price.asFraction),
-          }
-        }
-
-        return invariant(false, 'PRICE_PATH') as never
-      },
-
-      this.pools[0].token0.equals(this.pathInput)
-        ? {
-            nextInput: this.pools[0].token1,
-            price: this.pools[0].token0Price.asFraction,
-          }
-        : {
-            nextInput: this.pools[0].token0,
-            price: this.pools[0].token1Price.asFraction,
-          }
-    ).price
+    // this.path[i + 1] is always pool i's own currency object (the constructor pushes the
+    // pool's currency even when bridging a native/wrapped boundary), so exact equality is
+    // enough to orient each pool's price along the already-resolved path
+    const price = this.pools.reduce(
+      (price, pool, i) =>
+        price.multiply((this.path[i + 1].equals(pool.token1) ? pool.token0Price : pool.token1Price).asFraction),
+      new Fraction(1)
+    )
 
     return (this._midPrice = new Price(this.input, this.output, price.denominator, price.numerator))
   }
