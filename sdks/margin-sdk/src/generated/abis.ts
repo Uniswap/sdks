@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit 3d03ca50ced55e3940909680e45d25024bcfbcfd
- * (https://github.com/Uniswap/v4-periphery/commit/3d03ca50ced55e3940909680e45d25024bcfbcfd)
+ * Pinned to v4-periphery commit 0aa9cc38f0b9eef78888e2fa8f2f807574dd028d
+ * (https://github.com/Uniswap/v4-periphery/commit/0aa9cc38f0b9eef78888e2fa8f2f807574dd028d)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: '3d03ca50ced55e3940909680e45d25024bcfbcfd',
+  commit: '0aa9cc38f0b9eef78888e2fa8f2f807574dd028d',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -39,7 +39,7 @@ export const MARGIN_ROUTER_ABI = [
       },
       {
         type: 'address',
-        name: 'accountImplementation',
+        name: 'accountImplementation_',
       },
       {
         type: 'address',
@@ -1024,6 +1024,11 @@ export const MARGIN_ROUTER_ABI = [
   {
     type: 'error',
     name: 'NoActiveAccount',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoDebtToRepay',
     inputs: [],
   },
   {
@@ -2207,6 +2212,40 @@ export const MORPHO_LENDING_ADAPTER_ABI = [
     ],
   },
   {
+    type: 'event',
+    name: 'OwnershipTransferStarted',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
     type: 'error',
     name: 'MarketNotSupported',
     inputs: [
@@ -2817,6 +2856,40 @@ export const AAVE_LENDING_ADAPTER_ABI = [
     ],
   },
   {
+    type: 'event',
+    name: 'OwnershipTransferStarted',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
     type: 'error',
     name: 'AccountMismatch',
     inputs: [
@@ -3421,6 +3494,40 @@ export const AAVE_V4_LENDING_ADAPTER_ABI = [
         type: 'bool',
         name: 'allowed',
         indexed: false,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferStarted',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
       },
     ],
   },
@@ -4084,6 +4191,40 @@ export const COMPOUND_V3_LENDING_ADAPTER_ABI = [
         type: 'bool',
         name: 'allowed',
         indexed: false,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferStarted',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
+      },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OwnershipTransferred',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'previousOwner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'newOwner',
+        indexed: true,
       },
     ],
   },
