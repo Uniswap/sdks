@@ -2,7 +2,15 @@ import { expect } from 'chai'
 import JSBI from 'jsbi'
 import { BigNumber, utils } from 'ethers'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
-import { FeeOptions, encodeSqrtRatioX96, nearestUsableTick, TickMath, FeeAmount } from '@uniswap/v3-sdk'
+import {
+  FeeOptions,
+  encodeSqrtRatioX96,
+  nearestUsableTick,
+  TickMath,
+  FeeAmount,
+  Route as V3Route,
+  Trade as V3Trade,
+} from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion, isAtLeastV2_1_1 } from '../../src/utils/constants'
 import { encodeFeeBips, encodeFee1e18 } from '../../src/utils/numbers'
@@ -10,7 +18,7 @@ import { scalePortionFees, simulatePortionFeeDeduction } from '../../src/utils/p
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { CommandParser } from '../../src/utils/commandParser'
 import { SwapRouter, UniswapTrade, FlatFeeOptions, MAX_FEE_RECIPIENTS } from '../../src'
-import { buildTrade, swapOptions } from './uniswapData'
+import { buildTrade, swapOptions, makeV3Pool } from './uniswapData'
 import { TEST_FEE_RECIPIENT_ADDRESS } from './addresses'
 import { LEGACY_GOLDEN } from './goldenCalldata'
 import { ZERO_ADDRESS } from '../../src/utils/constants'
@@ -138,6 +146,39 @@ describe('Fee Encoding', () => {
         scalePortionFees([
           { fee: new Percent(60, 100), recipient: A },
           { fee: new Percent(60, 100), recipient: B },
+        ])
+      ).to.throw('Portion fees together exceed 100% of the swap output')
+    })
+
+    it('a zero fee entry scales to a zero portion and pays nothing, wherever it sits', () => {
+      const scaled = scalePortionFees([
+        { fee: new Percent(2000, 10_000), recipient: A },
+        { fee: new Percent(0, 10_000), recipient: B },
+        { fee: new Percent(2000, 10_000), recipient: C },
+      ])
+
+      expect(scaled[1].scaledFee.equalTo(0)).to.be.true
+      // the zero entry must not disturb the rescaling of the fees around it
+      const encoded = scaled.map((s) => BigNumber.from(encodeFee1e18(s.scaledFee)))
+      const paid = simulateSequentialPayments(BigNumber.from(100), encoded)
+      expect(paid.map((p) => p.toNumber())).to.deep.equal([20, 0, 20])
+    })
+
+    it('a zero fee after a 100% total takes the remaining-balance-is-zero branch without throwing', () => {
+      const scaled = scalePortionFees([
+        { fee: new Percent(1, 1), recipient: A },
+        { fee: new Percent(0, 1), recipient: B },
+      ])
+
+      expect(scaled[0].scaledFee.equalTo(new Percent(1, 1))).to.be.true
+      expect(scaled[1].scaledFee.equalTo(0)).to.be.true
+    })
+
+    it('throws when a positive fee follows a 100% total', () => {
+      expect(() =>
+        scalePortionFees([
+          { fee: new Percent(1, 1), recipient: A },
+          { fee: new Percent(1, 10_000), recipient: B },
         ])
       ).to.throw('Portion fees together exceed 100% of the swap output')
     })
@@ -518,6 +559,26 @@ describe('Fee Encoding', () => {
       return V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, utils.parseUnits('1000', 6).toString()),
+        TradeType.EXACT_OUTPUT
+      )
+    }
+
+    // V3 USDC -> ETH trades: a native-ETH output settles via UNWRAP_WETH instead of SWEEP,
+    // with the fees taken in WETH. Also the vehicle for pre-v4 router versions (V1_2).
+    const WETH_USDC_V3 = makeV3Pool(WETH, USDC)
+
+    async function ethOutExactInputTrade(): Promise<V3Trade<Token, Ether, TradeType.EXACT_INPUT>> {
+      return V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, utils.parseUnits('1000', 6).toString()),
+        TradeType.EXACT_INPUT
+      )
+    }
+
+    async function ethOutExactOutputTrade(): Promise<V3Trade<Token, Ether, TradeType.EXACT_OUTPUT>> {
+      return V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
         TradeType.EXACT_OUTPUT
       )
     }
@@ -995,6 +1056,153 @@ describe('Fee Encoding', () => {
             swapOptions({ fee: [FEE_A, FEE_B], urVersion: UniversalRouterVersion.V2_0 })
           )
         ).to.throw('Multiple fee recipients require Universal Router version V2_1_1 or higher')
+      })
+    })
+
+    describe('version gate across the whole enum', () => {
+      it('gates every enum member and undefined correctly', () => {
+        expect(isAtLeastV2_1_1(UniversalRouterVersion.V1_2)).to.be.false
+        expect(isAtLeastV2_1_1(UniversalRouterVersion.V2_0)).to.be.false
+        expect(isAtLeastV2_1_1(UniversalRouterVersion.V2_1_1)).to.be.true
+        expect(isAtLeastV2_1_1(UniversalRouterVersion.V2_2_0)).to.be.true
+        expect(isAtLeastV2_1_1(undefined)).to.be.false
+      })
+
+      it('accepts multiple recipients on V2_2_0 with the same portions as V2_1_1', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        const v220 = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [FEE_A, FEE_B], urVersion: UniversalRouterVersion.V2_2_0 })
+        )
+        const v211 = SwapRouter.swapCallParameters(
+          trade,
+          swapOptions({ fee: [FEE_A, FEE_B], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        const portions = (calldata: string) =>
+          feeCommands(calldata).map((cmd) => BigNumber.from(cmd.params[2].value).toString())
+        expect(feeCommands(v220.calldata).map((cmd) => cmd.commandName)).to.deep.equal([
+          'PAY_PORTION_FULL_PRECISION',
+          'PAY_PORTION_FULL_PRECISION',
+        ])
+        expect(portions(v220.calldata)).to.deep.equal(portions(v211.calldata))
+      })
+
+      it('rejects multiple recipients on V1_2', async () => {
+        // a V3 trade: V1_2 predates v4-sdk's URVersion, so a V4 trade would throw on the
+        // version mapping before the fee gate is ever reached
+        const trade = buildTrade([await ethOutExactInputTrade()])
+
+        expect(() =>
+          SwapRouter.swapCallParameters(
+            trade,
+            swapOptions({ fee: [FEE_A, FEE_B], urVersion: UniversalRouterVersion.V1_2 })
+          )
+        ).to.throw('Multiple fee recipients require Universal Router version V2_1_1 or higher')
+      })
+    })
+
+    describe('zero-fee entries', () => {
+      it('a 0% entry emits a zero-portion command for its recipient and leaves the others exact', async () => {
+        const zeroFee: FeeOptions = { fee: new Percent(0, 10_000), recipient: RECIPIENT_B }
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: [FEE_A, zeroFee, FEE_C], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        const cmds = feeCommands(methodParameters.calldata)
+        expect(cmds).to.have.length(3)
+        expect(BigNumber.from(cmds[1].params[2].value).isZero()).to.be.true
+        expect((cmds[1].params[1].value as string).toLowerCase()).to.equal(RECIPIENT_B)
+        // FEE_C is rescaled against a balance the zero entry did not shrink: 0.75% / (1 - 0.25%)
+        expect(BigNumber.from(cmds[2].params[2].value).toString()).to.equal(
+          BigNumber.from(10).pow(18).mul(75).div(9975).toString()
+        )
+      })
+    })
+
+    describe('duplicate recipients', () => {
+      it('two entries for the same recipient each emit a command and together pay both fractions', async () => {
+        const fees: FeeOptions[] = [FEE_A, { fee: new Percent(25, 10_000), recipient: RECIPIENT_A }]
+        const trade = buildTrade([await exactOutputTrade()])
+        const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        const cmds = feeCommands(methodParameters.calldata)
+        expect(cmds).to.have.length(2)
+        expect(cmds.map((cmd) => (cmd.params[1].value as string).toLowerCase())).to.deep.equal([
+          RECIPIENT_A,
+          RECIPIENT_A,
+        ])
+
+        // replay the cascade: the recipient's two payments must total 2 x 0.25% of gross (dust only)
+        const gross = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        let balance = gross
+        let totalPaid = BigNumber.from(0)
+        for (const cmd of cmds) {
+          const paid = balance.mul(BigNumber.from(cmd.params[2].value)).div(BigNumber.from(10).pow(18))
+          balance = balance.sub(paid)
+          totalPaid = totalPaid.add(paid)
+        }
+        const ideal = gross.mul(50).div(10_000)
+        expect(ideal.sub(totalPaid).abs().lte(2)).to.be.true
+      })
+    })
+
+    describe('ETH output: fees taken in WETH, settled by UNWRAP_WETH', () => {
+      function unwrapFloor(calldata: string): BigNumber {
+        const cmds = CommandParser.parseCalldata(calldata).commands.filter((cmd) => cmd.commandName === 'UNWRAP_WETH')
+        expect(cmds, 'expected exactly one UNWRAP_WETH command').to.have.length(1)
+        return BigNumber.from(cmds[0].params[1].value)
+      }
+
+      it('pays every fee in WETH and unwraps after the last fee command (exact input)', async () => {
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await ethOutExactInputTrade()]),
+          swapOptions({ fee: [FEE_A, FEE_B, FEE_C], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        const cmds = feeCommands(methodParameters.calldata)
+        expect(cmds).to.have.length(3)
+        for (const cmd of cmds) {
+          expect((cmd.params[0].value as string).toLowerCase()).to.equal(WETH.address.toLowerCase())
+        }
+
+        const names = commandNames(methodParameters.calldata)
+        expect(names).to.not.include('SWEEP')
+        expect(names.indexOf('UNWRAP_WETH')).to.be.greaterThan(names.lastIndexOf('PAY_PORTION_FULL_PRECISION'))
+      })
+
+      it('derives the exact-output unwrap floor from the encoded cascade, like the sweep floor', async () => {
+        const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
+        const trade = buildTrade([await ethOutExactOutputTrade()])
+        const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        const gross = BigNumber.from(trade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
+        const expectedFloor = gross.sub(simulatePortionFeeDeduction(gross, scalePortionFees(fees), true))
+        expect(unwrapFloor(methodParameters.calldata).toString()).to.equal(expectedFloor.toString())
+      })
+    })
+
+    describe('transaction value', () => {
+      it('multiple fee recipients do not change the ETH sent along for exact input', async () => {
+        const methodParameters = SwapRouter.swapCallParameters(
+          buildTrade([await exactInputTrade()]),
+          swapOptions({ fee: [FEE_A, FEE_B, FEE_C, FEE_D], urVersion: UniversalRouterVersion.V2_1_1 })
+        )
+
+        expect(BigNumber.from(methodParameters.value).toString()).to.equal(utils.parseEther('1').toString())
+      })
+
+      it('exact-output value stays the maximum input for the swap, untouched by output-side fees', async () => {
+        const trade = buildTrade([await exactOutputTrade()])
+        const opts = swapOptions({ fee: [FEE_A, FEE_B, FEE_C, FEE_D], urVersion: UniversalRouterVersion.V2_1_1 })
+        const methodParameters = SwapRouter.swapCallParameters(trade, opts)
+
+        expect(BigNumber.from(methodParameters.value).toString()).to.equal(
+          trade.maximumAmountIn(opts.slippageTolerance).quotient.toString()
+        )
       })
     })
   })
