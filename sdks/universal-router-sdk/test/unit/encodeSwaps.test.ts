@@ -1666,8 +1666,7 @@ describe('encodeSwaps', () => {
           WETH.address.toLowerCase(),
         ])
         expect(cmds.map((cmd) => (cmd.params[1] as string).toLowerCase())).to.deep.equal([RECIPIENT_A, RECIPIENT_B])
-        // first fee unscaled; second rescaled against the remaining balance:
-        // 0.50% / (1 - 0.25%) = 50/9975
+        // The first fee is unscaled; the second is 0.50% / (1 - 0.25%) = 50/9975.
         expect(cmds.map((cmd) => cmd.params[2].toString())).to.deep.equal([
           BigNumber.from(encodeFee1e18((PORTION_A as { fee: Percent }).fee)).toString(),
           BigNumber.from(10).pow(18).mul(50).div(9975).toString(),
@@ -1737,9 +1736,7 @@ describe('encodeSwaps', () => {
     })
 
     describe('cascade sweep floor', () => {
-      // oracle for the on-chain behavior: each PAY_PORTION_FULL_PRECISION floors against the
-      // router's *running* balance using the encoded portion, independent of how the SDK
-      // computed its deduction
+      // Oracle for on-chain behavior, independent of how the SDK computed its deduction.
       function replayEncodedCascade(gross: BigNumber, calldata: string): BigNumber {
         let balance = gross
         for (const cmd of decodeFeeCommands(calldata)) {
@@ -1758,17 +1755,12 @@ describe('encodeSwaps', () => {
         expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal(
           replayEncodedCascade(grossMin, result.calldata).toString()
         )
-        // gross is 4875e14; sum(floor(gross * f_i)) would deduct 12187500000000000, but the
-        // encoded cascade only pays 12187499999999997 — the floor is three wei tighter than the
-        // naive sum, never looser
+        // The cascade pays three wei less than the naive sum here: tighter, never looser.
         expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('475312500000000003')
       })
 
       it('keeps the exact-input sweep floor satisfiable when later rescaled portions capture earlier flooring dust', () => {
-        // [216, 519, 917, 3292] bps on gross 533206710: the sequential rescaled payments total
-        // 263617396 — one wei MORE than sum(floor(gross * f_i)) = 263617395. A sweep floor of
-        // 533206710 - 263617395 = 269589315 would revert a fill at (or within a wei above) the
-        // gross minimum even though it satisfied the user's slippage: only 269589314 remains.
+        // Here the cascade pays one wei MORE than the naive sum, so a sum-derived sweep floor would revert a legitimate fill.
         const fees = [
           portion(216, RECIPIENT_A),
           portion(519, RECIPIENT_B),
@@ -1789,10 +1781,7 @@ describe('encodeSwaps', () => {
       })
 
       it('property fuzz: the encoded sweep floor is met by the encoded cascade for random fee sets', () => {
-        // Deterministic PRNG (mulberry32) so failures reproduce; end-to-end oracle: encode with
-        // the SDK, decode the ABI-encoded portions from the calldata, replay them against the
-        // gross minimum, and require the SWEEP floor in that same calldata to be exactly what
-        // the replay leaves — and still met when the fill lands a few wei above the minimum.
+        // Deterministic PRNG so failures reproduce: encode, decode the portions back out, replay, and require the calldata's own SWEEP floor to match.
         let seed = 0x5eed >>> 0
         const rand = () => {
           seed = (seed + 0x6d2b79f5) >>> 0
@@ -1858,10 +1847,7 @@ describe('encodeSwaps', () => {
       })
 
       it('rescales three 1/3 portions to 1/3, 1/2, and 1 of the remaining balance', () => {
-        // three fees of 1/3 of gross each consume the whole output: the encoder rescales them to
-        // 1/3, then (1/3)/(2/3) = 1/2, then (1/3)/(1/3) = 1 of the shrinking balance. On the
-        // 3-wei gross the encoded cascade pays 0, 1, then the full remaining 2, so the sweep
-        // floor is 0.
+        // Three thirds consume the whole output: rescaled to 1/3, 1/2, then 1, paying 0, 1, 2 of a 3-wei gross.
         const third = new Percent(1, 3)
         const fees: Fee[] = [
           { kind: 'portion', recipient: RECIPIENT_A, fee: third },
@@ -1903,10 +1889,7 @@ describe('encodeSwaps', () => {
       })
 
       it('the encoded (rescaled) portions pay each recipient their fraction of gross on-chain', () => {
-        // Each PAY_PORTION_FULL_PRECISION reads the router's *current* balance. The SDK rescales
-        // fee i to f_i / (1 - sum of earlier fees), so simulating the sequential on-chain payments
-        // with the *encoded* portions must give every recipient their stated fraction of gross
-        // (up to flooring dust).
+        // Simulating the sequential payments with the encoded portions must pay each recipient its gross fraction.
         const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
         const spec = exactInSpec(fees, UniversalRouterVersion.V2_1_1)
         const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
@@ -1951,9 +1934,7 @@ describe('encodeSwaps', () => {
       })
 
       it('sweeps floor zero at exactly 100% even when the gross does not divide evenly', () => {
-        // 60% + 40% of gross 101: the encoded cascade pays 60 and then the full remaining 41,
-        // leaving 0. Sum-of-floors would deduct only 100 and demand a floor of 1 from an empty
-        // router, so every non-divisible gross at a 100% total would revert on-chain.
+        // At a 100% total the cascade leaves 0, where sum-of-floors would demand 1 wei from an empty router.
         const spec = buildSpec(
           { fee: [P60, P40], urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
           { quote: CurrencyAmount.fromRawAmount(WETH, '101') }
@@ -1991,9 +1972,7 @@ describe('encodeSwaps', () => {
     })
 
     describe('byte-identity with pre-multi-fee encoding (golden calldata from main)', () => {
-      // ENCODE_SWAPS_GOLDEN was generated by running SwapRouter.encodeSwaps on the unmodified
-      // main branch (commit 48dea05c) with these exact specs and steps. Byte equality here
-      // proves the single-fee paths are untouched by the multi-recipient change.
+      // Byte equality against calldata captured from unmodified main (48dea05c) proves the single-fee paths are untouched.
       const GOLDEN_PORTION: Fee = { kind: 'portion', recipient: FEE_RECIPIENT, fee: new Percent(5, 100) }
       const GOLDEN_FLAT: Fee = { kind: 'flat', recipient: FEE_RECIPIENT, amount: '100000000000000000' }
 

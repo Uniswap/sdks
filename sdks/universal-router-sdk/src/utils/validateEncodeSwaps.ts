@@ -191,9 +191,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     })
   }
 
-  // One command per fee entry, so the list is bounded. An empty array is rejected rather than read
-  // as "no fee": the caller clearly meant to pay someone, and silently paying nobody is the exact
-  // failure this surface exists to prevent.
+  // An empty array is rejected rather than read as "no fee": silently paying nobody is the failure to prevent.
   const fees = toFeeList(spec.fee)
   if (Array.isArray(spec.fee)) {
     invariant(fees.length > 0, 'AT_LEAST_ONE_FEE_RECIPIENT_REQUIRED')
@@ -209,9 +207,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     'MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1'
   )
 
-  // Applied per entry, so one bad recipient in a list is rejected rather than averaged away.
-  // These also make a mixed portion/flat array impossible: whichever kind does not match the
-  // trade type trips its own invariant.
+  // Per entry, so one bad entry is never averaged away, and a mixed portion/flat array trips one of these.
   let flatFeeTotal = BigNumber.from(0)
   for (const fee of fees) {
     // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
@@ -233,8 +229,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     )
   }
 
-  // Flat fees are absolute transfers, so it is their *total* that has to fit inside the exact
-  // output; the router pays each one in full out of the same balance.
+  // Each flat transfer is paid in full from the same balance, so it is the total that must fit.
   invariant(flatFeeTotal.lte(BigNumber.from(spec.routing.amount.quotient.toString())), 'FLAT_FEE_GT_AMOUNT')
 
   // per-step: capability-gate by UR version, recipients must be router custody (or the spec

@@ -16,24 +16,7 @@ export type Fee =
 export type PortionFee = Extract<Fee, { kind: 'portion' }>
 export type FlatFee = Extract<Fee, { kind: 'flat' }>
 
-/**
- * Fee(s) taken out of the swap output before it is settled to `recipient`.
- *
- * A bare `Fee` is the original shape and encodes exactly as it always has. An array pays one
- * recipient per entry, in the order given, and holds at most `MAX_FEE_RECIPIENTS` entries; each
- * entry costs one command, so the list is bounded to keep calldata size and the gas of the fee
- * tail predictable.
- *
- * Each `portion` entry's fee means "this fraction of the *gross* swap output": the encoder
- * rescales later entries against the router's shrinking balance (`scalePortionFees`), so every
- * recipient receives exactly their stated fraction of gross. The rescaled portions are fractional
- * bips, so more than one portion fee requires `urVersion` >= 2.1.1
- * (`MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1` otherwise).
- *
- * Entries must all be the same `kind`, because `kind` is already pinned by the trade type:
- * `portion` pairs with `EXACT_INPUT` and `flat` with `EXACT_OUTPUT`, so a mixed array is rejected
- * by `INVALID_PORTION_FEE_TRADE_TYPE` / `INVALID_FLAT_FEE_TRADE_TYPE` whichever way the trade goes.
- */
+/** A bare `Fee` encodes as it always has; an array pays one recipient per entry (at most MAX_FEE_RECIPIENTS), each a fraction of GROSS output, all the same `kind`, and >1 portion needs urVersion >= 2.1.1. */
 export type FeeSpecification = Fee | Fee[]
 
 export type SwapSpecification = {

@@ -1,6 +1,4 @@
-// Golden calldata captured from the unmodified main branch (commit 48dea05c) by running
-// SwapRouter.encodeSwaps on a fixed USDC->WETH V3 spec (see the byte-identity tests for the
-// exact spec). These pin the byte-identity claim: single-fee encodeSwaps output must not change.
+// Captured from unmodified main (48dea05c): pins that single-fee encodeSwaps output does not change.
 export const ENCODE_SWAPS_GOLDEN = {
   portionExactInV2_1_1: {
     calldata:

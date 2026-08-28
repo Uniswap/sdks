@@ -14,11 +14,7 @@ export function normalizeEncodeSwapsSpec(spec: SwapSpecification): NormalizedSwa
   }
 }
 
-/**
- * Normalizes the single-or-array `fee` field into a list, so every read site handles the
- * multi-recipient case by construction. A lone `Fee` becomes a one-element list, which keeps the
- * single-recipient encoding byte-identical to what it has always been.
- */
+/** A lone `Fee` becomes a one-element list, so every read site handles multiple recipients by construction. */
 export function toFeeList(fee: SwapSpecification['fee']): Fee[] {
   if (!fee) return []
   return Array.isArray(fee) ? fee : [fee]

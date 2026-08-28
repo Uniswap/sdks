@@ -28,11 +28,7 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
       .mul(slippageDenominator.sub(slippageNumerator))
       .div(slippageDenominator)
 
-    // The sweep floor must expect exactly what the encoded fee commands leave behind when the
-    // router holds the gross minimum, so the deduction replays their cascade — same scaled
-    // portions, same encoded precision as the encoder emits. It never exceeds the gross by
-    // construction (each payment floors against the running balance), and portions that
-    // together exceed 100% throw inside scalePortionFees before any subtraction can underflow.
+    // Replays the encoded cascade at the gross minimum, so the sweep floor expects exactly what the commands leave behind.
     const feeAmount = simulatePortionFeeDeduction(
       grossMinOrExactAmountOut,
       scalePortionFees(toPortionFeeList(spec.fee)),
@@ -49,8 +45,7 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
   const exactOrMaxAmountIn = routingQuote.mul(slippageDenominator.add(slippageNumerator)).div(slippageDenominator)
   const grossMinOrExactAmountOut = routingAmount
 
-  // Flat fees are absolute TRANSFERs, so unlike portions the sum is exact rather than an upper
-  // bound; the router must hold every one of them on top of the settled amount.
+  // Flat fees are absolute TRANSFERs, so the router must hold every one on top of the settled amount.
   let flatFeeTotal = BigNumber.from(0)
   for (const flatFee of toFlatFeeList(spec.fee)) {
     flatFeeTotal = flatFeeTotal.add(BigNumber.from(flatFee.amount))
