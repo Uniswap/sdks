@@ -15,11 +15,7 @@ export enum UniversalRouterVersion {
  * to avoid coupling universal-router-sdk's version logic to v4-sdk.
  */
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
-  // Explicit enum ordering rather than string comparison: the versions are a closed set, and
-  // string ordering would let an unexpected value (e.g. '2.1.1-rc.1' forced past the type
-  // system) sort as >= 2.1.1. Unknown values are index -1 and therefore rejected. The order is
-  // derived from the enum, whose members are declared oldest-to-newest, so a newly added
-  // version cannot be omitted here and silently gate as pre-2.1.1.
+  // Enum order, not string comparison: '2.1.1-rc.1' would sort >= '2.1.1', and unknown values must be index -1.
   const order: readonly UniversalRouterVersion[] = Object.values(UniversalRouterVersion)
   return !!version && order.indexOf(version) >= order.indexOf(UniversalRouterVersion.V2_1_1)
 }

@@ -1,6 +1,4 @@
-// Golden calldata captured from the unmodified main branch (commit 48dea05c) by running
-// SwapRouter.swapCallParameters on the deterministic ETH->USDC V4 pool used across these tests.
-// These pin the byte-identity claim: single-fee and flat-fee encoding must not change.
+// Captured from unmodified main (48dea05c): pins that single-fee and flat-fee encoding does not change.
 export const LEGACY_GOLDEN = {
   portionExactInV2_1_1: {
     calldata:

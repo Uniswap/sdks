@@ -197,8 +197,7 @@ describe('Fee Encoding', () => {
       }
     }
 
-    // On-chain semantics of the encoded fee tail: each PAY_PORTION(_FULL_PRECISION) pays
-    // floor(runningBalance * encodedPortion / SCALE) out of the router's running balance.
+    // On-chain: each command pays floor(runningBalance * encodedPortion / SCALE).
     function onchainRemaining(startingBalance: BigNumber, fees: FeeOptions[], useFullPrecision: boolean): BigNumber {
       const scale = useFullPrecision ? BigNumber.from(10).pow(18) : BigNumber.from(10_000)
       let balance = startingBalance
@@ -256,8 +255,7 @@ describe('Fee Encoding', () => {
     })
 
     it('known adversarial case: [216, 519, 917, 3292] bps on gross 533206710', () => {
-      // Naive sum(floor(gross * f_i)) gives 263617395 but the encoded cascade pays 263617396:
-      // the fixed deduction must match the cascade exactly.
+      // The naive sum gives 263617395 where the cascade pays 263617396.
       const fees: FeeOptions[] = [216, 519, 917, 3292].map((bps, i) => ({
         fee: new Percent(bps, 10_000),
         recipient: `0x000000000000000000000000000000000000000${i + 1}`,
@@ -563,8 +561,7 @@ describe('Fee Encoding', () => {
       )
     }
 
-    // V3 USDC -> ETH trades: a native-ETH output settles via UNWRAP_WETH instead of SWEEP,
-    // with the fees taken in WETH. Also the vehicle for pre-v4 router versions (V1_2).
+    // Native-ETH output settles via UNWRAP_WETH with fees in WETH; also the pre-v4 (V1_2) vehicle.
     const WETH_USDC_V3 = makeV3Pool(WETH, USDC)
 
     async function ethOutExactInputTrade(): Promise<V3Trade<Token, Ether, TradeType.EXACT_INPUT>> {
@@ -664,8 +661,7 @@ describe('Fee Encoding', () => {
         expect(cmds.map((cmd) => (cmd.params[1].value as string).toLowerCase())).to.deep.equal(
           fees.map((fee) => fee.recipient.toLowerCase())
         )
-        // The first fee is unscaled (nothing has been paid yet); the second is rescaled against
-        // the remaining balance: 0.50% / (1 - 0.25%) = 50/9975.
+        // The first fee is unscaled; the second is 0.50% / (1 - 0.25%) = 50/9975.
         expect(cmds.map((cmd) => BigNumber.from(cmd.params[2].value).toString())).to.deep.equal([
           BigNumber.from(encodeFee1e18(FEE_A.fee)).toString(),
           BigNumber.from(10).pow(18).mul(50).div(9975).toString(),
@@ -708,9 +704,7 @@ describe('Fee Encoding', () => {
     })
 
     describe('cascade fee deduction', () => {
-      // oracle for the on-chain behavior: each PAY_PORTION_FULL_PRECISION floors against the
-      // router's *running* balance using the encoded portion, independent of how the SDK
-      // computed its deduction
+      // Oracle for on-chain behavior, independent of how the SDK computed its deduction.
       function replayEncodedCascade(gross: BigNumber, calldata: string): BigNumber {
         let balance = gross
         for (const cmd of feeCommands(calldata)) {
@@ -729,17 +723,12 @@ describe('Fee Encoding', () => {
         expect(sweepFloor(methodParameters.calldata).toString()).to.equal(
           replayEncodedCascade(grossMinimumOut, methodParameters.calldata).toString()
         )
-        // gross is 1e9; sum(floor(gross * f_i)) would be 25000000, but the encoded cascade only
-        // pays 24999999 — the floor is one wei tighter than the naive sum, never looser
+        // The cascade pays 24999999 where the naive sum would be 25000000: tighter, never looser.
         expect(sweepFloor(methodParameters.calldata).toString()).to.equal('975000001')
       })
 
       it('keeps the exact-output sweep floor satisfiable when later rescaled portions capture earlier flooring dust', async () => {
-        // [216, 519, 917, 3292] bps on gross 533206710: the sequential rescaled payments total
-        // 263617396 — one wei MORE than sum(floor(gross * f_i)) = 263617395, because dust left
-        // by an earlier fee's floor is captured by a later (rescaled-larger) portion. A sweep
-        // floor of 533206710 - 263617395 = 269589315 would revert on-chain: exact output
-        // delivers exactly the gross minimum, and only 269589314 remains after the fees.
+        // Dust from an earlier floor is captured later, so the cascade pays 1 wei more than the naive sum and a sum-derived sweep floor would revert.
         const fees: FeeOptions[] = [
           { fee: new Percent(216, 10_000), recipient: RECIPIENT_A },
           { fee: new Percent(519, 10_000), recipient: RECIPIENT_B },
@@ -776,10 +765,7 @@ describe('Fee Encoding', () => {
       })
 
       it('the encoded (rescaled) portions pay each recipient their fraction of gross on-chain', async () => {
-        // Each PAY_PORTION_FULL_PRECISION reads the router's *current* balance. The SDK rescales
-        // fee i to f_i / (1 - sum of earlier fees), so simulating the sequential on-chain payments
-        // with the *encoded* portions must give every recipient their stated fraction of gross
-        // (up to flooring dust).
+        // Simulating the sequential payments with the encoded portions must pay each recipient its gross fraction.
         const fees = [FEE_A, FEE_B, FEE_C, FEE_D]
         const trade = buildTrade([await exactOutputTrade()])
         const opts = swapOptions({ fee: fees, urVersion: UniversalRouterVersion.V2_1_1 })
@@ -823,9 +809,7 @@ describe('Fee Encoding', () => {
     })
 
     describe('byte-identity with pre-multi-fee encoding (golden calldata from main)', () => {
-      // LEGACY_GOLDEN was generated by running SwapRouter.swapCallParameters on the unmodified
-      // main branch (commit 48dea05c) with these exact trades and options. Byte equality here
-      // proves the single-fee paths are untouched by the multi-recipient change.
+      // Byte equality against calldata captured from unmodified main (48dea05c) proves the single-fee paths are untouched.
       const FEE_5_PCT: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
 
       it('single portion fee, exact input, V2_1_1 is byte-identical to main', async () => {
@@ -856,10 +840,7 @@ describe('Fee Encoding', () => {
       })
 
       it('single fractional-1e18 fee (1/3), exact output keeps the quantized deduction: byte-identical to main', async () => {
-        // Percent(1, 3) is not representable in 1e18 precision, so main's deduction
-        // floor(gross * floor(1e18/3) / 1e18) differs from the exact floor(gross / 3): on a
-        // 3-wei gross the quantized deduction is 0 (sweep floor 3), the exact one is 1. The
-        // sweep floor must track the quantized payment the encoded command actually makes.
+        // Percent(1, 3) is not representable in 1e18, so the sweep floor must track the quantized payment, not the exact third.
         const trade = buildTrade([
           await V4Trade.fromRoute(
             new V4Route([ETH_USDC_V4], ETHER, USDC),
@@ -940,9 +921,7 @@ describe('Fee Encoding', () => {
       })
 
       it('exact output at exactly 100% sweeps floor zero even when the gross does not divide evenly', async () => {
-        // 60% + 40% of gross 101: the encoded cascade pays 60 and then the full remaining 41,
-        // leaving 0. Sum-of-floors would deduct only 100 and demand a floor of 1 from an empty
-        // router, so every non-divisible gross at a 100% total would revert.
+        // At a 100% total the cascade leaves 0, where sum-of-floors would demand 1 wei from an empty router.
         const trade = buildTrade([
           await V4Trade.fromRoute(
             new V4Route([ETH_USDC_V4], ETHER, USDC),
@@ -985,12 +964,10 @@ describe('Fee Encoding', () => {
     describe('version gate is enum-based, not string ordering', () => {
       it('rejects an rc-style version string forced past the type system', async () => {
         const trade = buildTrade([await exactInputTrade()])
-        // '2.1.1-rc.1' sorts >= '2.1.1' under numeric string comparison; the enum-based
-        // gate must reject it as an unknown version instead.
+        // '2.1.1-rc.1' sorts >= '2.1.1' as a string, so the enum gate must reject it as unknown.
         const rc = '2.1.1-rc.1' as UniversalRouterVersion
 
-        // The v4 URVersion mapping rejects the unknown version before the multi-fee gate runs;
-        // either way the encode must throw rather than treat the rc as >= 2.1.1.
+        // Either gate may fire first; the encode must never treat the rc as >= 2.1.1.
         expect(() =>
           SwapRouter.swapCallParameters(trade, swapOptions({ fee: [FEE_A, FEE_B], urVersion: rc }))
         ).to.throw(/Multiple fee recipients require|No v4-sdk URVersion mapping/)
@@ -1089,8 +1066,7 @@ describe('Fee Encoding', () => {
       })
 
       it('rejects multiple recipients on V1_2', async () => {
-        // a V3 trade: V1_2 predates v4-sdk's URVersion, so a V4 trade would throw on the
-        // version mapping before the fee gate is ever reached
+        // V1_2 predates v4-sdk's URVersion, so a V4 trade would throw on the mapping first.
         const trade = buildTrade([await ethOutExactInputTrade()])
 
         expect(() =>
