@@ -92,7 +92,8 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
    * which keeps the fixed quoted `amountIn`.
    *
    * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary),
-   * an ERC20 input, and `TradeType.EXACT_INPUT` on a single (non-split) route.
+   * an ERC20 input, and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported
+   * for v2, v3, v4 and mixed routes.
    * Incompatible with native input, `inputTokenPermit`, `nativeErc20Input`, and
    * `TokenTransferMode.ApproveProxy`.
    */
@@ -596,17 +597,32 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   const perHopSlippage = minHopPriceX36?.map((s) => BigNumber.from(s)) ?? []
 
-  if (options.routerBalanceInput) {
-    // V4Planner.addTrade bakes the quoted amountIn into the SWAP_EXACT_IN action, so a
-    // pure-v4 route cannot yet spend an unknown balance. The fix is an open-delta swap
-    // action paired with SETTLE(CONTRACT_BALANCE) in the v4-sdk; mixed routes containing
-    // v4 pools already take that shape and are supported.
-    throw new Error('routerBalanceInput does not yet support pure v4 routes')
-  }
-
   const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toV4URVersion(options.urVersion))
-  v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  if (options.routerBalanceInput) {
+    // V4Planner.addTrade would bake the quoted amountIn into the swap action, so build the
+    // pair explicitly instead: SETTLE the router's whole balance, then swap the resulting
+    // open delta. Same shape the mixed-route encoder uses for its v4 sections.
+    const pathInput = trade.route.pathInput
+    v4Planner.addSettle(pathInput, false, CONTRACT_BALANCE)
+    v4Planner.addAction(
+      Actions.SWAP_EXACT_IN,
+      [
+        {
+          currencyIn: pathInput.isNative ? ETH_ADDRESS : pathInput.wrapped.address,
+          path: encodeV4RouteToPath(v4Route),
+          minHopPriceX36: perHopSlippage,
+          amountIn: 0, // open delta: the amount settled above
+          amountOutMinimum: slippageToleranceOnSwap
+            ? trade.minimumAmountOut(slippageToleranceOnSwap).quotient.toString()
+            : 0,
+        },
+      ],
+      toV4URVersion(options.urVersion)
+    )
+  } else {
+    v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toV4URVersion(options.urVersion))
+    v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  }
 
   // Handle split route output consistency:
   // - If output is ETH and some routes output WETH: force all to output WETH, then unwrap

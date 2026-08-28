@@ -2,6 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { defaultAbiCoder } from '@ethersproject/abi'
 import { Trade as V3Trade, Pool as V3Pool, Route as V3Route } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { Trade as V2Trade, Route as V2Route, Pair } from '@uniswap/v2-sdk'
 import { CurrencyAmount, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
@@ -14,9 +15,11 @@ import {
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
 } from '../../src/utils/constants'
-import { ETHER, WETH, USDC, DAI, makeV3Pool, parseCommands } from '../utils/uniswapData'
+import { ETHER, WETH, USDC, DAI, makeV3Pool, makeV4Pool, parseCommands } from '../utils/uniswapData'
 
 const TEST_RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const V4_ACTION_SWAP_EXACT_IN = 0x07
+const V4_ACTION_SETTLE = 0x0b
 const MAINNET = 1
 
 function buildV3Trade(
@@ -213,6 +216,37 @@ describe('routerBalanceInput', () => {
       const { calldata } = SwapRouter.swapCallParameters(usdcTrade(), balanceInputOptions())
       const { commandTypes } = parseCommands(calldata)
       expect(commandTypes).to.not.include(CommandType.BALANCE_CHECK_ERC20)
+    })
+
+    it('settles CONTRACT_BALANCE and swaps the open delta for a pure V4 route', () => {
+      const pool = makeV4Pool(USDC, WETH)
+      const v4 = V4Trade.createUncheckedTrade({
+        route: new V4Route([pool], USDC, WETH),
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const trade = new RouterTrade({
+        v2Routes: [],
+        v3Routes: [],
+        v4Routes: [{ routev4: v4.route, inputAmount: v4.inputAmount, outputAmount: v4.outputAmount }],
+        mixedRoutes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      const { calldata } = SwapRouter.swapCallParameters(trade, balanceInputOptions())
+      const { commandTypes, inputs } = parseCommands(calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP])
+
+      const [actions, params] = defaultAbiCoder.decode(['bytes', 'bytes[]'], inputs[0])
+      const actionIds = Array.from(Buffer.from(actions.slice(2), 'hex'))
+      // SETTLE must precede the swap: the swap consumes the delta the settle opened
+      expect(actionIds[0]).to.equal(V4_ACTION_SETTLE)
+      expect(actionIds[1]).to.equal(V4_ACTION_SWAP_EXACT_IN)
+
+      const [, settleAmount, settlePayerIsUser] = defaultAbiCoder.decode(['address', 'uint256', 'bool'], params[0])
+      expect(BigNumber.from(settleAmount).eq(CONTRACT_BALANCE)).to.equal(true)
+      expect(settlePayerIsUser).to.equal(false)
     })
 
     it('encodes the first hop as CONTRACT_BALANCE for a V2 swap', () => {
