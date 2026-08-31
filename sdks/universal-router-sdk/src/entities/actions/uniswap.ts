@@ -91,10 +91,13 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
    * that deposits into the router and swaps atomically. Distinct from `useRouterBalance`,
    * which keeps the fixed quoted `amountIn`.
    *
-   * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary),
-   * an ERC20 input, and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported
-   * for v2, v3, v4 and mixed routes.
-   * Incompatible with native input, `inputTokenPermit`, `nativeErc20Input`, and
+   * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary)
+   * and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported for v2, v3, v4
+   * and mixed routes. A native input is funded by attaching msg.value to `execute()`
+   * (raw transfers to the router revert) and is wrapped in full via
+   * `WRAP_ETH(CONTRACT_BALANCE)`, with a trailing ETH dust sweep to the recipient; it
+   * requires a route that wraps, so pure-native v4 routes are unsupported.
+   * Incompatible with `inputTokenPermit`, `nativeErc20Input`, and
    * `TokenTransferMode.ApproveProxy`.
    */
   routerBalanceInput?: RouterBalanceInput
@@ -128,7 +131,10 @@ export class UniswapTrade implements Command {
   readonly tradeType: RouterActionType = RouterActionType.UniswapTrade
   readonly payerIsUser: boolean
 
-  constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
+  constructor(
+    public trade: RouterTrade<Currency, Currency, TradeType>,
+    public options: SwapOptions
+  ) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
     if (options.nativeErc20Input) {
@@ -154,8 +160,12 @@ export class UniswapTrade implements Command {
           'Explicit recipient address required with routerBalanceInput (SENDER_AS_RECIPIENT resolves to the caller, who is not the swapper)'
         )
       }
-      if (this.trade.inputAmount.currency.isNative) {
-        throw new Error('routerBalanceInput requires an ERC20 input token')
+      // Native input is funded as msg.value on execute() — raw transfers to the router
+      // revert (its receive() only accepts ETH from WETH) — and wrapped in full by the
+      // route's WRAP_ETH. Routes that consume native directly (pure-native v4) have no
+      // wrap step to size with CONTRACT_BALANCE, so they stay unsupported.
+      if (this.trade.inputAmount.currency.isNative && !this.inputRequiresWrap) {
+        throw new Error('routerBalanceInput with a native input requires a route that wraps to WETH')
       }
       if (this.trade.tradeType !== TradeType.EXACT_INPUT) {
         throw new Error('routerBalanceInput requires TradeType.EXACT_INPUT')
@@ -313,9 +323,11 @@ export class UniswapTrade implements Command {
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
-    // Input floor first, so an under-funded router reverts before any swap runs.
+    // Input floor first, so an under-funded router reverts before any swap runs. A native
+    // balance input has no balance-check command, so its floor is asserted post-wrap as WETH.
+    const balanceInputIsNative = !!this.options.routerBalanceInput && this.trade.inputAmount.currency.isNative
     const minimumRouterBalance = this.options.routerBalanceInput?.minimumAmount
-    if (minimumRouterBalance !== undefined) {
+    if (minimumRouterBalance !== undefined && !balanceInputIsNative) {
       // BALANCE_CHECK_ERC20 reads `owner` verbatim, without the sentinel resolution the
       // recipient params get, so this must be the router's real address.
       planner.addCommand(CommandType.BALANCE_CHECK_ERC20, [
@@ -330,8 +342,19 @@ export class UniswapTrade implements Command {
       // TODO: optimize if only one v2 pool we can directly send this to the pool
       planner.addCommand(CommandType.WRAP_ETH, [
         ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
+        // Balance input: wrap everything the router holds (attached msg.value plus any
+        // stray native), so no value is left behind — UR never refunds msg.value.
+        this.options.routerBalanceInput
+          ? CONTRACT_BALANCE
+          : this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
+      if (minimumRouterBalance !== undefined && balanceInputIsNative) {
+        planner.addCommand(CommandType.BALANCE_CHECK_ERC20, [
+          UNIVERSAL_ROUTER_ADDRESS(this.options.urVersion ?? UniversalRouterVersion.V2_0, this.options.chainId!),
+          this.trade.inputAmount.currency.wrapped.address,
+          minimumRouterBalance,
+        ])
+      }
     } else if (this.inputRequiresUnwrap) {
       if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
         // send wrapped token to router to unwrap via Permit2
@@ -468,7 +491,12 @@ export class UniswapTrade implements Command {
       }
     }
 
-    if (this.options.safeMode) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
+    // Native balance input always sweeps trailing ETH dust to the recipient: the funder is
+    // a third party, so anything left on the router would otherwise be stranded or swept
+    // by a stranger.
+    if (this.options.safeMode || (this.options.routerBalanceInput && this.trade.inputAmount.currency.isNative)) {
+      planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
+    }
   }
 }
 
@@ -655,7 +683,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   v4Planner.addTake(
     pathOutputForTake,
-    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT,
+    routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT),
     takeAmount
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
@@ -678,7 +706,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   }
   const inputAmount = swap.inputAmount
   const outputAmount = swap.outputAmount
-  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT)
 
   // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {

@@ -114,7 +114,12 @@ export abstract class SwapRouter {
 
     let nativeCurrencyValue: BigNumber
     if (inputCurrency.isNative) {
-      nativeCurrencyValue = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
+      // routerBalanceInput: the delivered amount is unknown at encode time — the executor
+      // attaches it as msg.value on execute() (raw transfers to the router revert), so the
+      // encoded value is zero and the plan wraps whatever arrives.
+      nativeCurrencyValue = options.routerBalanceInput
+        ? BigNumber.from(0)
+        : BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
     } else if (options.nativeErc20Input) {
       // input token is the chain's native-ERC20 gas token (e.g. Arc USDC predeploy):
       // fund the router via msg.value, scaled from token decimals to 18-decimal native units
