@@ -2,7 +2,7 @@ import { BigintIsh, CurrencyAmount, Price, Token } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { FACTORY_ADDRESS, FeeAmount, TICK_SPACINGS } from '../constants'
-import { NEGATIVE_ONE, Q192 } from '../internalConstants'
+import { NEGATIVE_ONE, Q192, ZERO } from '../internalConstants'
 import { computePoolAddress } from '../utils/computePoolAddress'
 import { v3Swap } from '../utils/v3swap'
 import { TickMath } from '../utils/tickMath'
@@ -154,11 +154,17 @@ export class Pool {
     const zeroForOne = inputAmount.currency.equals(this.token0)
 
     const {
+      amountSpecifiedRemaining,
       amountCalculated: outputAmount,
       sqrtRatioX96,
       liquidity,
       tickCurrent,
     } = await this.swap(zeroForOne, inputAmount.quotient, sqrtPriceLimitX96)
+
+    if (!JSBI.equal(amountSpecifiedRemaining, ZERO) && !sqrtPriceLimitX96) {
+      throw new Error('INSUFFICIENT_LIQUIDITY')
+    }
+
     const outputToken = zeroForOne ? this.token1 : this.token0
     return [
       CurrencyAmount.fromRawAmount(outputToken, JSBI.multiply(outputAmount, NEGATIVE_ONE)),
@@ -181,11 +187,17 @@ export class Pool {
     const zeroForOne = outputAmount.currency.equals(this.token1)
 
     const {
+      amountSpecifiedRemaining,
       amountCalculated: inputAmount,
       sqrtRatioX96,
       liquidity,
       tickCurrent,
     } = await this.swap(zeroForOne, JSBI.multiply(outputAmount.quotient, NEGATIVE_ONE), sqrtPriceLimitX96)
+
+    if (!JSBI.equal(amountSpecifiedRemaining, ZERO) && !sqrtPriceLimitX96) {
+      throw new Error('INSUFFICIENT_LIQUIDITY')
+    }
+
     const inputToken = zeroForOne ? this.token0 : this.token1
     return [
       CurrencyAmount.fromRawAmount(inputToken, inputAmount),
@@ -207,7 +219,13 @@ export class Pool {
     zeroForOne: boolean,
     amountSpecified: JSBI,
     sqrtPriceLimitX96?: JSBI
-  ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
+  ): Promise<{
+    amountSpecifiedRemaining: JSBI
+    amountCalculated: JSBI
+    sqrtRatioX96: JSBI
+    liquidity: JSBI
+    tickCurrent: number
+  }> {
     return v3Swap(
       JSBI.BigInt(this.fee),
       this.sqrtRatioX96,
