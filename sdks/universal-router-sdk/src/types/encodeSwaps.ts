@@ -1,7 +1,7 @@
 import { BigNumberish } from 'ethers'
 import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
 import { type PathKey, type PoolKey } from '@uniswap/v4-sdk'
-import { TokenTransferMode } from '../entities/actions/uniswap'
+import { RouterBalanceInput, TokenTransferMode } from '../entities/actions/uniswap'
 import { Permit2Permit } from '../utils/inputTokens'
 import { UniversalRouterVersion } from '../utils/constants'
 
@@ -10,8 +10,7 @@ export type { PathKey, PoolKey }
 // portion: % of variable output, used with exact-input
 // flat: fixed amount, deducted from exact-output target
 export type Fee =
-  | { kind: 'portion'; recipient: string; fee: Percent }
-  | { kind: 'flat'; recipient: string; amount: BigNumberish }
+  { kind: 'portion'; recipient: string; fee: Percent } | { kind: 'flat'; recipient: string; amount: BigNumberish }
 
 export type SwapSpecification = {
   tradeType: TradeType
@@ -45,6 +44,15 @@ export type SwapSpecification = {
    * See `SwapRouter.encodeSwaps`.
    */
   allowDirectTransfers?: boolean
+  /**
+   * Fund the swap from the Universal Router's own balance of the input token: no Permit2
+   * ingress is emitted, the first hop spends the CONTRACT_BALANCE sentinel, and an optional
+   * `minimumAmount` emits a BALANCE_CHECK_ERC20 up front (requires `chainId` to resolve the
+   * router address). Same semantics and guards as `SwapOptions.routerBalanceInput`: explicit
+   * `recipient`, ERC20 input, EXACT_INPUT, exactly one input-spending step (no splits);
+   * incompatible with `permit`, `nativeErc20Input`, `allowDirectTransfers`, and ApproveProxy.
+   */
+  routerBalanceInput?: RouterBalanceInput
 }
 
 // Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed

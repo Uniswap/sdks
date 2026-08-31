@@ -13,6 +13,7 @@ import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encode
 import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
 import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
+import { stepSpendsToken } from './routerBalanceSteps'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -130,6 +131,41 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     invariant(!spec.permit, 'NATIVE_ERC20_INPUT_PERMIT_CONFLICT')
     invariant(spec.tokenTransferMode !== TokenTransferMode.ApproveProxy, 'NATIVE_ERC20_INPUT_PROXY_CONFLICT')
     invariant(spec.routing.inputToken.decimals <= 18, 'NATIVE_ERC20_INPUT_DECIMALS')
+  }
+
+  // router-balance funding: no ingress, first hop spends CONTRACT_BALANCE. Mirrors the
+  // SwapOptions.routerBalanceInput guards; anything refused here would silently encode a
+  // fixed-amount wallet-funded swap instead.
+  if (spec.routerBalanceInput) {
+    invariant(spec.tradeType === TradeType.EXACT_INPUT, 'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
+    invariant(!spec.routing.inputToken.isNative, 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+    invariant(!spec.nativeErc20Input, 'ROUTER_BALANCE_INPUT_NATIVE_ERC20_CONFLICT')
+    invariant(!spec.permit, 'ROUTER_BALANCE_INPUT_PERMIT_CONFLICT')
+    invariant(spec.tokenTransferMode !== TokenTransferMode.ApproveProxy, 'ROUTER_BALANCE_INPUT_PROXY_CONFLICT')
+    invariant(!spec.allowDirectTransfers, 'ROUTER_BALANCE_INPUT_DIRECT_TRANSFERS_CONFLICT')
+    // SENDER_AS_RECIPIENT resolves to the caller of execute(), who in this flow is the
+    // funder (a bridge filler), not the swapper.
+    invariant(spec.recipient !== SENDER_AS_RECIPIENT, 'ROUTER_BALANCE_INPUT_EXPLICIT_RECIPIENT_REQUIRED')
+    if (spec.routerBalanceInput.minimumAmount !== undefined) {
+      // BALANCE_CHECK_ERC20 reads `owner` verbatim, so the router's real address is needed
+      invariant(!!spec.chainId, 'ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
+    }
+
+    // One CONTRACT_BALANCE cannot address two legs of the same currency: the first drains it
+    // and the second resolves to zero. Exactly one step may spend the input token, and it
+    // must be the first, so the transform has an unambiguous hop 0.
+    const balanceInputTokenAddress = getCurrencyAddress(spec.routing.inputToken)
+    const spenderIndexes = swapSteps
+      .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
+      .filter((index) => index >= 0)
+    invariant(spenderIndexes.length === 1 && spenderIndexes[0] === 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    for (const step of swapSteps) {
+      invariant(
+        step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
+        'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
+      )
+      invariant(step.type !== 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+    }
   }
 
   // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
