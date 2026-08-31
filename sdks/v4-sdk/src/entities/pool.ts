@@ -117,7 +117,7 @@ export class Pool {
       invariant(Number(hooks) > 0, 'Dynamic fee pool requires a hook')
     }
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
-    const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + 1)
+    const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + tickSpacing)
     invariant(
       JSBI.greaterThanOrEqual(JSBI.BigInt(sqrtRatioX96), tickCurrentSqrtRatioX96) &&
         JSBI.lessThanOrEqual(JSBI.BigInt(sqrtRatioX96), nextTickSqrtRatioX96),
