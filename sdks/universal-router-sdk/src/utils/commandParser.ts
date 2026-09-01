@@ -7,10 +7,11 @@ import {
   CommandDefinition,
   COMMAND_DEFINITION,
   V2V3_SWAP_COMMANDS_V2_1_1,
+  PAYMENTS_COMMANDS_V2_3_0,
   Subparser,
   Parser,
 } from '../utils/routerCommands'
-import { UniversalRouterVersion, isAtLeastV2_1_1 } from '../utils/constants'
+import { UniversalRouterVersion, isAtLeastV2_1_1, isAtLeastV2_3_0 } from '../utils/constants'
 
 export type Param = {
   readonly name: string
@@ -45,11 +46,14 @@ export abstract class CommandParser {
     calldata: string,
     urVersion: UniversalRouterVersion = UniversalRouterVersion.V2_0
   ): UniversalRouterCall {
-    // From V2.1.1 onwards the V2/V3 swap commands carry an extra minHopPriceX36 array,
-    // so the matching command definitions must be used to decode them correctly.
-    const commandDefinition = isAtLeastV2_1_1(urVersion)
-      ? { ...COMMAND_DEFINITION, ...V2V3_SWAP_COMMANDS_V2_1_1 }
-      : COMMAND_DEFINITION
+    // From V2.1.1 onwards the V2/V3 swap commands carry an extra minHopPriceX36 array, and from
+    // V2.3.0 onwards UNWRAP_WETH carries an explicit `amount` word, so the matching command
+    // definitions must be layered over the base table to decode them correctly.
+    const commandDefinition = {
+      ...COMMAND_DEFINITION,
+      ...(isAtLeastV2_1_1(urVersion) ? V2V3_SWAP_COMMANDS_V2_1_1 : {}),
+      ...(isAtLeastV2_3_0(urVersion) ? PAYMENTS_COMMANDS_V2_3_0 : {}),
+    }
     const genericParser = new GenericCommandParser(commandDefinition, urVersion)
     const txDescription = CommandParser.INTERFACE.parseTransaction({ data: calldata })
     const { commands, inputs } = txDescription.args
