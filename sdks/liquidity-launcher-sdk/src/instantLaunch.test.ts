@@ -79,6 +79,17 @@ describe('getInstantLaunchAddresses', () => {
     expect(isInstantLaunchSupportedChain(CHAIN_ID)).toBe(true)
     expect(isInstantLaunchSupportedChain(SupportedChainId.MAINNET)).toBe(false)
   })
+
+  it('resolves on Arc now that the chain carries a uERC20 factory (undefined in 1.12.0)', () => {
+    const launcher = getLauncherAddresses(SupportedChainId.ARC)!
+    for (const creatorFeesEnabled of [true, false]) {
+      const stack = getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled })
+      expect(stack?.uerc20Factory).toBe(getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6'))
+      expect(stack?.liquidityLauncher).toBe(launcher.liquidityLauncher)
+      expect(stack?.creatorFeesEnabled).toBe(creatorFeesEnabled)
+    }
+    expect(isInstantLaunchSupportedChain(SupportedChainId.ARC)).toBe(true)
+  })
 })
 
 describe('predictInstantLaunchTokenAddressCall', () => {

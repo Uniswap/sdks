@@ -314,8 +314,15 @@ describe('Arc (5042) deployment', () => {
     expect(addresses.positionManager).toBe(getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B'))
   })
 
-  it('supports pre-existing-token launches only (no token factory on 5042)', () => {
-    expect(selectTokenFactory(getLauncherAddresses(SupportedChainId.ARC)!)).toBeUndefined()
+  it('carries the Arc uERC20 factory (2026-09-01 deploy; not the shared CREATE2 address)', () => {
+    const addresses = getLauncherAddresses(SupportedChainId.ARC)!
+    const arcFactory = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
+    expect(addresses.uerc20Factory).toBe(arcFactory)
+    expect(addresses.uerc20Factory).not.toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.uerc20Factory!)
+    expect(addresses.usuperc20Factory).toBeUndefined()
+    // 1.12.0 shipped Arc without a factory (pre-existing-token launches only); new-token launches
+    // now resolve through the uERC20 path.
+    expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
   it('registers one Instant Launch generation with the native-USDC pool shape', () => {

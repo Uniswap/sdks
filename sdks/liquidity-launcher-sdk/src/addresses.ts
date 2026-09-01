@@ -81,6 +81,11 @@ const TOKEN_SPLITTER_ROBINHOOD = getAddress('0x4F5E3FBb9745358A92Da5674305FAb8D2
 // Ethereum-style chains that deploy it; the super-uERC20 factory shares one across the superchains.
 const UERC20_FACTORY = getAddress('0x000000e200088D55C39a11F609E5F667729ad49b')
 const USUPERC20_FACTORY = getAddress('0xeEeeEEE204Afb6BABb1287ffed52cCD6BA0b0fb2')
+// Arc (5042) uERC20 factory, deployed 2026-09-01 after the chain's launcher stack. Not at the shared
+// CREATE2 address above (the shared salt was not used on Arc), so it is a per-chain constant; read
+// from the chain-5042 deploy log (`UERC20Factory deployed at:`). Until this deploy Arc supported
+// launches with pre-existing tokens only (1.12.0).
+const UERC20_FACTORY_ARC = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
 
 // Canonical Uniswap v4 PositionManager per chain (sdk-core CHAIN_TO_ADDRESSES_MAP[id].v4PositionManagerAddress).
 const POSITION_MANAGER_MAINNET = getAddress('0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e')
@@ -170,8 +175,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     universalRouterStrategy: UNIVERSAL_ROUTER_STRATEGY_ARC,
-    // No token factory on 5042 (neither the uERC20 nor the super-uERC20 CREATE2 address has code),
-    // so Arc supports launches with pre-existing tokens only.
+    uerc20Factory: UERC20_FACTORY_ARC,
     positionManager: POSITION_MANAGER_ARC,
   },
   [SupportedChainId.SEPOLIA]: {
