@@ -16,7 +16,7 @@ describe('getBlockTimeSeconds', () => {
   })
 
   it('uses the Arc cadence', () => {
-    expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBe(0.48)
+    expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBe(0.5)
     expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBeLessThan(DEFAULT_BLOCK_TIME_SECONDS)
   })
 
@@ -55,8 +55,8 @@ describe('deriveBlocks — real-time auction window is honored', () => {
       nowUnix: NOW,
       blockTimeSeconds: getBlockTimeSeconds(SupportedChainId.ARC),
     })
-    // 50400s / 0.48s = 105000 blocks; the 12s default would yield only 4200 (~34min of real time).
-    expect(endBlock - startBlock).toBe(105_000n)
+    // 50400s / 0.5s = 100800 blocks; the 12s default would yield only 4200 (~35min of real time).
+    expect(endBlock - startBlock).toBe(100_800n)
   })
 
   it('spans a 14h auction correctly on Arbitrum One', () => {

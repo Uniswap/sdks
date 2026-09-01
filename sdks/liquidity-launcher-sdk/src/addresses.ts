@@ -350,8 +350,6 @@ const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf9526Dd3361fe0ba6b7a
 
 // Arc (5042) Instant Launch stack. Arc's native currency is 18-decimal USDC, so initialTick is
 // USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated 198,050.
-// Fees-on/fees-off assignment follows the deploy-log order; confirm via beneficiaryVault()
-// (fees-on = the Arc vault, fees-off = address(0)).
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
