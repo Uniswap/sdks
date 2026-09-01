@@ -195,7 +195,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
      * @inheritdoc order
      */
     serialize(): string {
-        const encodedRelativeBlocks = encodeRelativeBlocks(
+        const encodedInputRelativeBlocks = encodeRelativeBlocks(
             this.info.input.curve.relativeBlocks
         );
         const abiCoder = new ethers.utils.AbiCoder();
@@ -214,14 +214,17 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
-                    [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
+                    [encodedInputRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
                     this.info.input.adjustmentPerGweiBaseFee,
                 ],
                 this.info.outputs.map((output) => [
                     output.token,
                     output.startAmount,
-                    [encodedRelativeBlocks, output.curve.relativeAmounts],
+                    [
+                        encodeRelativeBlocks(output.curve.relativeBlocks),
+                        output.curve.relativeAmounts,
+                    ],
                     output.recipient,
                     output.minAmount,
                     output.adjustmentPerGweiBaseFee,
