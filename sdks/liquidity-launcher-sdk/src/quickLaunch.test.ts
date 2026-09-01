@@ -5,6 +5,7 @@ import { isCreatorFeesPositionRecipient } from './addresses'
 import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import { resolveNewPoolTickSpacing } from './config/fees'
+import { fdvUsdToPricePerToken } from './config/price'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
@@ -21,6 +22,7 @@ import {
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
   QUICK_LAUNCH_SOLD_SUPPLY_SHARE,
+  QUICK_LAUNCH_TOTAL_SUPPLY,
   QUICK_LAUNCH_TOTAL_SUPPLY_RAW,
   getQuickLaunchDurationBlocks,
   getQuickLaunchFloorPricePerToken,
@@ -422,7 +424,7 @@ describe('graduation threshold constants', () => {
 })
 
 describe('FDV -> price-per-token request derivation', () => {
-  it('derives the floor price per token: floorFDV / 1B tokens / ethUsd', () => {
+  it('derives the floor price per token: floorFDV / 1B tokens / nativeUsd', () => {
     // $1k FDV over 1B tokens at $2,000/ETH = 1e-6 / 2000 = 5e-10 ETH per token.
     expect(getQuickLaunchFloorPricePerToken(2_000)).toBe('0.0000000005')
   })
@@ -432,14 +434,23 @@ describe('FDV -> price-per-token request derivation', () => {
     expect(getQuickLaunchGraduationPricePerToken(2_500)).toBe('0.000000004')
   })
 
+  it('is chain-neutral: on Arc (5042) the native currency is USDC, so nativeUsdPrice ≈ 1 yields a USDC-denominated floor', () => {
+    const nativeUsdPrice = 1
+    // $1k FDV over 1B tokens at $1/USDC = 1e-6 USDC per token.
+    expect(getQuickLaunchFloorPricePerToken(nativeUsdPrice)).toBe(
+      fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
+    )
+    expect(getQuickLaunchFloorPricePerToken(nativeUsdPrice)).toBe('0.000001')
+  })
+
   it('keeps graduation/floor at the FDV ratio', () => {
-    const ethUsd = 3_123.45
-    const floor = Number(getQuickLaunchFloorPricePerToken(ethUsd))
-    const graduation = Number(getQuickLaunchGraduationPricePerToken(ethUsd))
+    const nativeUsd = 3_123.45
+    const floor = Number(getQuickLaunchFloorPricePerToken(nativeUsd))
+    const graduation = Number(getQuickLaunchGraduationPricePerToken(nativeUsd))
     expect(graduation / floor).toBeCloseTo(QUICK_LAUNCH_GRADUATION_FDV_USD / QUICK_LAUNCH_FLOOR_FDV_USD, 6)
   })
 
-  it('throws on a missing/invalid ETH price so callers choose their own fallback', () => {
+  it('throws on a missing/invalid native-currency price so callers choose their own fallback', () => {
     expect(() => getQuickLaunchFloorPricePerToken(0)).toThrow()
     expect(() => getQuickLaunchGraduationPricePerToken(Number.NaN)).toThrow()
   })
