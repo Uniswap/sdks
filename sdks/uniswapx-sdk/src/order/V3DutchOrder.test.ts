@@ -83,6 +83,44 @@ describe("V3DutchOrder", () => {
         expect(parsed.info).to.deep.eq(orderInfo);
     });
 
+    it("UnsignedV3DutchOrder.serialize() encodes each output's own relativeBlocks, not the input's", () => {
+        const orderInfo = getFullOrderInfo({
+            input: {
+                token: INPUT_TOKEN,
+                startAmount: RAW_AMOUNT,
+                curve: {
+                    relativeBlocks: [1, 2, 3, 4],
+                    relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
+                },
+                maxAmount: RAW_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            },
+            outputs: [
+                {
+                    token: OUTPUT_TOKEN,
+                    startAmount: RAW_AMOUNT,
+                    curve: {
+                        // deliberately different from the input curve above, so the
+                        // bug (input's blocks bleeding into every output) is visible
+                        relativeBlocks: [5, 10, 15, 20],
+                        relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
+                    },
+                    recipient: ethers.constants.AddressZero,
+                    minAmount: RAW_AMOUNT.sub(4),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
+                },
+            ],
+        });
+        // UnsignedV3DutchOrder specifically: both existing round-trip tests above
+        // construct a CosignedV3DutchOrder, whose serialize() already encodes each
+        // output's own relativeBlocks correctly, so they never exercised this bug.
+        const order = new UnsignedV3DutchOrder(orderInfo, CHAIN_ID);
+        const serialized = order.serialize();
+        const parsed = UnsignedV3DutchOrder.parse(serialized, CHAIN_ID);
+        expect(parsed.info.input.curve.relativeBlocks).to.deep.eq([1, 2, 3, 4]);
+        expect(parsed.info.outputs[0].curve.relativeBlocks).to.deep.eq([5, 10, 15, 20]);
+    });
+
     it("Parses a serialized v3 order with negative relativeAmounts", () => {
         const orderInfo = getFullOrderInfo({
             outputs: [
