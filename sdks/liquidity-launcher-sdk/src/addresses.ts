@@ -348,14 +348,20 @@ const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0xd35E9CA72F64C7F93BE30fa
 const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a')
 
 // Arc (5042) Instant Launch stack — a single generation so far, deployed alongside the chain's
-// launcher stack. Same pool shape as the Robinhood 2026-08-05 full redeploy (TICK_SPACING 25,
-// initialTick 198,050, MIN_LAUNCH_TICK -160,100 — read back from the deployed strategies' getters)
-// and the same split table (fees-on: 40% native to the vault, 60% native + 100% token
-// autocompounding; fees-off: 100% of both sides autocompounding — read back via getSplits()).
-// Variant identification verified on-chain: the fees-on strategy's beneficiaryVault() is the Arc
-// vault below, the fees-off strategy's is address(0).
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC = getAddress('0x26e7803154f31540185f13c7540B0148F8F0De4b')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC = getAddress('0xe510927f92c1E66a9E655E1D73F4367125E04EFF')
+// launcher stack. Pool shape read back from the deployed strategies' getters: TICK_SPACING 25,
+// initialTick 122,050, MIN_LAUNCH_TICK -160,100. Same split table as Robinhood (fees-on: 40%
+// native to the vault, 60% native + 100% token autocompounding; fees-off: 100% of both sides
+// autocompounding — read back via getSplits()). Variant identification verified on-chain: the
+// fees-on strategy's beneficiaryVault() is the Arc vault below, the fees-off strategy's is
+// address(0).
+//
+// The strategy pair is the 2026-09-01 same-day redeploy that moved initialTick 198,050 → 122,050
+// (a constructor immutable). The initial pair (`0x26e78031…` / `0xe510927f…`) is REPLACED rather
+// than retained: it was never launched against (zero logs on-chain), so there are no indexed
+// launches for the append-only rule to protect — the same reasoning as the v3.1.0 dev-pair removal
+// on chain 4663 above. Both pairs share the FeeSplitters, vault and compounding recipient below.
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 const UERC20_BENEFICIARY_VAULT_ARC = getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af')
@@ -580,10 +586,10 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
     tickSpacing: 25,
-    initialTick: 198050,
+    initialTick: 122050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch with creator fees (Arc/5042 initial stack, current): same pool shape as the 2026-08-05 Robinhood redeploy, pinned to the re-mined LiquidityLauncher; FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc CompoundingClaimRecipient',
+      'Instant Launch with creator fees (2026-09-01 Arc/5042 redeploy, current): initialTick 122,050 (TICK_SPACING 25, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ARC,
@@ -593,10 +599,10 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
     tickSpacing: 25,
-    initialTick: 198050,
+    initialTick: 122050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch without creator fees (Arc/5042 initial stack, current): same pool shape as the 2026-08-05 Robinhood redeploy, pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
+      'Instant Launch without creator fees (2026-09-01 Arc/5042 redeploy, current): initialTick 122,050 (TICK_SPACING 25, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
   },
 ]
 

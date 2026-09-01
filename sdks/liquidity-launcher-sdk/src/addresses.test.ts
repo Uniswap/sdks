@@ -300,8 +300,8 @@ describe('Arc (5042) deployment', () => {
   // identity via beneficiaryVault() (fees-on = the Arc vault, fees-off = address(0)), splitter
   // wiring via feeSplitter() + getSplits(), pool shape via TICK_SPACING/initialTick/MIN_LAUNCH_TICK
   // getters, and the ccaFactory via LBPStrategy.initializerFactory().
-  const ARC_FEES_ON_STRATEGY = getAddress('0x26e7803154f31540185f13c7540B0148F8F0De4b')
-  const ARC_FEES_OFF_STRATEGY = getAddress('0xe510927f92c1E66a9E655E1D73F4367125E04EFF')
+  const ARC_FEES_ON_STRATEGY = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
+  const ARC_FEES_OFF_STRATEGY = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
   const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
   const ARC_FEES_OFF_SPLITTER = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 
@@ -330,7 +330,7 @@ describe('Arc (5042) deployment', () => {
     expect(off!.creatorFeesEnabled).toBe(false)
     for (const variant of [on!, off!]) {
       expect(variant.tickSpacing).toBe(25)
-      expect(variant.initialTick).toBe(198050)
+      expect(variant.initialTick).toBe(122050)
       expect(variant.minLaunchTick).toBe(-160100)
     }
     expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })?.strategy).toBe(
