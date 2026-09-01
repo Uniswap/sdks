@@ -160,6 +160,13 @@ export class UniswapTrade implements Command {
           'Explicit recipient address required with routerBalanceInput (SENDER_AS_RECIPIENT resolves to the caller, who is not the swapper)'
         )
       }
+      // The Dispatcher maps recipient sentinels: address(2) resolves to the router itself —
+      // unwrapWETH9 then skips the transfer and a native-out execute() SUCCEEDS with the
+      // ETH stranded in the permissionless router — and address(0) burns. Both are
+      // format-valid addresses, so upstream shape checks pass them straight through.
+      if (options.recipient === ROUTER_AS_RECIPIENT || BigNumber.from(options.recipient).isZero()) {
+        throw new Error('routerBalanceInput recipient cannot be a UR sentinel or the zero address')
+      }
       // Native input is funded as msg.value on execute() — raw transfers to the router
       // revert (its receive() only accepts ETH from WETH) — and wrapped in full by the
       // route's WRAP_ETH. Routes that consume native directly (pure-native v4) have no

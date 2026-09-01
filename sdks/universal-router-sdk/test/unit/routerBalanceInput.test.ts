@@ -78,6 +78,25 @@ describe('routerBalanceInput', () => {
       )
     })
 
+    it('throws when the recipient is the router sentinel (address(2)) or the zero address', () => {
+      // address(2) makes a native-out unwrap skip its transfer: execute() succeeds with the
+      // ETH stranded in the permissionless router; address(0) burns.
+      expect(
+        () =>
+          new UniswapTrade(
+            usdcTrade(),
+            balanceInputOptions({ recipient: '0x0000000000000000000000000000000000000002' })
+          )
+      ).to.throw(/recipient cannot be a UR sentinel or the zero address/)
+      expect(
+        () =>
+          new UniswapTrade(
+            usdcTrade(),
+            balanceInputOptions({ recipient: '0x0000000000000000000000000000000000000000' })
+          )
+      ).to.throw(/recipient cannot be a UR sentinel or the zero address/)
+    })
+
     it('throws on a native input whose route does not wrap (pure-native v4)', () => {
       const nativeV4Pool = makeV4Pool(ETHER, USDC)
       const v4Route = new V4Route([nativeV4Pool], ETHER, USDC)
