@@ -1,5 +1,6 @@
 sdks/flashtestations-sdk/ @Uniswap/Unichain
 sdks/liquidity-launcher-sdk/ @Uniswap/apps-lp
+sdks/lp-sdk/ @Uniswap/apps-lp
 sdks/permit2-sdk/ @Uniswap/swap-be
 sdks/router-sdk/ @Uniswap/swap-be
 sdks/sdk-core/ @Uniswap/swap-be
@@ -20,3 +21,5 @@ sdks/v4-sdk/ @Uniswap/swap-be
 # repo-wide version-file rules above for their package only).
 sdks/liquidity-launcher-sdk/package.json @Uniswap/apps-lp
 sdks/liquidity-launcher-sdk/CHANGELOG.md @Uniswap/apps-lp
+sdks/lp-sdk/package.json @Uniswap/apps-lp
+sdks/lp-sdk/CHANGELOG.md @Uniswap/apps-lp
