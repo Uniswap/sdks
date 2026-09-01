@@ -296,11 +296,7 @@ describe('Instant Launch deployment registry', () => {
 })
 
 describe('Arc (5042) deployment', () => {
-  // Independent literals from the chain-5042 deploy logs. Launcher stack, splitters and singletons
-  // were verified on-chain on 2026-09-01 (beneficiaryVault(), feeSplitter() + getSplits(),
-  // LBPStrategy.initializerFactory()). The strategy pair is the 2026-09-01 21:26Z redeploy
-  // (initialTick 122,050, native-USDC denominated); its variant mapping follows the redeploy log's
-  // order (fees-on first, fees-off second) and was not read back on-chain at registration time.
+  // Independent literals (not read back from the registry) so a registry edit cannot silently move them.
   const ARC_FEES_ON_STRATEGY = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
   const ARC_FEES_OFF_STRATEGY = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
   const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
@@ -314,18 +310,16 @@ describe('Arc (5042) deployment', () => {
     expect(addresses.positionManager).toBe(getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B'))
   })
 
-  it('carries the Arc uERC20 factory (2026-09-01 deploy; not the shared CREATE2 address)', () => {
+  it('uses a per-chain uERC20 factory', () => {
     const addresses = getLauncherAddresses(SupportedChainId.ARC)!
     const arcFactory = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
     expect(addresses.uerc20Factory).toBe(arcFactory)
     expect(addresses.uerc20Factory).not.toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.uerc20Factory!)
     expect(addresses.usuperc20Factory).toBeUndefined()
-    // 1.12.0 shipped Arc without a factory (pre-existing-token launches only); new-token launches
-    // now resolve through the uERC20 path.
     expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
-  it('registers one Instant Launch generation with the native-USDC pool shape', () => {
+  it('registers one Instant Launch generation', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
     expect(deployments).toHaveLength(2)
     const [on, off] = deployments
@@ -338,8 +332,6 @@ describe('Arc (5042) deployment', () => {
     expect(off!.creatorFeesEnabled).toBe(false)
     for (const variant of [on!, off!]) {
       expect(variant.tickSpacing).toBe(25)
-      // 1.0001^-122050 ≈ 5.0e-6 native USDC per token: ≈ $5k FDV on a 1e9 supply. NOT Robinhood's
-      // ETH-denominated 198,050, which on Arc's 18-decimal native USDC would open at ≈ $2.50 FDV.
       expect(variant.initialTick).toBe(122050)
       expect(variant.initialTick % variant.tickSpacing).toBe(0)
       expect(variant.minLaunchTick).toBe(-160100)

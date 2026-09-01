@@ -80,7 +80,7 @@ describe('getInstantLaunchAddresses', () => {
     expect(isInstantLaunchSupportedChain(SupportedChainId.MAINNET)).toBe(false)
   })
 
-  it('resolves on Arc now that the chain carries a uERC20 factory (undefined in 1.12.0)', () => {
+  it('resolves on Arc', () => {
     const launcher = getLauncherAddresses(SupportedChainId.ARC)!
     for (const creatorFeesEnabled of [true, false]) {
       const stack = getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled })

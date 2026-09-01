@@ -93,7 +93,7 @@ export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   196: 1, // xlayer
   1301: 1, // unichain sepolia
   4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence (blocknumberish-aware contracts redeployed 2026-07-09)
-  5042: 0.48, // arc (matches sdk-core's AVERAGE_BLOCK_TIME entry)
+  5042: 0.48, // arc
   8453: 2, // base
   42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche

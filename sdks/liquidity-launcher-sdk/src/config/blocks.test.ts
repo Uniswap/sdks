@@ -15,9 +15,7 @@ describe('getBlockTimeSeconds', () => {
     expect(getBlockTimeSeconds(SupportedChainId.ROBINHOOD)).toBeLessThan(DEFAULT_BLOCK_TIME_SECONDS)
   })
 
-  it('uses the sub-second Arc cadence, not the 12s default', () => {
-    // Regression: 1.12.0 shipped Arc addresses with no block-time entry, so a 4h auction window on
-    // Arc derived to ~10 minutes of real time (12s default vs the ~0.48s actual cadence).
+  it('uses the Arc cadence', () => {
     expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBe(0.48)
     expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBeLessThan(DEFAULT_BLOCK_TIME_SECONDS)
   })
