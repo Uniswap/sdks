@@ -52,7 +52,7 @@ export const QUICK_LAUNCH_AUCTION_SUPPLY_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2
  */
 export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2n
 
-/** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
+/** Raise denomination: the chain's native currency only (`address(0)` sentinel; ETH on most chains, USDC on Arc). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
 /** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
@@ -254,7 +254,7 @@ export function isStructurallyPermanentLockMode(mode: QuickLaunchLockMode): bool
  * always 18 decimals, native raise is `address(0)` on every chain, the duration is a fixed real-time
  * window), so the preset is a frozen constant rather than a `getQuickLaunchPreset(chainId)` function.
  * The two values that ARE chain-dependent — the duration in blocks and the floor price — are
- * *derived* at build time from the chain block time / live ETH price, not stored here; see
+ * *derived* at build time from the chain block time / live native-currency USD price, not stored here; see
  * {@link getQuickLaunchDurationBlocks}.
  */
 export interface QuickLaunchPreset {
@@ -327,24 +327,25 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
 
 /**
  * The preset floor as the CreateAuction `floor_price_raise_per_token` decimal:
- * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (native ETH)
- * at `ethUsdPrice`. Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
+ * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (the chain's
+ * native currency) at `nativeUsdPrice` — the USD price of that native currency (ETH on Robinhood;
+ * USDC ≈ 1 on Arc). Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
  * their own fallback.
  */
-export function getQuickLaunchFloorPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchFloorPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
  * The preset graduation threshold as the CreateAuction `graduation_price_raise_per_token`
  * decimal: {@link QUICK_LAUNCH_GRADUATION_FDV_USD} / 1B tokens, converted to the raise currency
- * (native ETH) at `ethUsdPrice` — the same derivation as the floor, over the FULL supply. The
+ * (the chain's native currency) at `nativeUsdPrice` — the same derivation as the floor, over the FULL supply. The
  * service turns it into `requiredCurrencyRaised = graduationPrice x soldSupply`, so the USD
  * raise this demands is graduation FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}
  * (= {@link QUICK_LAUNCH_GRADUATION_RAISE_USD}), never the FDV 1:1.
  */
-export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchGraduationPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
@@ -505,7 +506,7 @@ export interface QuickLaunchMatchOptions {
  *
  * Presumes a CCA (v2) auction — the caller should gate on the auction version first (e.g. via the
  * factory→lens registry in `addresses`), since `AuctionParameters` is inherently CCA. The floor /
- * clearing price is intentionally NOT matched: it is derived from the live ETH price and so is not a
+ * clearing price is intentionally NOT matched: it is derived from the live native-currency USD price and so is not a
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,

@@ -296,12 +296,9 @@ describe('Instant Launch deployment registry', () => {
 })
 
 describe('Arc (5042) deployment', () => {
-  // Independent literals from the chain-5042 deploy log, verified on-chain (2026-09-01): variant
-  // identity via beneficiaryVault() (fees-on = the Arc vault, fees-off = address(0)), splitter
-  // wiring via feeSplitter() + getSplits(), pool shape via TICK_SPACING/initialTick/MIN_LAUNCH_TICK
-  // getters, and the ccaFactory via LBPStrategy.initializerFactory().
-  const ARC_FEES_ON_STRATEGY = getAddress('0x26e7803154f31540185f13c7540B0148F8F0De4b')
-  const ARC_FEES_OFF_STRATEGY = getAddress('0xe510927f92c1E66a9E655E1D73F4367125E04EFF')
+  // Independent literals (not read back from the registry) so a registry edit cannot silently move them.
+  const ARC_FEES_ON_STRATEGY = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
+  const ARC_FEES_OFF_STRATEGY = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
   const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
   const ARC_FEES_OFF_SPLITTER = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 
@@ -313,11 +310,16 @@ describe('Arc (5042) deployment', () => {
     expect(addresses.positionManager).toBe(getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B'))
   })
 
-  it('supports pre-existing-token launches only (no token factory on 5042)', () => {
-    expect(selectTokenFactory(getLauncherAddresses(SupportedChainId.ARC)!)).toBeUndefined()
+  it('uses a per-chain uERC20 factory', () => {
+    const addresses = getLauncherAddresses(SupportedChainId.ARC)!
+    const arcFactory = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
+    expect(addresses.uerc20Factory).toBe(arcFactory)
+    expect(addresses.uerc20Factory).not.toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.uerc20Factory!)
+    expect(addresses.usuperc20Factory).toBeUndefined()
+    expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
-  it('registers one Instant Launch generation with the redeploy pool shape', () => {
+  it('registers one Instant Launch generation', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
     expect(deployments).toHaveLength(2)
     const [on, off] = deployments
@@ -330,7 +332,8 @@ describe('Arc (5042) deployment', () => {
     expect(off!.creatorFeesEnabled).toBe(false)
     for (const variant of [on!, off!]) {
       expect(variant.tickSpacing).toBe(25)
-      expect(variant.initialTick).toBe(198050)
+      expect(variant.initialTick).toBe(122050)
+      expect(variant.initialTick % variant.tickSpacing).toBe(0)
       expect(variant.minLaunchTick).toBe(-160100)
     }
     expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })?.strategy).toBe(
@@ -404,7 +407,9 @@ describe('creator-fees position recipient', () => {
   })
 
   it('rejects an unknown recipient and a wrong chain', () => {
-    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')).toBe(false)
+    expect(
+      isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')
+    ).toBe(false)
     expect(isCreatorFeesPositionRecipient(SupportedChainId.MAINNET, FEES_ON_SPLITTER)).toBe(false)
   })
 })
@@ -437,7 +442,9 @@ describe('autocompound position recipient', () => {
   it('isAutocompoundPositionRecipient recognizes the fees-off splitter, case-insensitively', () => {
     expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER)).toBe(true)
     expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER.toLowerCase())).toBe(true)
-    expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER.toUpperCase().replace('0X', '0x'))).toBe(true)
+    expect(
+      isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER.toUpperCase().replace('0X', '0x'))
+    ).toBe(true)
   })
 
   it('rejects the fees-enabled splitter — that one is the creator-fees recipient', () => {
@@ -457,7 +464,9 @@ describe('autocompound position recipient', () => {
   })
 
   it('rejects an unknown recipient and a wrong chain', () => {
-    expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')).toBe(false)
+    expect(
+      isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')
+    ).toBe(false)
     expect(isAutocompoundPositionRecipient(SupportedChainId.MAINNET, FEES_OFF_SPLITTER)).toBe(false)
   })
 })

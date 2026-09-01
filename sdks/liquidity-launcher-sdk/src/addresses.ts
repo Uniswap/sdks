@@ -81,6 +81,8 @@ const TOKEN_SPLITTER_ROBINHOOD = getAddress('0x4F5E3FBb9745358A92Da5674305FAb8D2
 // Ethereum-style chains that deploy it; the super-uERC20 factory shares one across the superchains.
 const UERC20_FACTORY = getAddress('0x000000e200088D55C39a11F609E5F667729ad49b')
 const USUPERC20_FACTORY = getAddress('0xeEeeEEE204Afb6BABb1287ffed52cCD6BA0b0fb2')
+// Arc's uERC20 factory is not at the shared CREATE2 address.
+const UERC20_FACTORY_ARC = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
 
 // Canonical Uniswap v4 PositionManager per chain (sdk-core CHAIN_TO_ADDRESSES_MAP[id].v4PositionManagerAddress).
 const POSITION_MANAGER_MAINNET = getAddress('0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e')
@@ -170,8 +172,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     universalRouterStrategy: UNIVERSAL_ROUTER_STRATEGY_ARC,
-    // No token factory on 5042 (neither the uERC20 nor the super-uERC20 CREATE2 address has code),
-    // so Arc supports launches with pre-existing tokens only.
+    uerc20Factory: UERC20_FACTORY_ARC,
     positionManager: POSITION_MANAGER_ARC,
   },
   [SupportedChainId.SEPOLIA]: {
@@ -347,15 +348,10 @@ const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0xd35E9CA72F64C7F93BE30fa
 // autocompound claim surface of the older generations' splitters.
 const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a')
 
-// Arc (5042) Instant Launch stack — a single generation so far, deployed alongside the chain's
-// launcher stack. Same pool shape as the Robinhood 2026-08-05 full redeploy (TICK_SPACING 25,
-// initialTick 198,050, MIN_LAUNCH_TICK -160,100 — read back from the deployed strategies' getters)
-// and the same split table (fees-on: 40% native to the vault, 60% native + 100% token
-// autocompounding; fees-off: 100% of both sides autocompounding — read back via getSplits()).
-// Variant identification verified on-chain: the fees-on strategy's beneficiaryVault() is the Arc
-// vault below, the fees-off strategy's is address(0).
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC = getAddress('0x26e7803154f31540185f13c7540B0148F8F0De4b')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC = getAddress('0xe510927f92c1E66a9E655E1D73F4367125E04EFF')
+// Arc (5042) Instant Launch stack. Arc's native currency is 18-decimal USDC, so initialTick is
+// USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated 198,050.
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 const UERC20_BENEFICIARY_VAULT_ARC = getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af')
@@ -580,10 +576,10 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
     tickSpacing: 25,
-    initialTick: 198050,
+    initialTick: 122050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch with creator fees (Arc/5042 initial stack, current): same pool shape as the 2026-08-05 Robinhood redeploy, pinned to the re-mined LiquidityLauncher; FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc CompoundingClaimRecipient',
+      'Instant Launch with creator fees (Arc/5042, current): native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ARC,
@@ -593,10 +589,10 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
     tickSpacing: 25,
-    initialTick: 198050,
+    initialTick: 122050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch without creator fees (Arc/5042 initial stack, current): same pool shape as the 2026-08-05 Robinhood redeploy, pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
+      'Instant Launch without creator fees (Arc/5042, current): native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
   },
 ]
 
