@@ -157,7 +157,7 @@ jobs:
           # changed and the CLI crashes at load ("Export named
           # 'StdioServerTransport' not found"). Never `@latest` —
           # would silently absorb upstream changes mid-PR.
-          version: ${{ vars.REVIEW_CLI_VERSION || '1.6.0' }}
+          version: ${{ vars.REVIEW_CLI_VERSION || '1.10.6' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Gate — `review-cli triage --from-github-actions` reads
@@ -287,7 +287,7 @@ jobs:
         id: install-review-cli
         uses: ./.github/actions/install_review_cli
         with:
-          version: ${{ vars.REVIEW_CLI_VERSION || '1.6.0' }}
+          version: ${{ vars.REVIEW_CLI_VERSION || '1.10.6' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Fail fast if the OAuth token is missing — without it
