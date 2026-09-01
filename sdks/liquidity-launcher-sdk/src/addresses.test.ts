@@ -32,27 +32,32 @@ describe('getLauncherAddresses', () => {
     expect(addresses?.lbpStrategy).toBe(getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'))
   })
 
-  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood', () => {
+  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood and Arc', () => {
     const sharedLauncher = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
     for (const chainId of Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')) {
-      if (chainId === SupportedChainId.ROBINHOOD) continue
+      if (chainId === SupportedChainId.ROBINHOOD || chainId === SupportedChainId.ARC) continue
       expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(sharedLauncher)
     }
   })
 
-  it('scopes the 2026-08-05 full-redeploy launcher to Robinhood (4663) in both registries', () => {
+  it('scopes the redeployed launcher to Robinhood (4663) and Arc (5042) in both registries', () => {
     const redeployLauncher = getAddress('0x0000FffFBE8efE702c8703aE3477FF5dE3d319C0')
-    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(redeployLauncher)
-    expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(redeployLauncher)
+    for (const chainId of [SupportedChainId.ROBINHOOD, SupportedChainId.ARC]) {
+      expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(redeployLauncher)
+      expect(getInstantLaunchContracts(chainId)?.liquidityLauncher).toBe(redeployLauncher)
+    }
   })
 
   it('returns undefined for an unsupported chain', () => {
     expect(getLauncherAddresses(999999)).toBeUndefined()
   })
 
-  it('carries the UniversalRouterStrategy only where it is deployed (4663 so far)', () => {
+  it('carries the UniversalRouterStrategy only where it is deployed (4663 and 5042 so far)', () => {
     expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.universalRouterStrategy).toBe(
       getAddress('0x1242c9439d589cAE85E121B1f79f2aF51e91DCEE')
+    )
+    expect(getLauncherAddresses(SupportedChainId.ARC)?.universalRouterStrategy).toBe(
+      getAddress('0x0A122717bc36E3C7A7958128a5C789E0b070b3Ae')
     )
     expect(getLauncherAddresses(SupportedChainId.MAINNET)?.universalRouterStrategy).toBeUndefined()
   })
@@ -287,6 +292,69 @@ describe('Instant Launch deployment registry', () => {
       expect(launcherEntry).toBeDefined()
       expect(INSTANT_LAUNCH_CONTRACTS[chainId]!.liquidityLauncher).toBe(launcherEntry!.liquidityLauncher)
     }
+  })
+})
+
+describe('Arc (5042) deployment', () => {
+  // Independent literals from the chain-5042 deploy log, verified on-chain (2026-09-01): variant
+  // identity via beneficiaryVault() (fees-on = the Arc vault, fees-off = address(0)), splitter
+  // wiring via feeSplitter() + getSplits(), pool shape via TICK_SPACING/initialTick/MIN_LAUNCH_TICK
+  // getters, and the ccaFactory via LBPStrategy.initializerFactory().
+  const ARC_FEES_ON_STRATEGY = getAddress('0x26e7803154f31540185f13c7540B0148F8F0De4b')
+  const ARC_FEES_OFF_STRATEGY = getAddress('0xe510927f92c1E66a9E655E1D73F4367125E04EFF')
+  const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
+  const ARC_FEES_OFF_SPLITTER = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
+
+  it('carries the Arc launcher stack', () => {
+    const addresses = getLauncherAddresses(SupportedChainId.ARC)!
+    expect(addresses.lbpStrategy).toBe(getAddress('0xe9f36bcc222a6d2e459529D787f8c060d543A000'))
+    // Arc keeps the shared TokenSplitter, unlike Robinhood's full-redeploy one.
+    expect(addresses.tokenSplitter).toBe(getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd'))
+    expect(addresses.positionManager).toBe(getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B'))
+  })
+
+  it('supports pre-existing-token launches only (no token factory on 5042)', () => {
+    expect(selectTokenFactory(getLauncherAddresses(SupportedChainId.ARC)!)).toBeUndefined()
+  })
+
+  it('registers one Instant Launch generation with the redeploy pool shape', () => {
+    const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
+    expect(deployments).toHaveLength(2)
+    const [on, off] = deployments
+    expect(on!.strategy).toBe(ARC_FEES_ON_STRATEGY)
+    expect(on!.feeSplitter).toBe(ARC_FEES_ON_SPLITTER)
+    expect(on!.creatorFeesEnabled).toBe(true)
+    expect(on!.creatorFeeNativeBps).toBe(4000)
+    expect(off!.strategy).toBe(ARC_FEES_OFF_STRATEGY)
+    expect(off!.feeSplitter).toBe(ARC_FEES_OFF_SPLITTER)
+    expect(off!.creatorFeesEnabled).toBe(false)
+    for (const variant of [on!, off!]) {
+      expect(variant.tickSpacing).toBe(25)
+      expect(variant.initialTick).toBe(198050)
+      expect(variant.minLaunchTick).toBe(-160100)
+    }
+    expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })?.strategy).toBe(
+      ARC_FEES_ON_STRATEGY
+    )
+    expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: false })?.strategy).toBe(
+      ARC_FEES_OFF_STRATEGY
+    )
+  })
+
+  it('carries the Arc singletons (vault, compounding recipient)', () => {
+    const contracts = getInstantLaunchContracts(SupportedChainId.ARC)
+    expect(contracts?.beneficiaryVault).toBe(getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af'))
+    expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db'))
+  })
+
+  it('resolves the Arc position recipients per variant', () => {
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_ON_SPLITTER)
+    expect(getAutocompoundPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_OFF_SPLITTER)
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_ON_SPLITTER)).toBe(true)
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_OFF_SPLITTER)).toBe(false)
+    expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, ARC_FEES_OFF_SPLITTER)).toBe(true)
+    // Chain-scoped: the Robinhood splitters never classify on Arc.
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, FEES_ON_SPLITTER_20260805)).toBe(false)
   })
 })
 
