@@ -5,6 +5,9 @@ import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { TPool } from './TPool'
 
+// `Pair.involvesToken` and `V3Pool.involvesToken` only accept a `Token`, so calling `involvesToken`
+// on the `TPool` union with a bare `Currency` (e.g. native ETH from `route.path`) fails to
+// typecheck. This checks the same token0/token1 membership but against any `Currency`.
 const poolInvolvesCurrency = (pool: TPool, currency: Currency): boolean =>
   pool.token0.equals(currency) || pool.token1.equals(currency)
 
