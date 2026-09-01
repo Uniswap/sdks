@@ -175,6 +175,10 @@ export abstract class SwapRouter {
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
    * refund, and safeMode sweeps itself.
+   *
+   * Amount convention: on `EXACT_INPUT`, `spec.routing.quote` is the GROSS output (before fees).
+   * The fee cascade is deducted from it when sizing the sweep floor; passing a net
+   * (post-fee) quote double-counts the fees and floors the sweep below the real minimum.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
