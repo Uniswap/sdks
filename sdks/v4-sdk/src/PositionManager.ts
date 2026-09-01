@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency, Token } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -11,11 +11,13 @@ import invariant from 'tiny-invariant'
 import {
   EMPTY_BYTES,
   CANNOT_BURN,
+  CANNOT_COMBINE_NATIVE_OPTIONS,
   NATIVE_NOT_SET,
   NO_SQRT_PRICE,
   ONE,
   OPEN_DELTA,
   PositionFunctions,
+  SETTLE_CURRENCY_NOT_IN_POOL,
   ZERO,
   ZERO_LIQUIDITY,
 } from './internalConstants'
@@ -75,6 +77,17 @@ export interface CommonAddLiquidityOptions {
    * Whether to spend ether. If true, one of the currencies must be the NATIVE currency.
    */
   useNative?: NativeCurrency
+
+  /**
+   * Settle one pool currency from native value attached to the call (payer = spender,
+   * not the user) instead of pulling it via Permit2 — for currencies that are an ERC20
+   * predeploy backed 1:1 by the native balance, so native `value` sent to the spender
+   * credits its token balance. The pool key is UNCHANGED: the currency keeps its ERC20
+   * address (this does NOT make it a native pool, unlike `useNative`).
+   * `nativeDecimals` is the chain's native decimals; msg.value is scaled from
+   * `currency.decimals` up to `nativeDecimals`.
+   */
+  settleFromNativeValue?: { currency: Token; nativeDecimals: number }
 
   /**
    * The optional permit2 batch permit parameters for spending token0 and token1
@@ -229,6 +242,7 @@ export abstract class V4PositionManager {
      * then,
      * - if is mint, encode MINT_POSITION. If migrating, encode a SETTLE and SWEEP for both currencies. Else, encode a SETTLE_PAIR. If on a NATIVE pool, encode a SWEEP.
      * - else, encode INCREASE_LIQUIDITY and CLOSE_CURRENCY for each token (handles accrued fees). If on a NATIVE pool, encode a SWEEP.
+     * - if settleFromNativeValue is set (mint or increase), encode a SETTLE (payer = position manager, funded by msg.value) for that currency, a SETTLE (payer = user) for the other currency, and a SWEEP refund.
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
@@ -297,6 +311,32 @@ export abstract class V4PositionManager {
       // recipient will be same as the v4 lp token recipient
       planner.addSweep(options.useNative ? position.pool.currency0.wrapped : position.pool.currency0, options.recipient)
       planner.addSweep(position.pool.currency1, options.recipient)
+    } else if (options.settleFromNativeValue) {
+      const { currency: nativeErc20, nativeDecimals } = options.settleFromNativeValue
+      invariant(!options.useNative, CANNOT_COMBINE_NATIVE_OPTIONS)
+      invariant(
+        position.pool.currency0.equals(nativeErc20) || position.pool.currency1.equals(nativeErc20),
+        SETTLE_CURRENCY_NOT_IN_POOL
+      )
+      const isCurrency0 = position.pool.currency0.equals(nativeErc20)
+      const otherCurrency = isCurrency0 ? position.pool.currency1 : position.pool.currency0
+      const nativeErc20AmountMax = isCurrency0 ? maximumAmounts.amount0 : maximumAmounts.amount1
+
+      // Settle the native-backed ERC20 leg from the spender's own balance (funded by msg.value).
+      // No amount argument means the full delta owed is settled.
+      planner.addSettle(nativeErc20, /* payerIsUser */ false)
+      // Settle the other leg from the user via permit2, like SETTLE_PAIR would.
+      planner.addSettle(otherCurrency, /* payerIsUser */ true)
+      // Refund any unused native-backed ERC20 from the slippage-adjusted maximum value.
+      planner.addSweep(nativeErc20, MSG_SENDER)
+
+      // msg.value is denominated in native decimals; the owed amount is in the currency's decimals, so scale up
+      value = toHex(
+        JSBI.multiply(
+          nativeErc20AmountMax,
+          JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(nativeDecimals - nativeErc20.decimals))
+        )
+      )
     } else {
       if (isMint(options)) {
         // Mint: the user can never be owed a token when minting (delta is always >= 0), so SETTLE_PAIR is safe
