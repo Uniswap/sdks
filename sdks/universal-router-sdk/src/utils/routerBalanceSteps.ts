@@ -64,6 +64,19 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
   ]
 }
 
+function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
+  switch (step.type) {
+    case 'V2_SWAP_EXACT_IN':
+    case 'V3_SWAP_EXACT_IN':
+      return { ...step, amountIn: CONTRACT_BALANCE.toString() }
+    case 'V4_SWAP':
+      return { ...step, v4Actions: applyToV4Actions(step.v4Actions, tokenAddress) }
+    default:
+      // validateEncodeSwaps refuses exact-out and unexpected shapes before this runs
+      invariant(false, 'ROUTER_BALANCE_INPUT_UNSUPPORTED_STEP')
+  }
+}
+
 /**
  * Rewrites the first hop of a step plan to spend the router's entire input-token balance:
  * v2/v3 exact-in amounts become the CONTRACT_BALANCE sentinel; a v4 first step settles
@@ -78,19 +91,33 @@ export function applyRouterBalanceInputToSteps(swapSteps: SwapStep[], inputToken
   const first = swapSteps[0]
   invariant(first !== undefined && stepSpendsToken(first, tokenAddress), 'ROUTER_BALANCE_INPUT_FIRST_STEP')
 
-  let transformed: SwapStep
-  switch (first.type) {
-    case 'V2_SWAP_EXACT_IN':
-    case 'V3_SWAP_EXACT_IN':
-      transformed = { ...first, amountIn: CONTRACT_BALANCE.toString() }
-      break
-    case 'V4_SWAP':
-      transformed = { ...first, v4Actions: applyToV4Actions(first.v4Actions, tokenAddress) }
-      break
-    default:
-      // validateEncodeSwaps refuses exact-out and native shapes before this runs
-      invariant(false, 'ROUTER_BALANCE_INPUT_UNSUPPORTED_STEP')
-  }
+  return [rewriteSpendingStep(first, tokenAddress), ...swapSteps.slice(1)]
+}
 
-  return [transformed, ...swapSteps.slice(1)]
+/**
+ * Native-input variant: the plan leads with the route's WRAP_ETH, which is resized to wrap
+ * the router's entire native balance (attached msg.value plus any stray ETH, so no value
+ * is left behind — UR never refunds msg.value); the wrapped-token hop that follows then
+ * spends CONTRACT_BALANCE like an ERC20 balance swap.
+ *
+ * `validateEncodeSwaps` guarantees steps[0] is a router-recipient WRAP_ETH and exactly one
+ * later step spends the wrapped token.
+ */
+export function applyNativeRouterBalanceInputToSteps(swapSteps: SwapStep[], wrappedTokenAddress: string): SwapStep[] {
+  const tokenAddress = wrappedTokenAddress.toLowerCase()
+  const wrap = swapSteps[0]
+  invariant(wrap !== undefined && wrap.type === 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
+
+  const spenderIndex = swapSteps.findIndex((step, index) => index > 0 && stepSpendsToken(step, tokenAddress))
+  invariant(spenderIndex > 0, 'ROUTER_BALANCE_INPUT_FIRST_STEP')
+
+  return swapSteps.map((step, index) => {
+    if (index === 0) {
+      return { ...wrap, amount: CONTRACT_BALANCE.toString() }
+    }
+    if (index === spenderIndex) {
+      return rewriteSpendingStep(step, tokenAddress)
+    }
+    return step
+  })
 }

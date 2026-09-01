@@ -1893,20 +1893,76 @@ describe('encodeSwaps', () => {
       ).to.throw('ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
     })
 
-    it('rejects native input', () => {
+    const nativeRouting = {
+      inputToken: ETH,
+      outputToken: USDC,
+      amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+      quote: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+    }
+    const nativeSteps = (): SwapStep[] => [
+      { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1000000000000000000' },
+      buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC]),
+    ]
+
+    it('rejects a native input whose plan does not lead with WRAP_ETH', () => {
       expect(() =>
-        validateEncodeSwaps(
-          buildSpec(
-            { routerBalanceInput: {} },
-            {
-              inputToken: ETH,
-              amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
-              quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
-            }
-          ),
-          [buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, WETH])]
-        )
+        validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [
+          buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC]),
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
+    })
+
+    it('rejects a native plan with a second WRAP_ETH', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [
+          ...nativeSteps(),
+          { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1' },
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_DUPLICATE_WRAP')
+    })
+
+    it('rejects a WRAP_ETH step in an ERC20 balance plan', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec(), [
+          buildV3ExactInStep(),
+          { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1' },
+        ])
       ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+    })
+
+    it('encodes a native balance swap: full wrap, post-wrap floor, dust sweep, zero value', () => {
+      const result = SwapRouter.encodeSwaps(
+        buildSpec({ routerBalanceInput: { minimumAmount: '990000000000000000' }, chainId: 1 }, nativeRouting),
+        nativeSteps()
+      )
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(result.value).to.equal('0x00')
+      expect(commandTypes).to.deep.equal([
+        CommandType.WRAP_ETH,
+        CommandType.BALANCE_CHECK_ERC20,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+
+      const wrap = defaultAbiCoder.decode(['address', 'uint256'], inputs[0])
+      expect(wrap[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(wrap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+
+      const check = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[1])
+      expect(check[1].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(check[2].toString()).to.equal('990000000000000000')
+
+      const swap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[2])
+      expect(swap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(swap[4]).to.equal(false)
+
+      const dust = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(dust[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(dust[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(dust[2].toString()).to.equal('0')
     })
 
     it('rejects permits', () => {
