@@ -9,7 +9,6 @@ import { fdvUsdToPricePerToken } from './config/price'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
-  PERMANENT_UNLOCK_BLOCK_THRESHOLD,
   QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
   QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS,
   QUICK_LAUNCH_DURATION_SECONDS,
@@ -278,31 +277,36 @@ describe('isPermanentTimelock — timestamp form (create flow)', () => {
   })
 })
 
-describe('isPermanentTimelock — raw-block sentinel form (chain-agnostic serving)', () => {
-  it('accepts an unlock block at the sentinel threshold', () => {
-    expect(isPermanentTimelock({ unlockBlock: PERMANENT_UNLOCK_BLOCK_THRESHOLD })).toBe(true)
+describe('isPermanentTimelock — the horizon is re-derived, not read off the raw block', () => {
+  // A stored unlock block encodes the block time believed when the lock was created. Chain 4663
+  // has one converted at 12 s/block, a day before its 0.1 s cadence was registered: auction
+  // 4663_0xC5EdF1… (2026-07-08), horizon exactly PERMANENT_TIMELOCK_REQUEST_SECONDS / 12. At the
+  // real cadence that is 833 years, so it is finite — matching what the classifier already stored
+  // for it (is_quick_launch = false).
+  const endBlock = 4_731_535n
+  const unlockBlock = endBlock + PERMANENT_TIMELOCK_REQUEST_SECONDS / 12n
+
+  it('reports a mis-converted legacy horizon as finite, on the chain it actually runs at', () => {
+    expect(isPermanentTimelock({ chainId: SupportedChainId.ROBINHOOD, endBlock, unlockBlock })).toBe(false)
   })
 
-  it('rejects an unlock block one below the sentinel threshold', () => {
-    expect(isPermanentTimelock({ unlockBlock: PERMANENT_UNLOCK_BLOCK_THRESHOLD - 1n })).toBe(false)
+  it('accepts the same request converted at the correct cadence', () => {
+    const correct = endBlock + PERMANENT_TIMELOCK_REQUEST_SECONDS * 10n // 0.1 s/block
+    expect(isPermanentTimelock({ chainId: SupportedChainId.ROBINHOOD, endBlock, unlockBlock: correct })).toBe(true)
   })
 
-  it('accepts a legacy max-uint256 sentinel unlock block', () => {
-    expect(isPermanentTimelock({ unlockBlock: 2n ** 256n - 1n })).toBe(true)
-  })
-
-  it('rejects an ordinary near-term unlock block', () => {
-    expect(isPermanentTimelock({ unlockBlock: 25_000_000n })).toBe(false)
+  it('accepts a permanent lock on a slow chain, where the raw block number is small', () => {
+    const end = 21_000_000n
+    const unlock =
+      end + BigInt(Math.ceil(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / getBlockTimeSeconds(SupportedChainId.MAINNET)))
+    expect(unlock).toBeLessThan(3_000_000_000n) // ~2.6e9 blocks — no raw-block bound could see this
+    expect(isPermanentTimelock({ chainId: SupportedChainId.MAINNET, endBlock: end, unlockBlock: unlock })).toBe(true)
   })
 })
 
 describe('isPermanentTimelock — burn is structurally permanent', () => {
   it('accepts a burn lock at unlock block 0 (block form), as burn rows carry', () => {
     expect(isPermanentTimelock({ lockMode: 'burn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(true)
-  })
-
-  it('accepts a burn lock at unlock block 0 (sentinel form)', () => {
-    expect(isPermanentTimelock({ lockMode: 'burn', unlockBlock: 0n })).toBe(true)
   })
 
   it('accepts a burn lock regardless of the timestamp horizon', () => {
@@ -313,7 +317,9 @@ describe('isPermanentTimelock — burn is structurally permanent', () => {
     expect(isPermanentTimelock({ lockMode: 'buybackBurn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(
       false
     )
-    expect(isPermanentTimelock({ lockMode: 'timelock', unlockBlock: 0n })).toBe(false)
+    expect(isPermanentTimelock({ lockMode: 'timelock', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(
+      false
+    )
   })
 })
 
@@ -322,9 +328,6 @@ describe('isPermanentTimelock — creatorFees is structurally permanent', () => 
     expect(isPermanentTimelock({ lockMode: 'creatorFees', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(true)
   })
 
-  it('accepts a creatorFees position at unlock block 0 (sentinel form)', () => {
-    expect(isPermanentTimelock({ lockMode: 'creatorFees', unlockBlock: 0n })).toBe(true)
-  })
 
   it('exposes the structural set: burn and creatorFees only', () => {
     expect([...STRUCTURALLY_PERMANENT_LOCK_MODES].sort()).toEqual(['burn', 'creatorFees'])
