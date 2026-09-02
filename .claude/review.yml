@@ -13,7 +13,7 @@
 # selects the model (see resolve-model.ts priority order: CLI
 # override > frontmatter pin > config default > sonnet fallback).
 model:
-  default: claude-opus-4-8
+  default: claude-opus-5
 
 # Per-agent budget — soft cap. Same value as universe/backend so
 # investigations on cross-package SDK changes aren't budget-starved.
