@@ -177,11 +177,17 @@ export class UniswapTrade implements Command {
       if (this.trade.tradeType !== TradeType.EXACT_INPUT) {
         throw new Error('routerBalanceInput requires TradeType.EXACT_INPUT')
       }
-      // CONTRACT_BALANCE resolves to the router's whole balance at execution, so it cannot
-      // address two legs of the same currency: the first would drain it and the second
-      // would resolve to zero.
-      if (this.trade.swaps.length > 1) {
-        throw new Error('routerBalanceInput does not support split routes')
+      // Split routes: CONTRACT_BALANCE resolves to the router's whole balance,
+      // so exactly ONE leg (the largest, encoded last) spends it; the other
+      // legs keep their quoted amounts from router custody. With a native
+      // input every leg must consume the wrapped token, since the single
+      // WRAP_ETH funds them all.
+      if (
+        this.trade.swaps.length > 1 &&
+        this.trade.inputAmount.currency.isNative &&
+        this.trade.swaps.some((swap) => (swap.route as { pathInput?: Currency }).pathInput?.isNative)
+      ) {
+        throw new Error('routerBalanceInput split routes with a native input require every leg to wrap to WETH')
       }
       if (options.inputTokenPermit) {
         throw new Error('routerBalanceInput does not use Permit2; remove inputTokenPermit')
@@ -384,21 +390,44 @@ export class UniswapTrade implements Command {
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
     const routerMustCustody =
-      performAggregatedSlippageCheck || this.outputRequiresTransition || hasFeeOption(this.options)
+      performAggregatedSlippageCheck ||
+      this.outputRequiresTransition ||
+      hasFeeOption(this.options) ||
+      // Balance-swap splits: the remainder leg's output varies with delivery,
+      // so the minimum is enforced on the aggregate sweep, never per leg.
+      (!!this.options.routerBalanceInput && this.trade.swaps.length > 1)
 
-    for (const swap of this.trade.swaps) {
+    // Balance-swap splits: the fixed legs run first with their quoted amounts
+    // (per-leg options drop routerBalanceInput, so they encode normally from
+    // router custody); the largest leg runs LAST and spends CONTRACT_BALANCE,
+    // absorbing all delivery variance. The fill only reverts when delivery
+    // cannot cover the fixed legs, so the tolerance is the largest leg's share.
+    let swapsInOrder = this.trade.swaps
+    let remainderSwap: (typeof swapsInOrder)[number] | undefined
+    if (this.options.routerBalanceInput && swapsInOrder.length > 1) {
+      remainderSwap = swapsInOrder.reduce((largest, swap) =>
+        swap.inputAmount.greaterThan(largest.inputAmount) ? swap : largest
+      )
+      swapsInOrder = [...swapsInOrder.filter((swap) => swap !== remainderSwap), remainderSwap]
+    }
+
+    for (const swap of swapsInOrder) {
+      const legOptions =
+        remainderSwap !== undefined && swap !== remainderSwap
+          ? { ...this.options, routerBalanceInput: undefined }
+          : this.options
       switch (swap.route.protocol) {
         case Protocol.V2:
-          addV2Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV2Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V3:
-          addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV3Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV4Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
-          addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addMixedSwap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         default:
           throw new Error('UNSUPPORTED_TRADE_PROTOCOL')

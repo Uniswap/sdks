@@ -1991,22 +1991,64 @@ describe('encodeSwaps', () => {
       ).to.throw('ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
     })
 
-    it('rejects split routes: two steps spending the input token', () => {
-      expect(() =>
-        validateEncodeSwaps(balanceSpec(), [
-          buildV3ExactInStep({ amountIn: '100000' }),
-          buildV3ExactInStep({ amountIn: '900000' }, [USDC, DAI, WETH], [500, 3000]),
-        ])
-      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    // Split routes: the fixed legs keep their quoted amounts and the largest
+    // leg is rewritten to CONTRACT_BALANCE and moved last, absorbing all
+    // delivery variance.
+    it('encodes a split: fixed leg first, CONTRACT_BALANCE remainder last', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        // largest leg deliberately FIRST so the reorder is exercised
+        buildV3ExactInStep({ amountIn: '900000' }, [USDC, DAI, WETH], [500, 3000]),
+        buildV3ExactInStep({ amountIn: '100000' }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+      const firstLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(firstLeg[1].toString()).to.equal('100000')
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(remainderLeg[4]).to.equal(false)
     })
 
-    it('rejects plans whose input-spending step is not first', () => {
+    it('accepts a plan whose single spending step is not first', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
+        buildV3ExactInStep({}, [USDC, DAI]),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const spender = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(spender[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+    })
+
+    it('rejects a V4 spender inside a split', () => {
+      const v4Spender: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              {
+                intermediateCurrency: WETH.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+                hookData: '0x',
+              },
+            ],
+            amountIn: '900000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
       expect(() =>
-        validateEncodeSwaps(balanceSpec(), [
-          buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
-          buildV3ExactInStep({}, [USDC, DAI]),
-        ])
-      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+        SwapRouter.encodeSwaps(balanceSpec(), [buildV3ExactInStep({ amountIn: '100000' }), v4Spender])
+      ).to.throw('ROUTER_BALANCE_INPUT_V4_SPLIT_UNSUPPORTED')
     })
 
     it('encodes a v3 balance swap with no ingress and CONTRACT_BALANCE on hop 0', () => {

@@ -149,11 +149,14 @@ describe('routerBalanceInput', () => {
       )
     })
 
-    it('throws on split routes, which cannot share one CONTRACT_BALANCE', () => {
+    // Splits are supported: fixed legs keep their quoted amounts from router
+    // custody, the largest leg runs last and spends CONTRACT_BALANCE, and the
+    // minimum output moves to the aggregate sweep.
+    it('encodes a split: fixed leg first, CONTRACT_BALANCE remainder last, aggregate sweep floor', () => {
       const v3 = V3Trade.createUncheckedTrade({
         route: new V3Route([usdcWethPool], USDC, WETH),
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '500000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(WETH, '250000000000000000'),
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '700000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '350000000000000000'),
         tradeType: TradeType.EXACT_INPUT,
       })
       const pair = new Pair(
@@ -162,9 +165,10 @@ describe('routerBalanceInput', () => {
       )
       const v2 = new V2Trade(
         new V2Route([pair], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, '500000000'),
+        CurrencyAmount.fromRawAmount(USDC, '300000000'),
         TradeType.EXACT_INPUT
       )
+      // larger v3 leg listed second in the trade, but v2 (the fixed leg) must encode first
       const split = new RouterTrade({
         v2Routes: [{ routev2: v2.route, inputAmount: v2.inputAmount, outputAmount: v2.outputAmount }],
         v3Routes: [{ routev3: v3.route, inputAmount: v3.inputAmount, outputAmount: v3.outputAmount }],
@@ -172,9 +176,23 @@ describe('routerBalanceInput', () => {
         mixedRoutes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
-      expect(() => new UniswapTrade(split, balanceInputOptions())).to.throw(
-        /routerBalanceInput does not support split routes/
-      )
+      const result = SwapRouter.swapCallParameters(split, balanceInputOptions())
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.V2_SWAP_EXACT_IN,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+      const fixedLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[0])
+      expect(fixedLeg[1].toString()).to.equal('300000000')
+      // custody: per-leg minimum zero, enforced on the aggregate sweep instead
+      expect(fixedLeg[2].toString()).to.equal('0')
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(BigNumber.from(sweep[2]).gt(0)).to.equal(true)
     })
 
     it('throws when an inputTokenPermit is provided', () => {

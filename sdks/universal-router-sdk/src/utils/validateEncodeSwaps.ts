@@ -158,9 +158,11 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       invariant(swapSteps[0]?.type === 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
     }
 
-    // One CONTRACT_BALANCE cannot address two legs of the same currency: the first drains it
-    // and the second resolves to zero. Exactly one step may spend the (wrapped) input token,
-    // and it must lead the plan, so the transform has an unambiguous hop 0.
+    // At least one step must spend the (wrapped) input token. Splits are
+    // allowed: the transform keeps every spender's quoted amount except the
+    // largest, which is rewritten to CONTRACT_BALANCE and moved last among the
+    // spenders. V4 spenders in a split are refused (their spend amount is not
+    // comparable), which the transform enforces.
     const balanceInputTokenAddress = nativeBalanceInput
       ? spec.routing.inputToken.wrapped.address
       : getCurrencyAddress(spec.routing.inputToken)
@@ -168,7 +170,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     const spenderIndexes = spendableSteps
       .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
       .filter((index) => index >= 0)
-    invariant(spenderIndexes.length === 1 && spenderIndexes[0] === 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    invariant(spenderIndexes.length > 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
     swapSteps.forEach((step, index) => {
       invariant(
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
