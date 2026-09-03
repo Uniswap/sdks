@@ -109,6 +109,15 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & 
   routerBalanceInput?: RouterBalanceInput
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
+  /**
+   * Exact-input only. When true, the settlement floor (SWEEP / UNWRAP_WETH amountMin) is the
+   * trade's minimum output MINUS the portion-fee cascade, so it is what the router actually
+   * holds for the swapper after PAY_PORTION runs. The default keeps the historical floor at the
+   * trade's minimum, which is only correct when the trade's output amount is already net of
+   * fees; callers whose trade carries the GROSS route output (fees paid out of it on-chain)
+   * must set this, or every fill whose fee exceeds the slippage tolerance reverts.
+   */
+  netMinimumAmountOut?: boolean
   safeMode?: boolean
   urVersion?: UniversalRouterVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
   tokenTransferMode?: TokenTransferMode // How input tokens are transferred to the UR (defaults to Permit2). ApproveProxy uses the SwapProxy contract.
@@ -501,9 +510,11 @@ export class UniswapTrade implements Command {
         feeDeduction = BigNumber.from(feeAmount)
       }
 
-      // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-      // Otherwise we continue as expected with the trade's normal expected output
-      if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
+      // Exact output: the fee comes out of the fixed target, so the floor is the target minus the fee.
+      // Exact input: historically the trade's minimum is kept as-is (correct only when the trade's
+      // output is already net of fees); netMinimumAmountOut opts into deducting the cascade so a
+      // gross-output trade floors at what the router really holds after PAY_PORTION.
+      if (this.trade.tradeType === TradeType.EXACT_OUTPUT || this.options.netMinimumAmountOut) {
         minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 
