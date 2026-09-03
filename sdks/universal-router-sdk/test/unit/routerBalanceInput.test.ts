@@ -116,6 +116,16 @@ describe('routerBalanceInput', () => {
       expect(() => new UniswapTrade(nativeTrade, balanceInputOptions())).to.throw(
         /routerBalanceInput with a native input requires a route that wraps to WETH/
       )
+      // With a minimumAmount too: the legacy encoder has no native balance check and the
+      // post-wrap WETH floor lives inside the wrap branch, so this shape must never reach
+      // encode() with the floor silently dropped. The constructor refuses it first.
+      expect(
+        () =>
+          new UniswapTrade(
+            nativeTrade,
+            balanceInputOptions({ routerBalanceInput: { minimumAmount: '990000000000000000' } })
+          )
+      ).to.throw(/routerBalanceInput with a native input requires a route that wraps to WETH/)
     })
 
     it('accepts a native input whose route wraps to WETH', () => {
