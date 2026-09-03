@@ -6,7 +6,7 @@ import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { SwapRouter } from '../../src/swapRouter'
-import { TokenTransferMode } from '../../src/entities/actions/uniswap'
+import { MAX_FEE_RECIPIENTS, TokenTransferMode } from '../../src/entities/actions/uniswap'
 import {
   Fee,
   NormalizedSwapSpecification,
@@ -21,6 +21,8 @@ import {
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
 import { encodeFee1e18 } from '../../src/utils/numbers'
+import { computeEncodeSwapsAmounts } from '../../src/utils/computeEncodeSwapsAmounts'
+import { ENCODE_SWAPS_GOLDEN } from './fixtures/encodeSwapsGolden'
 import {
   CONTRACT_BALANCE,
   ETH_ADDRESS,
@@ -1543,6 +1545,529 @@ describe('encodeSwaps', () => {
           }),
         ])
       ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+  })
+
+  describe('multiple fee recipients', () => {
+    // deliberately not in ascending order, so an implementation that sorted or deduped would fail
+    const RECIPIENT_A = '0xcccccccccccccccccccccccccccccccccccccccc'
+    const RECIPIENT_B = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1'
+    const RECIPIENT_C = '0xdddddddddddddddddddddddddddddddddddddddd'
+    const RECIPIENT_D = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2'
+
+    const portion = (bips: number, recipient: string): Fee => ({
+      kind: 'portion',
+      recipient,
+      fee: new Percent(bips, 10_000),
+    })
+    const flat = (amount: string, recipient: string): Fee => ({ kind: 'flat', recipient, amount })
+
+    const PORTION_A = portion(25, RECIPIENT_A) // 0.25%
+    const PORTION_B = portion(50, RECIPIENT_B) // 0.50%
+    const PORTION_C = portion(75, RECIPIENT_C) // 0.75%
+    const PORTION_D = portion(100, RECIPIENT_D) // 1.00%
+
+    const SLIPPAGE = new Percent(25, 1000)
+
+    function exactInSpec(fee: SwapSpecification['fee'], urVersion: UniversalRouterVersion) {
+      return buildSpec({ fee, urVersion, slippageTolerance: SLIPPAGE })
+    }
+
+    function exactOutSpec(fee: SwapSpecification['fee'], urVersion = UniversalRouterVersion.V2_1_1) {
+      return buildSpec(
+        { tradeType: TradeType.EXACT_OUTPUT, fee, urVersion, slippageTolerance: new Percent(5, 100) },
+        {
+          amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+    }
+
+    const exactOutSteps = () => [
+      buildV3ExactOutStep({ amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), new Percent(5, 100)).toString() }),
+    ]
+
+    function feeCommandIndexes(commandTypes: number[]): number[] {
+      return commandTypes
+        .map((type, index) => ({ type, index }))
+        .filter(
+          ({ type }) =>
+            type === CommandType.PAY_PORTION ||
+            type === CommandType.PAY_PORTION_FULL_PRECISION ||
+            type === CommandType.TRANSFER
+        )
+        .map(({ index }) => index)
+    }
+
+    // the settlement sweep of the output token is the first SWEEP; exact-output adds an input refund after it
+    function settlementSweep(commandTypes: number[], inputs: string[]) {
+      const index = commandTypes.indexOf(CommandType.SWEEP)
+      expect(index, 'expected a settlement SWEEP').to.be.greaterThan(-1)
+      return { index, decoded: defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[index]) }
+    }
+
+    function decodeFeeCommands(calldata: string) {
+      const { commandTypes, inputs } = parseCommands(calldata)
+      return feeCommandIndexes(commandTypes).map((index) => ({
+        type: commandTypes[index],
+        params: defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[index]),
+      }))
+    }
+
+    describe('one recipient is unchanged', () => {
+      it('a one-element array encodes byte-identically to the bare Fee (V2_1_1, exact input)', () => {
+        const single = SwapRouter.encodeSwaps(exactInSpec(PORTION_A, UniversalRouterVersion.V2_1_1), [
+          buildV3ExactInStep(),
+        ])
+        const asArray = SwapRouter.encodeSwaps(exactInSpec([PORTION_A], UniversalRouterVersion.V2_1_1), [
+          buildV3ExactInStep(),
+        ])
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(asArray.value).to.equal(single.value)
+        expect(decodeFeeCommands(asArray.calldata)).to.have.length(1)
+      })
+
+      it('a one-element array encodes byte-identically to the bare Fee (V2_0 bips, exact input)', () => {
+        const single = SwapRouter.encodeSwaps(exactInSpec(PORTION_A, UniversalRouterVersion.V2_0), [
+          buildV3ExactInStep(),
+        ])
+        const asArray = SwapRouter.encodeSwaps(exactInSpec([PORTION_A], UniversalRouterVersion.V2_0), [
+          buildV3ExactInStep(),
+        ])
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(decodeFeeCommands(asArray.calldata)[0].type).to.equal(CommandType.PAY_PORTION)
+      })
+
+      it('a one-element flat array encodes byte-identically to the bare flat Fee (exact output)', () => {
+        const fee = flat('100000000000000000', RECIPIENT_A)
+        const single = SwapRouter.encodeSwaps(exactOutSpec(fee), exactOutSteps())
+        const asArray = SwapRouter.encodeSwaps(exactOutSpec([fee]), exactOutSteps())
+
+        expect(asArray.calldata).to.equal(single.calldata)
+        expect(asArray.value).to.equal(single.value)
+      })
+    })
+
+    describe('command emission', () => {
+      it('emits one PAY_PORTION_FULL_PRECISION per recipient for two recipients', () => {
+        const fees = [PORTION_A, PORTION_B]
+        const result = SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+
+        const cmds = decodeFeeCommands(result.calldata)
+        expect(cmds).to.have.length(2)
+        expect(cmds.map((cmd) => cmd.type)).to.deep.equal([
+          CommandType.PAY_PORTION_FULL_PRECISION,
+          CommandType.PAY_PORTION_FULL_PRECISION,
+        ])
+        expect(cmds.map((cmd) => (cmd.params[0] as string).toLowerCase())).to.deep.equal([
+          WETH.address.toLowerCase(),
+          WETH.address.toLowerCase(),
+        ])
+        expect(cmds.map((cmd) => (cmd.params[1] as string).toLowerCase())).to.deep.equal([RECIPIENT_A, RECIPIENT_B])
+        // The first fee is unscaled; the second is 0.50% / (1 - 0.25%) = 50/9975.
+        expect(cmds.map((cmd) => cmd.params[2].toString())).to.deep.equal([
+          BigNumber.from(encodeFee1e18((PORTION_A as { fee: Percent }).fee)).toString(),
+          BigNumber.from(10).pow(18).mul(50).div(9975).toString(),
+        ])
+      })
+
+      it('two 2000-bps fees on a 100-unit output pay 20 and 20 (second encoded as 25% of remaining)', () => {
+        const fees = [portion(2000, RECIPIENT_A), portion(2000, RECIPIENT_B)]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '100') }
+        )
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        const cmds = decodeFeeCommands(result.calldata)
+        expect(cmds.map((cmd) => cmd.params[2].toString())).to.deep.equal([
+          BigNumber.from(10).pow(17).mul(2).toString(), // 20% of gross
+          BigNumber.from(10).pow(17).mul(25).div(10).toString(), // 25% of the remaining 80
+        ])
+
+        // simulate the sequential on-chain payments: 20 then 20
+        let balance = BigNumber.from(100)
+        const paid = cmds.map((cmd) => {
+          const p = balance.mul(BigNumber.from(cmd.params[2])).div(BigNumber.from(10).pow(18))
+          balance = balance.sub(p)
+          return p.toNumber()
+        })
+        expect(paid).to.deep.equal([20, 20])
+
+        // and the sweep floor deducts exactly 40 of the gross 100
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('60')
+      })
+
+      it('rejects multiple recipients on V2_0, which lacks PAY_PORTION_FULL_PRECISION', () => {
+        const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_0), [buildV3ExactInStep()])
+        ).to.throw('MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1')
+      })
+
+      it('preserves the caller ordering rather than sorting or deduping recipients', () => {
+        const result = SwapRouter.encodeSwaps(
+          exactInSpec([PORTION_C, PORTION_A, PORTION_D, PORTION_B], UniversalRouterVersion.V2_1_1),
+          [buildV3ExactInStep()]
+        )
+
+        expect(decodeFeeCommands(result.calldata).map((cmd) => (cmd.params[1] as string).toLowerCase())).to.deep.equal([
+          RECIPIENT_C,
+          RECIPIENT_A,
+          RECIPIENT_D,
+          RECIPIENT_B,
+        ])
+      })
+
+      it('emits every fee command before the settlement SWEEP', () => {
+        const result = SwapRouter.encodeSwaps(
+          exactInSpec([PORTION_A, PORTION_B, PORTION_C], UniversalRouterVersion.V2_1_1),
+          [buildV3ExactInStep()]
+        )
+
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        const feeIndexes = feeCommandIndexes(commandTypes)
+        expect(feeIndexes).to.have.length(3)
+        expect(settlementSweep(commandTypes, inputs).index).to.be.greaterThan(Math.max(...feeIndexes))
+      })
+    })
+
+    describe('cascade sweep floor', () => {
+      // Oracle for on-chain behavior, independent of how the SDK computed its deduction.
+      function replayEncodedCascade(gross: BigNumber, calldata: string): BigNumber {
+        let balance = gross
+        for (const cmd of decodeFeeCommands(calldata)) {
+          balance = balance.sub(balance.mul(BigNumber.from(cmd.params[2])).div(BigNumber.from(10).pow(18)))
+        }
+        return balance
+      }
+
+      it('sets the exact-input sweep floor to exactly what the sequential encoded portions leave', () => {
+        const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
+        const spec = exactInSpec(fees, UniversalRouterVersion.V2_1_1)
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        const grossMin = exactInputGrossMin(BigNumber.from(spec.routing.quote.quotient.toString()), SLIPPAGE)
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal(
+          replayEncodedCascade(grossMin, result.calldata).toString()
+        )
+        // The cascade pays three wei less than the naive sum here: tighter, never looser.
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('475312500000000003')
+      })
+
+      it('keeps the exact-input sweep floor satisfiable when later rescaled portions capture earlier flooring dust', () => {
+        // Here the cascade pays one wei MORE than the naive sum, so a sum-derived sweep floor would revert a legitimate fill.
+        const fees = [
+          portion(216, RECIPIENT_A),
+          portion(519, RECIPIENT_B),
+          portion(917, RECIPIENT_C),
+          portion(3292, RECIPIENT_D),
+        ]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '533206710') }
+        )
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal(
+          replayEncodedCascade(BigNumber.from('533206710'), result.calldata).toString()
+        )
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('269589314')
+      })
+
+      it('property fuzz: the encoded sweep floor is met by the encoded cascade for random fee sets', () => {
+        // Deterministic PRNG so failures reproduce: encode, decode the portions back out, replay, and require the calldata's own SWEEP floor to match.
+        let seed = 0x5eed >>> 0
+        const rand = () => {
+          seed = (seed + 0x6d2b79f5) >>> 0
+          let t = seed
+          t = Math.imul(t ^ (t >>> 15), t | 1)
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+        const recipients = [RECIPIENT_A, RECIPIENT_B, RECIPIENT_C, RECIPIENT_D]
+
+        for (let run = 0; run < 150; run++) {
+          const count = 1 + Math.floor(rand() * MAX_FEE_RECIPIENTS)
+          const fees: Fee[] = []
+          for (let i = 0; i < count; i++) {
+            // fractional-bps fees in (0, 25%]
+            const denominator = 10_000 + Math.floor(rand() * 9_999_999)
+            const numerator = 1 + Math.floor(rand() * Math.floor(denominator / 4))
+            fees.push({ kind: 'portion', recipient: recipients[i], fee: new Percent(numerator, denominator) })
+          }
+          const quote = BigNumber.from(Math.floor(1 + rand() * Number.MAX_SAFE_INTEGER)).mul(
+            BigNumber.from(10).pow(Math.floor(rand() * 8))
+          )
+          const spec = buildSpec(
+            { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+            { quote: CurrencyAmount.fromRawAmount(WETH, quote.toString()) }
+          )
+
+          const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+          const { commandTypes, inputs } = parseCommands(result.calldata)
+          const floor = BigNumber.from(settlementSweep(commandTypes, inputs).decoded[2])
+          const label = `run ${run}: gross=${quote.toString()} fees=${fees
+            .map((fee) => {
+              const f = (fee as { fee: Percent }).fee
+              return `${f.numerator.toString()}/${f.denominator.toString()}`
+            })
+            .join(',')}`
+
+          expect(floor.toString(), `${label} (exact fill)`).to.equal(
+            replayEncodedCascade(quote, result.calldata).toString()
+          )
+          for (const bonus of [1, 3]) {
+            const remaining = replayEncodedCascade(quote.add(bonus), result.calldata)
+            expect(remaining.gte(floor), `${label} (fill +${bonus} wei leaves ${remaining.toString()})`).to.be.true
+          }
+        }
+      })
+
+      it('computeEncodeSwapsAmounts floors the net min-out at what the encoded cascade leaves', () => {
+        const fees = [
+          portion(216, RECIPIENT_A),
+          portion(519, RECIPIENT_B),
+          portion(917, RECIPIENT_C),
+          portion(3292, RECIPIENT_D),
+        ]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '533206710') }
+        )
+
+        const amounts = computeEncodeSwapsAmounts(spec)
+        expect(amounts.grossMinOrExactAmountOut.toString()).to.equal('533206710')
+        expect(amounts.netMinOrExactAmountOut.toString()).to.equal('269589314')
+      })
+
+      it('refuses three 1/3 portions: together they reach 100% and would pay the swapper nothing', () => {
+        const third = new Percent(1, 3)
+        const fees: Fee[] = [
+          { kind: 'portion', recipient: RECIPIENT_A, fee: third },
+          { kind: 'portion', recipient: RECIPIENT_B, fee: third },
+          { kind: 'portion', recipient: RECIPIENT_C, fee: third },
+        ]
+        const spec = buildSpec(
+          { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
+          { quote: CurrencyAmount.fromRawAmount(WETH, '3') }
+        )
+        expect(() => SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])).to.throw(
+          'Portion fees together exceed 100% of the swap output'
+        )
+      })
+
+      it('deducts strictly more for four recipients than for the first one alone', () => {
+        const oneFloor = parseCommands(
+          SwapRouter.encodeSwaps(exactInSpec([PORTION_A], UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+            .calldata
+        )
+        const fourFloor = parseCommands(
+          SwapRouter.encodeSwaps(
+            exactInSpec([PORTION_A, PORTION_B, PORTION_C, PORTION_D], UniversalRouterVersion.V2_1_1),
+            [buildV3ExactInStep()]
+          ).calldata
+        )
+
+        const one = settlementSweep(oneFloor.commandTypes, oneFloor.inputs).decoded[2]
+        const four = settlementSweep(fourFloor.commandTypes, fourFloor.inputs).decoded[2]
+        expect(BigNumber.from(four).lt(BigNumber.from(one))).to.be.true
+      })
+
+      it('the encoded (rescaled) portions pay each recipient their fraction of gross on-chain', () => {
+        // Simulating the sequential payments with the encoded portions must pay each recipient its gross fraction.
+        const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
+        const spec = exactInSpec(fees, UniversalRouterVersion.V2_1_1)
+        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        const grossMin = exactInputGrossMin(BigNumber.from(spec.routing.quote.quotient.toString()), SLIPPAGE)
+        const encodedPortions = decodeFeeCommands(result.calldata).map((cmd) => BigNumber.from(cmd.params[2]))
+
+        let balance = grossMin
+        encodedPortions.forEach((portionValue, i) => {
+          const paid = balance.mul(portionValue).div(BigNumber.from(10).pow(18))
+          balance = balance.sub(paid)
+          const f = (fees[i] as { fee: Percent }).fee
+          const idealPaid = grossMin.mul(f.numerator.toString()).div(f.denominator.toString())
+          expect(idealPaid.sub(paid).abs().lte(4), `recipient ${i} must receive its fraction of gross`).to.be.true
+        })
+      })
+
+      it('rejects portions that together exceed the output', () => {
+        const fees = [portion(6000, RECIPIENT_A), portion(6000, RECIPIENT_B)]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+    })
+
+    describe('100% total boundary', () => {
+      const P60 = portion(6000, RECIPIENT_A) // 60%
+      const P40 = portion(4000, RECIPIENT_B) // 40%
+      const P40_MINUS_1BPS = portion(3999, RECIPIENT_B) // 39.99%
+      const P40_PLUS_1BPS = portion(4001, RECIPIENT_B) // 40.01%
+
+      it('throws at exactly 100%: the last portion would take the full remaining balance', () => {
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec([P60, P40], UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+
+      it('encodes at 100% - 1 bps with a non-zero sweep floor', () => {
+        const result = SwapRouter.encodeSwaps(exactInSpec([P60, P40_MINUS_1BPS], UniversalRouterVersion.V2_1_1), [
+          buildV3ExactInStep(),
+        ])
+        const cmds = decodeFeeCommands(result.calldata)
+        expect(cmds).to.have.length(2)
+        expect(BigNumber.from(cmds[1].params[2]).lt(BigNumber.from(10).pow(18))).to.be.true
+
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        expect(BigNumber.from(settlementSweep(commandTypes, inputs).decoded[2]).gt(0)).to.be.true
+      })
+
+      it('throws just over 100% (100% + 1 bps)', () => {
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec([P60, P40_PLUS_1BPS], UniversalRouterVersion.V2_1_1), [
+            buildV3ExactInStep(),
+          ])
+        ).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+
+      it('computeEncodeSwapsAmounts throws at exactly 100% instead of returning a zero net output', () => {
+        const spec = buildSpec({ fee: [P60, P40], urVersion: UniversalRouterVersion.V2_1_1 })
+        expect(() => computeEncodeSwapsAmounts(spec)).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+
+      it('computeEncodeSwapsAmounts throws just over 100% instead of underflowing', () => {
+        const spec = buildSpec({ fee: [P60, P40_PLUS_1BPS], urVersion: UniversalRouterVersion.V2_1_1 })
+        expect(() => computeEncodeSwapsAmounts(spec)).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+    })
+
+    describe('byte-identity with pre-multi-fee encoding (golden calldata from main)', () => {
+      // Byte equality against calldata captured from unmodified main (48dea05c) proves the single-fee paths are untouched.
+      const GOLDEN_PORTION: Fee = { kind: 'portion', recipient: FEE_RECIPIENT, fee: new Percent(5, 100) }
+      const GOLDEN_FLAT: Fee = { kind: 'flat', recipient: FEE_RECIPIENT, amount: '100000000000000000' }
+
+      it('single portion fee, exact input, V2_1_1 is byte-identical to main', () => {
+        const mp = SwapRouter.encodeSwaps(
+          buildSpec({ fee: GOLDEN_PORTION, urVersion: UniversalRouterVersion.V2_1_1 }),
+          [buildV3ExactInStep()]
+        )
+        expect(mp.calldata).to.equal(ENCODE_SWAPS_GOLDEN.portionExactInV2_1_1.calldata)
+        expect(mp.value).to.equal(ENCODE_SWAPS_GOLDEN.portionExactInV2_1_1.value)
+      })
+
+      it('single portion fee, exact input, V2_0 (bips) is byte-identical to main', () => {
+        const mp = SwapRouter.encodeSwaps(buildSpec({ fee: GOLDEN_PORTION, urVersion: UniversalRouterVersion.V2_0 }), [
+          buildV3ExactInStep(),
+        ])
+        expect(mp.calldata).to.equal(ENCODE_SWAPS_GOLDEN.portionExactInV2_0.calldata)
+        expect(mp.value).to.equal(ENCODE_SWAPS_GOLDEN.portionExactInV2_0.value)
+      })
+
+      it('single flat fee, exact output is byte-identical to main', () => {
+        const mp = SwapRouter.encodeSwaps(exactOutSpec(GOLDEN_FLAT), exactOutSteps())
+        expect(mp.calldata).to.equal(ENCODE_SWAPS_GOLDEN.flatExactOutV2_1_1.calldata)
+        expect(mp.value).to.equal(ENCODE_SWAPS_GOLDEN.flatExactOutV2_1_1.value)
+      })
+
+      it('no fee, exact input is byte-identical to main', () => {
+        const mp = SwapRouter.encodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [
+          buildV3ExactInStep(),
+        ])
+        expect(mp.calldata).to.equal(ENCODE_SWAPS_GOLDEN.noFeeExactInV2_1_1.calldata)
+        expect(mp.value).to.equal(ENCODE_SWAPS_GOLDEN.noFeeExactInV2_1_1.value)
+      })
+    })
+
+    describe('flat fees on exact output', () => {
+      it('emits one TRANSFER per recipient and settles the summed net amount', () => {
+        const fees = [flat('100000000000000000', RECIPIENT_A), flat('50000000000000000', RECIPIENT_B)]
+        const result = SwapRouter.encodeSwaps(exactOutSpec(fees), exactOutSteps())
+
+        const cmds = decodeFeeCommands(result.calldata)
+        expect(cmds.map((cmd) => cmd.type)).to.deep.equal([CommandType.TRANSFER, CommandType.TRANSFER])
+        expect(cmds.map((cmd) => (cmd.params[1] as string).toLowerCase())).to.deep.equal([RECIPIENT_A, RECIPIENT_B])
+        expect(cmds.map((cmd) => cmd.params[2].toString())).to.deep.equal(['100000000000000000', '50000000000000000'])
+
+        const { commandTypes, inputs } = parseCommands(result.calldata)
+        // flat transfers are absolute, so the deduction is exact rather than an upper bound
+        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('350000000000000000')
+      })
+
+      it('rejects flat fees whose total exceeds the exact output, even when each fits alone', () => {
+        const fees = [flat('300000000000000000', RECIPIENT_A), flat('300000000000000000', RECIPIENT_B)]
+        expect(() => SwapRouter.encodeSwaps(exactOutSpec(fees), exactOutSteps())).to.throw('FLAT_FEE_GT_AMOUNT')
+      })
+    })
+
+    describe('validation', () => {
+      it(`rejects more than ${MAX_FEE_RECIPIENTS} recipients`, () => {
+        const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D, portion(1, FEE_RECIPIENT)]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('TOO_MANY_FEE_RECIPIENTS')
+      })
+
+      it(`accepts exactly ${MAX_FEE_RECIPIENTS} recipients`, () => {
+        const fees = [PORTION_A, PORTION_B, PORTION_C, PORTION_D]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.not.throw()
+      })
+
+      it('rejects an empty fee array', () => {
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec([], UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('AT_LEAST_ONE_FEE_RECIPIENT_REQUIRED')
+      })
+
+      it('rejects a fractional-bips single fee on UR 2.0', () => {
+        const fees: Fee[] = [{ kind: 'portion', recipient: RECIPIENT_B, fee: new Percent(1, 3) }]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_0), [buildV3ExactInStep()])
+        ).to.throw('FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0')
+      })
+
+      it('rejects multiple recipients on UR 2.0 even when every fee is whole bips', () => {
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec([PORTION_A, PORTION_B], UniversalRouterVersion.V2_0), [
+            buildV3ExactInStep(),
+          ])
+        ).to.throw('MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1')
+      })
+
+      it('rejects a portion fee mixed into an exact-output flat fee array', () => {
+        const fees = [flat('100000000000000000', RECIPIENT_A), PORTION_B]
+        expect(() => SwapRouter.encodeSwaps(exactOutSpec(fees), exactOutSteps())).to.throw(
+          'INVALID_PORTION_FEE_TRADE_TYPE'
+        )
+      })
+
+      it('rejects a flat fee mixed into an exact-input portion fee array', () => {
+        const fees = [PORTION_A, flat('1000', RECIPIENT_B)]
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec(fees, UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('INVALID_FLAT_FEE_TRADE_TYPE')
+      })
+
+      it('still requires router custody when any entry in the array is a portion fee', () => {
+        const spec = buildSpec({
+          fee: [PORTION_A, PORTION_B],
+          urVersion: UniversalRouterVersion.V2_1_1,
+          allowDirectTransfers: true,
+          slippageTolerance: SLIPPAGE,
+        })
+        expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({ recipient: TEST_RECIPIENT })])).to.throw(
+          'PORTION_FEE_REQUIRES_ROUTER_CUSTODY'
+        )
+      })
     })
   })
 

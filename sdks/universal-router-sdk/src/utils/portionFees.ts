@@ -17,6 +17,7 @@ const ONE = new Fraction(1)
 export function scalePortionFees(fees: FeeOptions[]): ScaledPortionFee[] {
   let remaining: Fraction = ONE
   return fees.map(({ fee, recipient }) => {
+    if (fee.lessThan(0)) throw new Error('Portion fees cannot be negative')
     // Strictly less: remaining stays positive, so the swapper's sweep is always non-empty.
     if (!fee.lessThan(remaining)) throw new Error('Portion fees together exceed 100% of the swap output')
     const scaled = fee.divide(remaining)

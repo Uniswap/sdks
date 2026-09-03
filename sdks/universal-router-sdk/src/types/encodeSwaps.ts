@@ -13,6 +13,12 @@ export type Fee =
   | { kind: 'portion'; recipient: string; fee: Percent }
   | { kind: 'flat'; recipient: string; amount: BigNumberish }
 
+export type PortionFee = Extract<Fee, { kind: 'portion' }>
+export type FlatFee = Extract<Fee, { kind: 'flat' }>
+
+/** A bare `Fee` encodes as it always has; an array pays one recipient per entry (at most MAX_FEE_RECIPIENTS), each a fraction of GROSS output, all the same `kind`, and >1 portion needs urVersion >= 2.1.1. */
+export type FeeSpecification = Fee | Fee[]
+
 export type SwapSpecification = {
   tradeType: TradeType
   routing: {
@@ -23,7 +29,7 @@ export type SwapSpecification = {
   }
   slippageTolerance: Percent
   recipient?: string // defaults to SENDER_AS_RECIPIENT (0x01); ApproveProxy requires an explicit address
-  fee?: Fee
+  fee?: FeeSpecification
   tokenTransferMode?: TokenTransferMode
   permit?: Permit2Permit
   chainId?: number // required only for ApproveProxy

@@ -37,7 +37,8 @@ import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
 import { applyNativeRouterBalanceInputToSteps, applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
-import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
+import { normalizeEncodeSwapsSpec, toFeeList, toPortionFeeList } from './utils/normalizeEncodeSwapsSpec'
+import { scalePortionFees } from './utils/portionFees'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
@@ -174,6 +175,10 @@ export abstract class SwapRouter {
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
    * refund, and safeMode sweeps itself.
+   *
+   * Amount convention: on `EXACT_INPUT`, `spec.routing.quote` is the GROSS output (before fees).
+   * The fee cascade is deducted from it when sizing the sweep floor; passing a net
+   * (post-fee) quote double-counts the fees and floors the sweep below the real minimum.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
@@ -251,29 +256,31 @@ export abstract class SwapRouter {
       }
     })
 
-    // Fee deducted from gross output before final settlement.
-    // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
-    if (normalizedSpec.fee?.kind === 'portion') {
-      const feeCommandType = isAtLeastV2_1_1(normalizedSpec.urVersion)
-        ? CommandType.PAY_PORTION_FULL_PRECISION
-        : CommandType.PAY_PORTION
-      const encodedFee = isAtLeastV2_1_1(normalizedSpec.urVersion)
-        ? encodeFee1e18(normalizedSpec.fee.fee)
-        : encodeFeeBips(normalizedSpec.fee.fee)
-
-      planner.addCommand(
-        feeCommandType,
-        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, encodedFee],
-        false,
-        normalizedSpec.urVersion
-      )
-    } else if (normalizedSpec.fee?.kind === 'flat') {
-      planner.addCommand(
-        CommandType.TRANSFER,
-        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, normalizedSpec.fee.amount],
-        false,
-        normalizedSpec.urVersion
-      )
+    // One command per recipient ahead of the settlement SWEEP, rescaled from gross fractions so each recipient gets its stated share.
+    const useFullPrecision = isAtLeastV2_1_1(normalizedSpec.urVersion)
+    const scaledPortions = scalePortionFees(toPortionFeeList(normalizedSpec.fee))
+    let portionIndex = 0
+    for (const fee of toFeeList(normalizedSpec.fee)) {
+      if (fee.kind === 'portion') {
+        const scaledFee = scaledPortions[portionIndex++].scaledFee
+        planner.addCommand(
+          useFullPrecision ? CommandType.PAY_PORTION_FULL_PRECISION : CommandType.PAY_PORTION,
+          [
+            getCurrencyAddress(outputToken),
+            fee.recipient,
+            useFullPrecision ? encodeFee1e18(scaledFee) : encodeFeeBips(scaledFee),
+          ],
+          false,
+          normalizedSpec.urVersion
+        )
+      } else {
+        planner.addCommand(
+          CommandType.TRANSFER,
+          [getCurrencyAddress(outputToken), fee.recipient, fee.amount],
+          false,
+          normalizedSpec.urVersion
+        )
+      }
     }
 
     // Assumes routers already normalized final gross output into `routing.outputToken`.

@@ -1,0 +1,13 @@
+---
+'@uniswap/universal-router-sdk': minor
+---
+
+`SwapRouter.encodeSwaps` can now pay a fee to more than one recipient. `SwapSpecification.fee` accepts an array of up to `MAX_FEE_RECIPIENTS` (4) `Fee` entries alongside the single `Fee` it has always accepted; each entry becomes its own command (`PAY_PORTION` / `PAY_PORTION_FULL_PRECISION` for `portion`, `TRANSFER` for `flat`), emitted in the caller's order ahead of the settlement `SWEEP`.
+
+Portion fees have gross-output semantics: each entry's fee means "this fraction of the gross swap output". Since on-chain `PAY_PORTION` pays a portion of the router's *remaining* balance, the encoder rescales fee i via the shared `scalePortionFees` helper to `f_i / (1 - sum(f_0..f_{i-1}))` (exact fraction math), so every recipient receives their stated fraction of gross to within the flooring dust of 1e18 command precision. The rescaled portions are fractional bips and are emitted as `PAY_PORTION_FULL_PRECISION`, so more than one portion fee requires `urVersion` >= 2.1.1 and is rejected with `MULTIPLE_FEE_RECIPIENTS_REQUIRE_UR_V2_1_1` on older versions.
+
+The sweep floor replays the encoded command cascade against the gross minimum output (`computeEncodeSwapsAmounts`, via the shared `simulatePortionFeeDeduction` helper): each command floors against the router's running balance using the exact portion value that gets ABI-encoded, so the floor equals exactly what the router holds after the fees and a fill at the gross minimum always satisfies it. Portion totals exceeding 100% are rejected with `Portion fees together exceed 100% of the swap output` (thrown by `scalePortionFees`) instead of underflowing into ABI encoding. Flat fees are absolute transfers, so their sum is exact by construction; a flat total exceeding the exact output is rejected (`FLAT_FEE_GT_AMOUNT` in `validateEncodeSwaps`, `FEE_TOTAL_GT_AMOUNT_OUT` in `computeEncodeSwapsAmounts`).
+
+Every existing per-fee invariant applies per entry: portion pairs with `EXACT_INPUT`, flat with `EXACT_OUTPUT`, fractional bips require UR >= 2.1.1, and portion fees require router custody under `allowDirectTransfers`. A mixed portion/flat array is rejected by those same invariants. An empty array (`AT_LEAST_ONE_FEE_RECIPIENT_REQUIRED`) and more than `MAX_FEE_RECIPIENTS` entries (`TOO_MANY_FEE_RECIPIENTS`) are rejected in `validateEncodeSwaps`.
+
+Passing a single `Fee` is unchanged: calldata is byte-identical across UR 2.0 / 2.1.1, both trade types, portion and flat fees, `safeMode`, and the `ApproveProxy` wrapper — a single portion needs no rescaling, and for one fee the cascade replay reduces exactly to the previous quantized deduction `floor(gross * encodedFee / SCALE)`.
