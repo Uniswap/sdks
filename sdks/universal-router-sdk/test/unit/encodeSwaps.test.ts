@@ -1846,8 +1846,7 @@ describe('encodeSwaps', () => {
         expect(amounts.netMinOrExactAmountOut.toString()).to.equal('269589314')
       })
 
-      it('rescales three 1/3 portions to 1/3, 1/2, and 1 of the remaining balance', () => {
-        // Three thirds consume the whole output: rescaled to 1/3, 1/2, then 1, paying 0, 1, 2 of a 3-wei gross.
+      it('refuses three 1/3 portions: together they reach 100% and would pay the swapper nothing', () => {
         const third = new Percent(1, 3)
         const fees: Fee[] = [
           { kind: 'portion', recipient: RECIPIENT_A, fee: third },
@@ -1858,17 +1857,9 @@ describe('encodeSwaps', () => {
           { fee: fees, urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
           { quote: CurrencyAmount.fromRawAmount(WETH, '3') }
         )
-
-        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
-        const cmds = decodeFeeCommands(result.calldata)
-        expect(cmds.map((cmd) => cmd.params[2].toString())).to.deep.equal([
-          BigNumber.from(encodeFee1e18(third)).toString(),
-          BigNumber.from(10).pow(18).div(2).toString(),
-          BigNumber.from(10).pow(18).toString(),
-        ])
-
-        const { commandTypes, inputs } = parseCommands(result.calldata)
-        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('0')
+        expect(() => SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])).to.throw(
+          'Portion fees together exceed 100% of the swap output'
+        )
       })
 
       it('deducts strictly more for four recipients than for the first one alone', () => {
@@ -1918,31 +1909,25 @@ describe('encodeSwaps', () => {
     describe('100% total boundary', () => {
       const P60 = portion(6000, RECIPIENT_A) // 60%
       const P40 = portion(4000, RECIPIENT_B) // 40%
+      const P40_MINUS_1BPS = portion(3999, RECIPIENT_B) // 39.99%
       const P40_PLUS_1BPS = portion(4001, RECIPIENT_B) // 40.01%
 
-      it('encodes the last portion as the full remaining balance (1e18) at exactly 100%', () => {
-        const result = SwapRouter.encodeSwaps(exactInSpec([P60, P40], UniversalRouterVersion.V2_1_1), [
-          buildV3ExactInStep(),
-        ])
-
-        const cmds = decodeFeeCommands(result.calldata)
-        expect(cmds).to.have.length(2)
-        expect(cmds[1].params[2].toString()).to.equal(BigNumber.from(10).pow(18).toString())
-
-        const { commandTypes, inputs } = parseCommands(result.calldata)
-        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('0')
+      it('throws at exactly 100%: the last portion would take the full remaining balance', () => {
+        expect(() =>
+          SwapRouter.encodeSwaps(exactInSpec([P60, P40], UniversalRouterVersion.V2_1_1), [buildV3ExactInStep()])
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
-      it('sweeps floor zero at exactly 100% even when the gross does not divide evenly', () => {
-        // At a 100% total the cascade leaves 0, where sum-of-floors would demand 1 wei from an empty router.
-        const spec = buildSpec(
-          { fee: [P60, P40], urVersion: UniversalRouterVersion.V2_1_1, slippageTolerance: new Percent(0, 1) },
-          { quote: CurrencyAmount.fromRawAmount(WETH, '101') }
-        )
-        const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      it('encodes at 100% - 1 bps with a non-zero sweep floor', () => {
+        const result = SwapRouter.encodeSwaps(exactInSpec([P60, P40_MINUS_1BPS], UniversalRouterVersion.V2_1_1), [
+          buildV3ExactInStep(),
+        ])
+        const cmds = decodeFeeCommands(result.calldata)
+        expect(cmds).to.have.length(2)
+        expect(BigNumber.from(cmds[1].params[2]).lt(BigNumber.from(10).pow(18))).to.be.true
 
         const { commandTypes, inputs } = parseCommands(result.calldata)
-        expect(settlementSweep(commandTypes, inputs).decoded[2].toString()).to.equal('0')
+        expect(BigNumber.from(settlementSweep(commandTypes, inputs).decoded[2]).gt(0)).to.be.true
       })
 
       it('throws just over 100% (100% + 1 bps)', () => {
@@ -1953,16 +1938,9 @@ describe('encodeSwaps', () => {
         ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
-      it('computeEncodeSwapsAmounts returns a zero net output at exactly 100% without underflowing', () => {
+      it('computeEncodeSwapsAmounts throws at exactly 100% instead of returning a zero net output', () => {
         const spec = buildSpec({ fee: [P60, P40], urVersion: UniversalRouterVersion.V2_1_1 })
-        const amounts = computeEncodeSwapsAmounts(spec)
-
-        const grossMin = exactInputGrossMin(
-          BigNumber.from(spec.routing.quote.quotient.toString()),
-          spec.slippageTolerance
-        )
-        expect(amounts.grossMinOrExactAmountOut.toString()).to.equal(grossMin.toString())
-        expect(amounts.netMinOrExactAmountOut.toString()).to.equal('0')
+        expect(() => computeEncodeSwapsAmounts(spec)).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
       it('computeEncodeSwapsAmounts throws just over 100% instead of underflowing', () => {
