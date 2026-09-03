@@ -1867,4 +1867,202 @@ describe('encodeSwaps', () => {
       expect(nextSettlement[2].toString()).to.equal(legacySettlement[2].toString())
     })
   })
+
+  describe('routerBalanceInput', () => {
+    const balanceSpec = (overrides: Partial<SwapSpecification> = {}) =>
+      buildSpec({ routerBalanceInput: {}, ...overrides })
+
+    it('rejects the sender-as-recipient sentinel', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec({ recipient: SENDER_AS_RECIPIENT }), [buildV3ExactInStep()])
+      ).to.throw('ROUTER_BALANCE_INPUT_EXPLICIT_RECIPIENT_REQUIRED')
+    })
+
+    it('rejects exact-output trades', () => {
+      expect(() =>
+        validateEncodeSwaps(
+          buildSpec(
+            { routerBalanceInput: {}, tradeType: TradeType.EXACT_OUTPUT },
+            {
+              amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+              quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+            }
+          ),
+          [buildV3ExactOutStep()]
+        )
+      ).to.throw('ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
+    })
+
+    it('rejects native input', () => {
+      expect(() =>
+        validateEncodeSwaps(
+          buildSpec(
+            { routerBalanceInput: {} },
+            {
+              inputToken: ETH,
+              amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+              quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+            }
+          ),
+          [buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, WETH])]
+        )
+      ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+    })
+
+    it('rejects permits', () => {
+      expect(() => validateEncodeSwaps(balanceSpec({ permit: TEST_PERMIT }), [buildV3ExactInStep()])).to.throw(
+        'ROUTER_BALANCE_INPUT_PERMIT_CONFLICT'
+      )
+    })
+
+    it('rejects ApproveProxy', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec({ tokenTransferMode: TokenTransferMode.ApproveProxy, chainId: 1 }), [
+          buildV3ExactInStep(),
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_PROXY_CONFLICT')
+    })
+
+    it('rejects allowDirectTransfers', () => {
+      expect(() => validateEncodeSwaps(balanceSpec({ allowDirectTransfers: true }), [buildV3ExactInStep()])).to.throw(
+        'ROUTER_BALANCE_INPUT_DIRECT_TRANSFERS_CONFLICT'
+      )
+    })
+
+    it('rejects a minimumAmount without chainId', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec({ routerBalanceInput: { minimumAmount: '1000000' } }), [buildV3ExactInStep()])
+      ).to.throw('ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
+    })
+
+    it('rejects split routes: two steps spending the input token', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec(), [
+          buildV3ExactInStep({ amountIn: '100000' }),
+          buildV3ExactInStep({ amountIn: '900000' }, [USDC, DAI, WETH], [500, 3000]),
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    })
+
+    it('rejects plans whose input-spending step is not first', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec(), [
+          buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
+          buildV3ExactInStep({}, [USDC, DAI]),
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    })
+
+    it('encodes a v3 balance swap with no ingress and CONTRACT_BALANCE on hop 0', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [buildV3ExactInStep()])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(result.value).to.equal('0x00')
+      expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+
+      const swap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(swap[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(swap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(swap[4]).to.equal(false)
+
+      const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[1])
+      const expectedGrossMin = exactInputGrossMin(BigNumber.from('500000000000000000'), new Percent(5, 100))
+      expect(sweep[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(sweep[2].toString()).to.equal(expectedGrossMin.toString())
+    })
+
+    it('leads with BALANCE_CHECK_ERC20 when minimumAmount is set', () => {
+      const result = SwapRouter.encodeSwaps(
+        balanceSpec({ routerBalanceInput: { minimumAmount: '999000' }, chainId: 1 }),
+        [buildV3ExactInStep()]
+      )
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.BALANCE_CHECK_ERC20,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+
+      const check = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[0])
+      expect(check[0].toLowerCase()).to.equal(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1).toLowerCase())
+      expect(check[1].toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect(check[2].toString()).to.equal('999000')
+    })
+
+    it('encodes a pure-v4 balance swap as SETTLE(CONTRACT_BALANCE) + open-delta swap', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              {
+                intermediateCurrency: WETH.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+                hookData: '0x',
+              },
+            ],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+          { action: 'TAKE_ALL', currency: WETH.address, minAmount: '0' },
+        ],
+      }
+      // TAKE_ALL is refused outside direct transfers; keep the plan router-custody
+      const routerCustodyStep: V4Swap = { ...step, v4Actions: [step.v4Actions[0]] }
+
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [routerCustodyStep])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.SWEEP])
+
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect(parsed.actions[0].actionName).to.equal('SETTLE')
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(parsed.actions[0].params[2].value).to.equal(false)
+      expect(parsed.actions[1].actionName).to.equal('SWAP_EXACT_IN')
+      const swapParams = parsed.actions[1].params[0].value as any
+      expect(swapParams.amountIn.toString()).to.equal('0')
+    })
+
+    it('rewrites an existing v4 SETTLE of the input token instead of adding a second', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: false },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              {
+                intermediateCurrency: WETH.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+                hookData: '0x',
+              },
+            ],
+            amountIn: '0',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [step])
+      const { inputs } = decodeExecute(result.calldata)
+
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect(parsed.actions.length).to.equal(2)
+      expect(parsed.actions[0].actionName).to.equal('SETTLE')
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+    })
+  })
 })

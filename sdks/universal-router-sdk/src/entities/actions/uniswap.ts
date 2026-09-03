@@ -35,6 +35,7 @@ import {
   CONTRACT_BALANCE,
   ETH_ADDRESS,
   UniversalRouterVersion,
+  UNIVERSAL_ROUTER_ADDRESS,
   isAtLeastV2_1_1,
 } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
@@ -56,6 +57,19 @@ export enum TokenTransferMode {
   ApproveProxy = 'ApproveProxy',
 }
 
+export type RouterBalanceInput = {
+  /**
+   * Optional floor on the router's input-token balance, enforced by a `BALANCE_CHECK_ERC20`
+   * command before any swap runs, so an under-funded router reverts up front rather than
+   * swapping a short amount. Use when the funding amount is guaranteed by the caller.
+   *
+   * This is a distinct guarantee from `slippageTolerance`: the trade-level minimum output
+   * only catches a shortfall large enough to breach it, so a wide tolerance can let an
+   * under-delivery through. This bounds the input side directly.
+   */
+  minimumAmount?: BigNumberish
+}
+
 export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   useRouterBalance?: boolean
   /**
@@ -67,6 +81,23 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
    * Incompatible with native input, inputTokenPermit, and TokenTransferMode.ApproveProxy.
    */
   nativeErc20Input?: boolean
+  /**
+   * Fund the swap from the Universal Router's own balance of the input token, spending
+   * whatever it holds at execution time rather than pulling a fixed amount from a payer
+   * (`payerIsUser = false`, first hop encoded as `CONTRACT_BALANCE`).
+   *
+   * This is for flows where the router is funded by a third party in the same transaction
+   * and the delivered amount is not known when the calldata is built, e.g. a bridge filler
+   * that deposits into the router and swaps atomically. Distinct from `useRouterBalance`,
+   * which keeps the fixed quoted `amountIn`.
+   *
+   * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary),
+   * an ERC20 input, and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported
+   * for v2, v3, v4 and mixed routes.
+   * Incompatible with native input, `inputTokenPermit`, `nativeErc20Input`, and
+   * `TokenTransferMode.ApproveProxy`.
+   */
+  routerBalanceInput?: RouterBalanceInput
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
@@ -76,6 +107,13 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
+
+// The amount encoded for a route's FIRST hop. With routerBalanceInput the router spends
+// whatever it holds at execution time, so the quoted amount is replaced by the
+// CONTRACT_BALANCE sentinel; later hops already use it to chain the intermediate token.
+function firstHopInputAmount(options: SwapOptions, quotedAmountIn: string): BigNumberish {
+  return options.routerBalanceInput ? CONTRACT_BALANCE : quotedAmountIn
+}
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
   route: IRoute<TInput, TOutput, TPool>
@@ -108,6 +146,40 @@ export class UniswapTrade implements Command {
       }
     }
 
+    if (options.routerBalanceInput) {
+      // The router spends a balance a third party funded in the same transaction, so the
+      // amount is unknown at encode time and msg.sender is the funder, not the beneficiary.
+      if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
+        throw new Error(
+          'Explicit recipient address required with routerBalanceInput (SENDER_AS_RECIPIENT resolves to the caller, who is not the swapper)'
+        )
+      }
+      if (this.trade.inputAmount.currency.isNative) {
+        throw new Error('routerBalanceInput requires an ERC20 input token')
+      }
+      if (this.trade.tradeType !== TradeType.EXACT_INPUT) {
+        throw new Error('routerBalanceInput requires TradeType.EXACT_INPUT')
+      }
+      // CONTRACT_BALANCE resolves to the router's whole balance at execution, so it cannot
+      // address two legs of the same currency: the first would drain it and the second
+      // would resolve to zero.
+      if (this.trade.swaps.length > 1) {
+        throw new Error('routerBalanceInput does not support split routes')
+      }
+      if (options.inputTokenPermit) {
+        throw new Error('routerBalanceInput does not use Permit2; remove inputTokenPermit')
+      }
+      if (options.nativeErc20Input) {
+        throw new Error('routerBalanceInput is not supported with nativeErc20Input')
+      }
+      if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
+        throw new Error('routerBalanceInput is not supported with ApproveProxy')
+      }
+      if (options.routerBalanceInput.minimumAmount !== undefined && !options.chainId) {
+        throw new Error('routerBalanceInput.minimumAmount requires chainId to resolve the router address')
+      }
+    }
+
     if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
         throw new Error(
@@ -119,7 +191,8 @@ export class UniswapTrade implements Command {
       this.inputRequiresWrap ||
       this.inputRequiresUnwrap ||
       this.options.useRouterBalance ||
-      this.options.nativeErc20Input
+      this.options.nativeErc20Input ||
+      this.options.routerBalanceInput
     ) {
       this.payerIsUser = false
     } else {
@@ -240,6 +313,18 @@ export class UniswapTrade implements Command {
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
+    // Input floor first, so an under-funded router reverts before any swap runs.
+    const minimumRouterBalance = this.options.routerBalanceInput?.minimumAmount
+    if (minimumRouterBalance !== undefined) {
+      // BALANCE_CHECK_ERC20 reads `owner` verbatim, without the sentinel resolution the
+      // recipient params get, so this must be the router's real address.
+      planner.addCommand(CommandType.BALANCE_CHECK_ERC20, [
+        UNIVERSAL_ROUTER_ADDRESS(this.options.urVersion ?? UniversalRouterVersion.V2_0, this.options.chainId!),
+        (this.trade.inputAmount.currency as Token).address,
+        minimumRouterBalance,
+      ])
+    }
+
     // If the input currency is the native currency, we need to wrap it with the router as the recipient
     if (this.inputRequiresWrap) {
       // TODO: optimize if only one v2 pool we can directly send this to the pool
@@ -414,7 +499,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
     const params: any[] = [
       // if native, we have to unwrap so keep in the router for now
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
-      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
+      firstHopInputAmount(options, trade.maximumAmountIn(options.slippageTolerance).quotient.toString()),
       // if router will custody funds, we do aggregated slippage check from router
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((token) => token.wrapped.address),
@@ -463,7 +548,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   if (tradeType == TradeType.EXACT_INPUT) {
     const params: any[] = [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
-      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
+      firstHopInputAmount(options, trade.maximumAmountIn(options.slippageTolerance).quotient.toString()),
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
       payerIsUser,
@@ -513,8 +598,31 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const perHopSlippage = minHopPriceX36?.map((s) => BigNumber.from(s)) ?? []
 
   const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toV4URVersion(options.urVersion))
-  v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  if (options.routerBalanceInput) {
+    // V4Planner.addTrade would bake the quoted amountIn into the swap action, so build the
+    // pair explicitly instead: SETTLE the router's whole balance, then swap the resulting
+    // open delta. Same shape the mixed-route encoder uses for its v4 sections.
+    const pathInput = trade.route.pathInput
+    v4Planner.addSettle(pathInput, false, CONTRACT_BALANCE)
+    v4Planner.addAction(
+      Actions.SWAP_EXACT_IN,
+      [
+        {
+          currencyIn: pathInput.isNative ? ETH_ADDRESS : pathInput.wrapped.address,
+          path: encodeV4RouteToPath(v4Route),
+          minHopPriceX36: perHopSlippage,
+          amountIn: 0, // open delta: the amount settled above
+          amountOutMinimum: slippageToleranceOnSwap
+            ? trade.minimumAmountOut(slippageToleranceOnSwap).quotient.toString()
+            : 0,
+        },
+      ],
+      toV4URVersion(options.urVersion)
+    )
+  } else {
+    v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toV4URVersion(options.urVersion))
+    v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  }
 
   // Handle split route output consistency:
   // - If output is ETH and some routes output WETH: force all to output WETH, then unwrap
@@ -637,7 +745,11 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
       const v4SectionSlippage: BigNumber[] = sectionHopSlippage?.map((s) => BigNumber.from(s)) ?? []
 
-      v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
+      v4Planner.addSettle(
+        inputToken,
+        payerIsUser && i === 0,
+        (i == 0 ? firstHopInputAmount(options, amountIn) : CONTRACT_BALANCE) as BigNumber
+      )
       v4Planner.addAction(
         Actions.SWAP_EXACT_IN,
         [
@@ -678,7 +790,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     } else if (routePool instanceof V3Pool) {
       const v3Params: any[] = [
         swapRecipient, // recipient
-        i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
+        i == 0 ? firstHopInputAmount(options, amountIn) : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         encodeMixedRouteToPath(subRoute), // path
         payerIsUser && i === 0, // payerIsUser
@@ -688,7 +800,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     } else if (routePool instanceof Pair) {
       const v2Params: any[] = [
         swapRecipient, // recipient
-        i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
+        i === 0 ? firstHopInputAmount(options, amountIn) : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         subRoute.path.map((token) => token.wrapped.address), // path
         payerIsUser && i === 0,
