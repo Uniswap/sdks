@@ -13,13 +13,13 @@ export interface ScaledPortionFee {
 
 const ONE = new Fraction(1)
 
-/** Gross fractions to remaining-balance fractions: scaled_i = f_i / (1 - sum(f_0..f_{i-1})), in exact Fraction arithmetic; throws past 100%. */
+/** Gross fractions to remaining-balance fractions: scaled_i = f_i / (1 - sum(f_0..f_{i-1})), in exact Fraction arithmetic; throws at or past 100%, since a 100% total encodes a swap that pays the swapper nothing. */
 export function scalePortionFees(fees: FeeOptions[]): ScaledPortionFee[] {
   let remaining: Fraction = ONE
   return fees.map(({ fee, recipient }) => {
-    if (fee.greaterThan(remaining)) throw new Error('Portion fees together exceed 100% of the swap output')
-    // remaining can only be 0 here when fee is also 0 (a >0 fee would have thrown above)
-    const scaled = remaining.equalTo(0) ? new Fraction(0) : fee.divide(remaining)
+    // Strictly less: remaining stays positive, so the swapper's sweep is always non-empty.
+    if (!fee.lessThan(remaining)) throw new Error('Portion fees together exceed 100% of the swap output')
+    const scaled = fee.divide(remaining)
     remaining = remaining.subtract(fee)
     return {
       recipient,

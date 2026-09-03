@@ -164,23 +164,25 @@ describe('Fee Encoding', () => {
       expect(paid.map((p) => p.toNumber())).to.deep.equal([20, 0, 20])
     })
 
-    it('a zero fee after a 100% total takes the remaining-balance-is-zero branch without throwing', () => {
-      const scaled = scalePortionFees([
-        { fee: new Percent(1, 1), recipient: A },
-        { fee: new Percent(0, 1), recipient: B },
-      ])
-
-      expect(scaled[0].scaledFee.equalTo(new Percent(1, 1))).to.be.true
-      expect(scaled[1].scaledFee.equalTo(0)).to.be.true
-    })
-
-    it('throws when a positive fee follows a 100% total', () => {
+    it('throws when the fees together reach exactly 100% (the swapper would receive nothing)', () => {
       expect(() =>
         scalePortionFees([
-          { fee: new Percent(1, 1), recipient: A },
-          { fee: new Percent(1, 10_000), recipient: B },
+          { fee: new Percent(50, 100), recipient: A },
+          { fee: new Percent(50, 100), recipient: B },
         ])
       ).to.throw('Portion fees together exceed 100% of the swap output')
+      expect(() => scalePortionFees([{ fee: new Percent(1, 1), recipient: A }])).to.throw(
+        'Portion fees together exceed 100% of the swap output'
+      )
+    })
+
+    it('accepts fees that together leave the swapper a single unit of the output', () => {
+      const scaled = scalePortionFees([
+        { fee: new Percent(5000, 10_000), recipient: A },
+        { fee: new Percent(4999, 10_000), recipient: B },
+      ])
+      // second leg: 0.4999 / 0.5 of the remaining balance
+      expect(scaled[1].scaledFee.equalTo(new Percent(4999, 5000))).to.be.true
     })
   })
 
@@ -267,13 +269,12 @@ describe('Fee Encoding', () => {
       expect(deduction.toString()).to.equal(gross.sub(onchainRemaining(gross, fees, true)).toString())
     })
 
-    it('known adversarial case: 100% total on non-divisible gross 101 deducts everything', () => {
+    it('known adversarial case: a 100% total is refused before it can deduct the whole gross', () => {
       const fees: FeeOptions[] = [
         { fee: new Percent(60, 100), recipient: '0x0000000000000000000000000000000000000001' },
         { fee: new Percent(40, 100), recipient: '0x0000000000000000000000000000000000000002' },
       ]
-      const gross = BigNumber.from(101)
-      expect(simulatePortionFeeDeduction(gross, scalePortionFees(fees), true).toString()).to.equal('101')
+      expect(() => scalePortionFees(fees)).to.throw('Portion fees together exceed 100% of the swap output')
     })
   })
 
@@ -882,15 +883,17 @@ describe('Fee Encoding', () => {
     describe('100% total boundary', () => {
       const SIXTY: FeeOptions = { fee: new Percent(60, 100), recipient: RECIPIENT_A }
       const FORTY: FeeOptions = { fee: new Percent(40, 100), recipient: RECIPIENT_B }
+      const FORTY_LESS_1BPS: FeeOptions = { fee: new Percent(3999, 10_000), recipient: RECIPIENT_B }
       const FORTY_PLUS_1BPS: FeeOptions = { fee: new Percent(4001, 10_000), recipient: RECIPIENT_B }
 
-      it('scalePortionFees encodes the last portion as the full remaining balance at exactly 100%', () => {
-        const scaled = scalePortionFees([SIXTY, FORTY])
-        expect(scaled[1].scaledFee.equalTo(new Percent(1, 1))).to.be.true
-        expect(BigNumber.from(encodeFee1e18(scaled[1].scaledFee)).toString()).to.equal(
-          BigNumber.from(10).pow(18).toString()
-        )
-        expect(BigNumber.from(encodeFeeBips(scaled[1].scaledFee)).toNumber()).to.equal(10_000)
+      it('scalePortionFees throws at exactly 100%: a 1e18 last portion would pay the swapper nothing', () => {
+        expect(() => scalePortionFees([SIXTY, FORTY])).to.throw('Portion fees together exceed 100% of the swap output')
+      })
+
+      it('scalePortionFees accepts 100% - 1 bps and encodes the last portion below 1e18', () => {
+        const scaled = scalePortionFees([SIXTY, FORTY_LESS_1BPS])
+        expect(scaled[1].scaledFee.equalTo(new Percent(3999, 4000))).to.be.true
+        expect(BigNumber.from(encodeFee1e18(scaled[1].scaledFee)).lt(BigNumber.from(10).pow(18))).to.be.true
       })
 
       it('scalePortionFees throws just over 100% (100% + 1 bps)', () => {
@@ -899,29 +902,27 @@ describe('Fee Encoding', () => {
         )
       })
 
-      it('exact input succeeds at exactly 100%: last PAY_PORTION_FULL_PRECISION portion is 1e18', async () => {
-        const methodParameters = SwapRouter.swapCallParameters(
-          buildTrade([await exactInputTrade()]),
-          swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
-        )
-
-        const cmds = feeCommands(methodParameters.calldata)
-        expect(cmds).to.have.length(2)
-        expect(BigNumber.from(cmds[1].params[2].value).toString()).to.equal(BigNumber.from(10).pow(18).toString())
+      it('exact input at exactly 100% is refused at encode time', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        expect(() =>
+          SwapRouter.swapCallParameters(
+            trade,
+            swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
+          )
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
-      it('exact output at exactly 100% deducts the full minimum: sweep floor is zero, no underflow', async () => {
+      it('exact output at exactly 100% is refused at encode time (would sweep a zero floor)', async () => {
         const trade = buildTrade([await exactOutputTrade()])
-        const methodParameters = SwapRouter.swapCallParameters(
-          trade,
-          swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
-        )
-
-        expect(sweepFloor(methodParameters.calldata).toString()).to.equal('0')
+        expect(() =>
+          SwapRouter.swapCallParameters(
+            trade,
+            swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
+          )
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
-      it('exact output at exactly 100% sweeps floor zero even when the gross does not divide evenly', async () => {
-        // At a 100% total the cascade leaves 0, where sum-of-floors would demand 1 wei from an empty router.
+      it('exact output at 100% - 1 bps still produces a positive sweep floor on a non-divisible gross', async () => {
         const trade = buildTrade([
           await V4Trade.fromRoute(
             new V4Route([ETH_USDC_V4], ETHER, USDC),
@@ -931,10 +932,9 @@ describe('Fee Encoding', () => {
         ])
         const methodParameters = SwapRouter.swapCallParameters(
           trade,
-          swapOptions({ fee: [SIXTY, FORTY], urVersion: UniversalRouterVersion.V2_1_1 })
+          swapOptions({ fee: [SIXTY, FORTY_LESS_1BPS], urVersion: UniversalRouterVersion.V2_1_1 })
         )
-
-        expect(sweepFloor(methodParameters.calldata).toString()).to.equal('0')
+        expect(sweepFloor(methodParameters.calldata).gte(0)).to.be.true
       })
 
       it('throws the scalePortionFees error just over 100%', async () => {
@@ -947,17 +947,17 @@ describe('Fee Encoding', () => {
         ).to.throw('Portion fees together exceed 100% of the swap output')
       })
 
-      it('a single 100% fee also encodes as the full balance and succeeds', async () => {
-        const methodParameters = SwapRouter.swapCallParameters(
-          buildTrade([await exactInputTrade()]),
-          swapOptions({
-            fee: [{ fee: new Percent(1, 1), recipient: RECIPIENT_A }],
-            urVersion: UniversalRouterVersion.V2_1_1,
-          })
-        )
-        const cmds = feeCommands(methodParameters.calldata)
-        expect(cmds).to.have.length(1)
-        expect(BigNumber.from(cmds[0].params[2].value).toString()).to.equal(BigNumber.from(10).pow(18).toString())
+      it('a single 100% fee is refused too', async () => {
+        const trade = buildTrade([await exactInputTrade()])
+        expect(() =>
+          SwapRouter.swapCallParameters(
+            trade,
+            swapOptions({
+              fee: [{ fee: new Percent(1, 1), recipient: RECIPIENT_A }],
+              urVersion: UniversalRouterVersion.V2_1_1,
+            })
+          )
+        ).to.throw('Portion fees together exceed 100% of the swap output')
       })
     })
 
