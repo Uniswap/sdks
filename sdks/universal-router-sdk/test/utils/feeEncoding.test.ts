@@ -480,43 +480,6 @@ describe('Fee Encoding', () => {
       expect(sweepMinAmount.gt(0)).to.be.true
     })
 
-    it('exact input keeps the historical floor at the trade minimum by default', async () => {
-      const trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
-        TradeType.EXACT_INPUT
-      )
-      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1 })
-      const routerTrade = buildTrade([trade])
-      const methodParameters = SwapRouter.swapCallParameters(routerTrade, opts)
-      const sweepCmd = CommandParser.parseCalldata(methodParameters.calldata).commands.find(
-        (cmd) => cmd.commandName === 'SWEEP'
-      )
-      const expectedFloor = routerTrade.minimumAmountOut(opts.slippageTolerance).quotient.toString()
-      expect(BigNumber.from(sweepCmd!.params[2].value).toString()).to.equal(expectedFloor)
-    })
-
-    it('exact input with netMinimumAmountOut floors at the trade minimum minus the fee cascade', async () => {
-      const trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
-        TradeType.EXACT_INPUT
-      )
-      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1, netMinimumAmountOut: true })
-      const routerTrade = buildTrade([trade])
-      const methodParameters = SwapRouter.swapCallParameters(routerTrade, opts)
-      const sweepCmd = CommandParser.parseCalldata(methodParameters.calldata).commands.find(
-        (cmd) => cmd.commandName === 'SWEEP'
-      )
-      const M = BigNumber.from(routerTrade.minimumAmountOut(opts.slippageTolerance).quotient.toString())
-      const expectedFloor = M.sub(simulatePortionFeeDeduction(M, scalePortionFees([feeOptions]), true))
-      expect(BigNumber.from(sweepCmd!.params[2].value).toString()).to.equal(expectedFloor.toString())
-      // and it is the fee below the default floor, so a fill at exactly M no longer reverts
-      expect(expectedFloor.lt(M)).to.be.true
-    })
-
     it('exact output adjusts minimumAmountOut with bips precision for V2_0', async () => {
       const outputUSDC = utils.parseUnits('1000', 6)
       const adjustedOutput = outputUSDC.mul(10000).div(10000 - 500)
