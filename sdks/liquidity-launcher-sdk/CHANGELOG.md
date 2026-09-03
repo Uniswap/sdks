@@ -1,5 +1,65 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 1.13.0
+
+### Minor Changes
+
+- 9a52777: Arc (5042): Instant Launch strategy redeploy, uERC20 factory and block time.
+
+  - `INSTANT_LAUNCH_DEPLOYMENTS`: the Arc fees-on / fees-off `InstantLaunchStrategy` pair is now `0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056` / `0xff301aCB22816D210d75D71F31Ac13C771093EF3` with `initialTick` `122050` (Arc's native currency is USDC, so the tick is USDC-denominated: ≈ $5k FDV on 1e9 supply). The previous pair (`0x26e78031…` / `0xe510927f…`, `initialTick` `198050`) is removed. `tickSpacing` 25, `minLaunchTick` -160100, FeeSplitters, vault and claim recipient are unchanged.
+  - `LAUNCHER_ADDRESSES[5042].uerc20Factory` = `0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6`: `selectTokenFactory(5042)` now resolves `{ kind: 'uerc20' }`, and `getInstantLaunchAddresses(5042, …)` / `isInstantLaunchSupportedChain(5042)` resolve.
+  - `BLOCK_TIME_SECONDS_BY_CHAIN[5042]` = `0.5` (measured on-chain; was the 12s default).
+  - `getQuickLaunchFloorPricePerToken` / `getQuickLaunchGraduationPricePerToken`: the price parameter is now `nativeUsdPrice`, the USD price of the chain's native currency (ETH on Robinhood, USDC ≈ 1 on Arc); `ethUsdPrice` is deprecated in favour of `nativeUsdPrice` (positional, so existing callers are unaffected). Docs now say "native currency"; no math changes.
+
+### Patch Changes
+
+- Updated dependencies [9a52777]
+  - @uniswap/sdk-core@7.19.2
+  - @uniswap/v3-sdk@3.31.3
+  - @uniswap/v4-sdk@2.3.3
+
+## 1.12.0
+
+### Minor Changes
+
+- e71b445: Add Arc (5042) to the deployment registries: launcher stack (redeployed LiquidityLauncher, LBPStrategy, shared TokenSplitter, UniversalRouterStrategy, v4 PositionManager) and the Instant Launch generation (fees-on/fees-off strategy + FeeSplitter pairs, UERC20BeneficiaryVault, CompoundingClaimRecipient). Arc deploys no token factory, so new-token launches stay unsupported there (`selectTokenFactory`/`getInstantLaunchAddresses` return undefined); everything else resolves.
+
+## 1.11.0
+
+### Minor Changes
+
+- 79c161c: Launcher pool tick spacing: give the derivation a single source of truth — `max(round(fee / 100), 1)`, one tick of spacing per bip of fee — scoped to the **new v4 pools this launcher opens**.
+
+  - `resolveNewPoolTickSpacing(fee)` (new) — the named entry point. Previously the derivation consulted the v3 `TICK_SPACINGS` table for well-known tiers and fell back to `max(round(2 * fee / 100), 1)`; it now computes `max(round(fee / 100), 1)` directly and no longer consults the v3 table at all (v3's fee→spacing pairs are factory-enforced on-chain and describe v3 pools, not the pools this launcher opens). The `MAX_TICK_SPACING` guard and `INVALID_FEE` rejection are unchanged.
+  - Resolved spacings that change: `500: 10 → 5`, `2500: 50 → 25`, `3000: 60 → 30`, `10000: 200 → 100`; every fee that previously fell through to the doubled fallback halves (e.g. `1234: 25 → 12`). `100 → 1` is unchanged (floor at 1).
+  - Contract: the function decides the spacing a **new** pool is opened with. It must not be used to reconstruct, hash, or look up the key of a pool that already exists — those resolve from the pool's own stored, served, or on-chain key, or by racing the relevant `*_ALLOWED_POOL_TICK_SPACINGS` grandfather set.
+  - `feeToTickSpacing` is now a deprecated alias of `resolveNewPoolTickSpacing`, so existing imports keep working.
+  - `QUICK_LAUNCH_POOL_TICK_SPACING` is now derived from `resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE)` instead of being a hand-maintained literal. Its value is unchanged (25), and it remains exported.
+  - Grandfather sets are unchanged: `QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS` stays `[25, 50]` (pools are permanent; pre-redeploy graduation pools on chain 4663 are reachable only through the `50` entry when no served pool key is available) and `INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS` stays `[25, 60]`. Tests assert each set contains the spacing its mechanism's fee tier resolves to.
+
+  The v3 `TICK_SPACINGS` table is not modified.
+
+## 1.10.0
+
+### Minor Changes
+
+- 4cfb073: Instant Launch: state the post-redeploy pool shape. The 2026-08-05 chain-4663 full redeploy did not re-pin the 3e05da8 InstantLaunchStrategy unchanged — it recompiled it with a new pool shape, which the SDK still described as "unchanged across deploys". All values below were read back from the deployed strategies' getters (`TICK_SPACING()` / `initialTick()` / `MIN_LAUNCH_TICK()`) on both current strategies and all eight pre-redeploy strategies.
+
+  - `INSTANT_LAUNCH_POOL_TICK_SPACING` → `25` (was 60). The current generation's compile-time `TICK_SPACING`; every pre-redeploy generation is 60. Confirmed against live `TokenLaunched` events: post-redeploy launches carry pool keys `(2500, 25, hookless)`.
+  - `INSTANT_LAUNCH_ALLOWED_POOL_TICK_SPACINGS` (new) → `[25, 60]`. The append-only grandfather set (same shape as `QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS`): pools are permanent, so routing/discovery consumers deriving a token's candidate launch pools must race a `(INSTANT_LAUNCH_POOL_LP_FEE, spacing)` key for every entry — the token address alone cannot say which generation minted its pool.
+  - `INSTANT_LAUNCH_INITIAL_TICK` → `198_050` (was 198,060) and `INSTANT_LAUNCH_MIN_LAUNCH_TICK` → `-160_100` (was -208,980): the current generation's launch-position bounds.
+  - `InstantLaunchDeployment.tickSpacing` / `.minLaunchTick` (new registry fields, beside the existing `initialTick`): the authoritative per-generation pool shape — 25 / 198,050 / -160,100 on the 2026-08-05 pair, 60 / 198,060 / -208,980 on every earlier generation. Consumers that know a launch's minting strategy resolve the exact pool key from here.
+  - `getInstantLaunchPoolKey` / `getInstantLaunchPoolId` now take an optional `tickSpacing` (default: the current generation) — pass the minting generation's spacing for pre-redeploy tokens. `getInstantLaunchPoolKeys` (new) returns one candidate key per grandfathered spacing, newest first, for consumers that must probe. `QuoteInstantLaunchBuyParams.tickSpacing` (new, optional) threads the same override through quoting.
+
+  `INSTANT_LAUNCH_POOL_LP_FEE` is genuinely unchanged (2500 on all ten deployed strategies). The quick-launch graduation-pool counterpart of this change (50 → 25) shipped in 1.9.0.
+
+### Patch Changes
+
+- Updated dependencies [4600c8d]
+  - @uniswap/sdk-core@7.19.1
+  - @uniswap/v3-sdk@3.31.2
+  - @uniswap/v4-sdk@2.3.2
+
 ## 1.9.0
 
 ### Minor Changes

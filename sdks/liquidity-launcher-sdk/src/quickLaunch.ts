@@ -1,6 +1,7 @@
 import { type Address } from 'viem'
 
 import { getBlockTimeSeconds } from './config/blocks'
+import { resolveNewPoolTickSpacing } from './config/fees'
 import type { PriceRangeKind } from './config/positions'
 import { fdvUsdToPricePerToken } from './config/price'
 import {
@@ -51,7 +52,7 @@ export const QUICK_LAUNCH_AUCTION_SUPPLY_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2
  */
 export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2n
 
-/** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
+/** Raise denomination: the chain's native currency only (`address(0)` sentinel; ETH on most chains, USDC on Arc). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
 /** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
@@ -101,13 +102,17 @@ export const QUICK_LAUNCH_LP_FEE = 2_500
 
 /**
  * V4 graduation-pool tick spacing, as passed in `MigratorParameters.poolParameters` since the
- * 2026-08-05 chain-4663 full redeploy. Deliberately NOT the generic {@link feeToTickSpacing}
- * derivation, which yields 50 for the {@link QUICK_LAUNCH_LP_FEE} tier: the post-redeploy
- * Initialize census shows every quick-launch graduation pool minted at spacing 25 (295 pools in
- * the redeploy's first day, zero new pools at 50), so the preset states the observed value rather
- * than a formula the launch flow no longer follows.
+ * 2026-08-05 chain-4663 full redeploy. Derived from {@link resolveNewPoolTickSpacing}, which is now
+ * the single source of truth for the spacing a new launcher pool is opened with and maps the
+ * {@link QUICK_LAUNCH_LP_FEE} tier to 25 — the value the launch flow actually passes. The preset and
+ * the derivation therefore agree, and a future change to the tier's canonical spacing moves both
+ * together instead of leaving the preset to be updated by hand.
+ *
+ * This is the spacing NEW graduation pools are opened with. Pools minted by an earlier generation
+ * keep the spacing they were initialized with — see
+ * {@link QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS}.
  */
-export const QUICK_LAUNCH_POOL_TICK_SPACING = 25
+export const QUICK_LAUNCH_POOL_TICK_SPACING = resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE)
 
 /**
  * Every tick spacing a quick-launch graduation pool has ever been minted at, newest first — the
@@ -115,11 +120,15 @@ export const QUICK_LAUNCH_POOL_TICK_SPACING = 25
  * Pools are permanent, so a superseded spacing never leaves this list; routing/discovery consumers
  * deriving a token's candidate launch pools must race a `(QUICK_LAUNCH_LP_FEE, spacing)` key for
  * EVERY entry, because the token address alone cannot say which generation minted the pool.
+ * Every entry is a pinned literal: if the fee tier (and with it {@link
+ * QUICK_LAUNCH_POOL_TICK_SPACING}) ever changes, the new spacing must be APPENDED here rather than
+ * a derived entry silently replacing 25 — the test asserting this set contains
+ * `resolveNewPoolTickSpacing(QUICK_LAUNCH_LP_FEE)` forces that append.
  * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link QUICK_LAUNCH_POOL_TICK_SPACING}).
- * - 50: every earlier generation — the {@link feeToTickSpacing} derivation of the fee, kept as a
- *   literal so a future change to that formula cannot rewrite the historical record.
+ * - 50: every earlier generation. Pre-redeploy graduation pools on chain 4663 are reachable only
+ *   through this entry when no served pool key is available.
  */
-export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [QUICK_LAUNCH_POOL_TICK_SPACING, 50] as const
+export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [25, 50] as const
 
 /** V4 LP price-range strategy: full-range + concentrated. */
 export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
@@ -245,7 +254,7 @@ export function isStructurallyPermanentLockMode(mode: QuickLaunchLockMode): bool
  * always 18 decimals, native raise is `address(0)` on every chain, the duration is a fixed real-time
  * window), so the preset is a frozen constant rather than a `getQuickLaunchPreset(chainId)` function.
  * The two values that ARE chain-dependent — the duration in blocks and the floor price — are
- * *derived* at build time from the chain block time / live ETH price, not stored here; see
+ * *derived* at build time from the chain block time / live native-currency USD price, not stored here; see
  * {@link getQuickLaunchDurationBlocks}.
  */
 export interface QuickLaunchPreset {
@@ -318,24 +327,25 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
 
 /**
  * The preset floor as the CreateAuction `floor_price_raise_per_token` decimal:
- * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (native ETH)
- * at `ethUsdPrice`. Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
+ * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (the chain's
+ * native currency) at `nativeUsdPrice` — the USD price of that native currency (ETH on Robinhood;
+ * USDC ≈ 1 on Arc). Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
  * their own fallback.
  */
-export function getQuickLaunchFloorPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchFloorPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
  * The preset graduation threshold as the CreateAuction `graduation_price_raise_per_token`
  * decimal: {@link QUICK_LAUNCH_GRADUATION_FDV_USD} / 1B tokens, converted to the raise currency
- * (native ETH) at `ethUsdPrice` — the same derivation as the floor, over the FULL supply. The
+ * (the chain's native currency) at `nativeUsdPrice` — the same derivation as the floor, over the FULL supply. The
  * service turns it into `requiredCurrencyRaised = graduationPrice x soldSupply`, so the USD
  * raise this demands is graduation FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}
  * (= {@link QUICK_LAUNCH_GRADUATION_RAISE_USD}), never the FDV 1:1.
  */
-export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchGraduationPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
@@ -496,7 +506,7 @@ export interface QuickLaunchMatchOptions {
  *
  * Presumes a CCA (v2) auction — the caller should gate on the auction version first (e.g. via the
  * factory→lens registry in `addresses`), since `AuctionParameters` is inherently CCA. The floor /
- * clearing price is intentionally NOT matched: it is derived from the live ETH price and so is not a
+ * clearing price is intentionally NOT matched: it is derived from the live native-currency USD price and so is not a
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,

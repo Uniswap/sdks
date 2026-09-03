@@ -1,5 +1,36 @@
 # @uniswap/universal-router-sdk
 
+## 5.11.5
+
+### Patch Changes
+
+- Updated dependencies [9a52777]
+  - @uniswap/sdk-core@7.19.2
+  - @uniswap/router-sdk@2.11.4
+  - @uniswap/v2-sdk@4.21.3
+  - @uniswap/v3-sdk@3.31.3
+  - @uniswap/v4-sdk@2.3.3
+
+## 5.11.4
+
+### Patch Changes
+
+- Updated dependencies [0954b08]
+  - @uniswap/router-sdk@2.11.3
+
+## 5.11.3
+
+### Patch Changes
+
+- 0d91d5f: Encode the ACROSS_V4_DEPOSIT_V3 command input as a single offset-prefixed tuple, matching ChainedActions.sol's `abi.decode(input, (AcrossV4DepositV3Params))`. The previous flat 13-value encoding reverted with empty data at the dispatcher's decode, so every payload built via `addAcrossBridge` / `swapCallParameters` `bridgeOptions` was unexecutable.
+- 4600c8d: Update permissioned pools deployment addresses for mainnet and Sepolia
+- Updated dependencies [4600c8d]
+  - @uniswap/sdk-core@7.19.1
+  - @uniswap/router-sdk@2.11.2
+  - @uniswap/v2-sdk@4.21.2
+  - @uniswap/v3-sdk@3.31.2
+  - @uniswap/v4-sdk@2.3.2
+
 ## 5.11.2
 
 ### Patch Changes

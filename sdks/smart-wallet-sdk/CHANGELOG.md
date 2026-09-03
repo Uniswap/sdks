@@ -1,5 +1,19 @@
 # @uniswap/smart-wallet-sdk
 
+## 2.8.3
+
+### Patch Changes
+
+- Updated dependencies [9a52777]
+  - @uniswap/sdk-core@7.19.2
+
+## 2.8.2
+
+### Patch Changes
+
+- Updated dependencies [4600c8d]
+  - @uniswap/sdk-core@7.19.1
+
 ## 2.8.1
 
 ### Patch Changes
