@@ -10,7 +10,8 @@ export type { PathKey, PoolKey }
 // portion: % of variable output, used with exact-input
 // flat: fixed amount, deducted from exact-output target
 export type Fee =
-  { kind: 'portion'; recipient: string; fee: Percent } | { kind: 'flat'; recipient: string; amount: BigNumberish }
+  | { kind: 'portion'; recipient: string; fee: Percent }
+  | { kind: 'flat'; recipient: string; amount: BigNumberish }
 
 export type SwapSpecification = {
   tradeType: TradeType
