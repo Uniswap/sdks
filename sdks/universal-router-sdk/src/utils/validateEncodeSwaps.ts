@@ -138,7 +138,6 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
   // fixed-amount wallet-funded swap instead.
   if (spec.routerBalanceInput) {
     invariant(spec.tradeType === TradeType.EXACT_INPUT, 'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
-    invariant(!spec.routing.inputToken.isNative, 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
     invariant(!spec.nativeErc20Input, 'ROUTER_BALANCE_INPUT_NATIVE_ERC20_CONFLICT')
     invariant(!spec.permit, 'ROUTER_BALANCE_INPUT_PERMIT_CONFLICT')
     invariant(spec.tokenTransferMode !== TokenTransferMode.ApproveProxy, 'ROUTER_BALANCE_INPUT_PROXY_CONFLICT')
@@ -151,21 +150,39 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       invariant(!!spec.chainId, 'ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
     }
 
-    // One CONTRACT_BALANCE cannot address two legs of the same currency: the first drains it
-    // and the second resolves to zero. Exactly one step may spend the input token, and it
-    // must be the first, so the transform has an unambiguous hop 0.
-    const balanceInputTokenAddress = getCurrencyAddress(spec.routing.inputToken)
-    const spenderIndexes = swapSteps
+    const nativeBalanceInput = spec.routing.inputToken.isNative
+    // Native input is funded as msg.value on execute() (raw transfers to the router
+    // revert) and must be wrapped in full before anything spends it, so the plan has to
+    // lead with a WRAP_ETH; the spender checks below then run against the wrapped token.
+    if (nativeBalanceInput) {
+      invariant(swapSteps[0]?.type === 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
+    }
+
+    // At least one step must spend the (wrapped) input token. Splits are
+    // allowed: the transform keeps every spender's quoted amount except the
+    // largest, which is rewritten to CONTRACT_BALANCE and moved last among the
+    // spenders. V4 spenders in a split are refused (their spend amount is not
+    // comparable), which the transform enforces.
+    const balanceInputTokenAddress = nativeBalanceInput
+      ? spec.routing.inputToken.wrapped.address
+      : getCurrencyAddress(spec.routing.inputToken)
+    const spendableSteps = nativeBalanceInput ? swapSteps.slice(1) : swapSteps
+    const spenderIndexes = spendableSteps
       .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
       .filter((index) => index >= 0)
-    invariant(spenderIndexes.length === 1 && spenderIndexes[0] === 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
-    for (const step of swapSteps) {
+    invariant(spenderIndexes.length > 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    swapSteps.forEach((step, index) => {
       invariant(
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
         'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
       )
-      invariant(step.type !== 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
-    }
+      // The native plan's single wrap is steps[0]; a second wrap (or any wrap in an
+      // ERC20 plan) would double-spend the router's native balance.
+      invariant(
+        step.type !== 'WRAP_ETH' || (nativeBalanceInput && index === 0),
+        nativeBalanceInput ? 'ROUTER_BALANCE_INPUT_DUPLICATE_WRAP' : 'ROUTER_BALANCE_INPUT_NATIVE_INPUT'
+      )
+    })
   }
 
   // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)

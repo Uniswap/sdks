@@ -35,7 +35,7 @@ import {
 import { getCurrencyAddress } from './utils/getCurrencyAddress'
 import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
-import { applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
+import { applyNativeRouterBalanceInputToSteps, applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
@@ -114,7 +114,12 @@ export abstract class SwapRouter {
 
     let nativeCurrencyValue: BigNumber
     if (inputCurrency.isNative) {
-      nativeCurrencyValue = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
+      // routerBalanceInput: the delivered amount is unknown at encode time — the executor
+      // attaches it as msg.value on execute() (raw transfers to the router revert), so the
+      // encoded value is zero and the plan wraps whatever arrives.
+      nativeCurrencyValue = options.routerBalanceInput
+        ? BigNumber.from(0)
+        : BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
     } else if (options.nativeErc20Input) {
       // input token is the chain's native-ERC20 gas token (e.g. Arc USDC predeploy):
       // fund the router via msg.value, scaled from token decimals to 18-decimal native units
@@ -181,21 +186,27 @@ export abstract class SwapRouter {
       routing: { inputToken, outputToken },
     } = normalizedSpec
 
-    // Router-balance funding: assert the floor before anything else runs, so an
-    // under-funded router reverts up front rather than swapping a short amount.
-    if (normalizedSpec.routerBalanceInput?.minimumAmount !== undefined) {
+    // Router-balance funding: assert the floor before anything spends, so an under-funded
+    // router reverts up front rather than swapping a short amount. A native balance input
+    // has no balance-check command, so its floor is asserted post-wrap as WETH instead
+    // (inside the step loop below).
+    const nativeBalanceInput = !!normalizedSpec.routerBalanceInput && inputToken.isNative
+    const routerBalanceFloor = normalizedSpec.routerBalanceInput?.minimumAmount
+    const emitRouterBalanceFloor = () =>
       planner.addCommand(
         CommandType.BALANCE_CHECK_ERC20,
         [
           // BALANCE_CHECK_ERC20 reads `owner` verbatim (no sentinel resolution), so it
           // needs the router's real address; validateEncodeSwaps requires chainId.
           UNIVERSAL_ROUTER_ADDRESS(normalizedSpec.urVersion, normalizedSpec.chainId!),
-          getCurrencyAddress(inputToken),
-          normalizedSpec.routerBalanceInput.minimumAmount,
+          inputToken.wrapped.address,
+          routerBalanceFloor!,
         ],
         false,
         normalizedSpec.urVersion
       )
+    if (routerBalanceFloor !== undefined && !nativeBalanceInput) {
+      emitRouterBalanceFloor()
     }
 
     // Ingress: pull funds into the router. Native input is paid as msg.value at the bottom
@@ -224,13 +235,21 @@ export abstract class SwapRouter {
     // With router-balance funding the delivered amount is unknown at encode time, so the
     // input-spending first hop is rewritten to the CONTRACT_BALANCE sentinel (v4: settle
     // the whole balance, swap the open delta).
-    const stepsToEncode = normalizedSpec.routerBalanceInput
-      ? applyRouterBalanceInputToSteps(swapSteps, getCurrencyAddress(inputToken))
-      : swapSteps
-
-    for (const step of stepsToEncode) {
-      encodeSwapStep(planner, step, normalizedSpec.urVersion)
+    let stepsToEncode = swapSteps
+    if (nativeBalanceInput) {
+      stepsToEncode = applyNativeRouterBalanceInputToSteps(swapSteps, inputToken.wrapped.address)
+    } else if (normalizedSpec.routerBalanceInput) {
+      stepsToEncode = applyRouterBalanceInputToSteps(swapSteps, getCurrencyAddress(inputToken))
     }
+
+    stepsToEncode.forEach((step, index) => {
+      encodeSwapStep(planner, step, normalizedSpec.urVersion)
+      // Native balance input: the WRAP_ETH just consumed the whole native balance, so the
+      // WETH floor is checkable only now.
+      if (index === 0 && nativeBalanceInput && routerBalanceFloor !== undefined) {
+        emitRouterBalanceFloor()
+      }
+    })
 
     // Fee deducted from gross output before final settlement.
     // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
@@ -285,7 +304,10 @@ export abstract class SwapRouter {
     }
 
     // safeMode: zero-min ETH sweep recovers any native funds left on the router (dust or unintended msg.value)
-    if (normalizedSpec.safeMode) {
+    // Native balance input always sweeps trailing ETH dust to the recipient: the funder is
+    // a third party, so anything left on the router would otherwise be stranded or swept
+    // by a stranger.
+    if (normalizedSpec.safeMode || nativeBalanceInput) {
       planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
     }
 
@@ -306,7 +328,10 @@ export abstract class SwapRouter {
     // scaled from token decimals to 18-decimal native units.
     let nativeCurrencyValue: BigNumber
     if (inputToken.isNative) {
-      nativeCurrencyValue = exactOrMaxAmountIn
+      // routerBalanceInput: the delivered amount is unknown at encode time — the executor
+      // attaches it as msg.value on execute() (raw transfers to the router revert), so the
+      // encoded value is zero and the plan wraps whatever arrives.
+      nativeCurrencyValue = normalizedSpec.routerBalanceInput ? BigNumber.from(0) : exactOrMaxAmountIn
     } else if (normalizedSpec.nativeErc20Input) {
       nativeCurrencyValue = exactOrMaxAmountIn.mul(BigNumber.from(10).pow(18 - inputToken.decimals))
     } else {
