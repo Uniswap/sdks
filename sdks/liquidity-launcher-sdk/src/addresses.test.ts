@@ -29,7 +29,7 @@ import { SupportedChainId } from './chains'
 describe('getLauncherAddresses', () => {
   it('returns the Unichain LBPStrategy singleton', () => {
     const addresses = getLauncherAddresses(SupportedChainId.UNICHAIN)
-    expect(addresses?.lbpStrategy).toBe(getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'))
+    expect(addresses?.lbpStrategy).toBe(getAddress('0x48F55E7E8ac229aA4e2f3F2d44aa9284D86da000'))
   })
 
   it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood and Arc', () => {
@@ -53,6 +53,8 @@ describe('getLauncherAddresses', () => {
   })
 
   it('carries the UniversalRouterStrategy only where it is deployed (4663 and 5042 so far)', () => {
+    // v3.3.0 did not redeploy the UniversalRouterStrategy on either chain, so both keep the
+    // addresses they already had — 4663 and 5042 stay distinct.
     expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.universalRouterStrategy).toBe(
       getAddress('0x1242c9439d589cAE85E121B1f79f2aF51e91DCEE')
     )
@@ -73,16 +75,28 @@ describe('getLauncherAddresses', () => {
     }
   })
 
-  it('returns the per-chain LBPStrategy singletons for the 2026-07 launch chains', () => {
-    expect(getLauncherAddresses(SupportedChainId.AVALANCHE)?.lbpStrategy).toBe(
-      getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000')
-    )
-    expect(getLauncherAddresses(SupportedChainId.XLAYER)?.lbpStrategy).toBe(
-      getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000')
-    )
-    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.lbpStrategy).toBe(
-      getAddress('0x05d552391067389EE44fec3924157ed33F976000')
-    )
+  it('returns the per-chain v3.3.0 LBPStrategy singleton on every supported chain', () => {
+    // Independent literals from the v3.3.0 deployment README. v3.3.0 rotates every chain, so pin
+    // all of them — a chain silently left on its v3.2.0 strategy is the failure mode here.
+    const V330_LBP_STRATEGIES: Record<number, string> = {
+      [SupportedChainId.MAINNET]: '0x2EEF0e2a9a652d755AccAD95a24541A98B5CA000',
+      [SupportedChainId.UNICHAIN]: '0x48F55E7E8ac229aA4e2f3F2d44aa9284D86da000',
+      [SupportedChainId.BASE]: '0xf10124B01E9fa88b0a2eF3fA95a53B3310446000',
+      [SupportedChainId.ARBITRUM_ONE]: '0xc80f3f4497CD9ae41bf8cB5C8809620182B6E000',
+      [SupportedChainId.AVALANCHE]: '0x7575c9488AB7913e7749B9F5e02789355699E000',
+      [SupportedChainId.XLAYER]: '0xde758D7B3202b7f4f842E8313Fc04Bf19c6Be000',
+      [SupportedChainId.ROBINHOOD]: '0xbf1aB81f7d534b2CC0Da76fcf4d541322bB0e000',
+      [SupportedChainId.ARC]: '0x542BCDA1015485ef0B1cD11B835DC58DF5102000',
+      [SupportedChainId.SEPOLIA]: '0x95434E898Af471945Cab33D5064d2aC1A6Ba2000',
+      [SupportedChainId.BASE_SEPOLIA]: '0x73ad52384798AdADfBe19fCfD28ff09D2CC82000',
+    }
+    const chainIds = Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')
+    expect(Object.keys(V330_LBP_STRATEGIES).map(Number).sort()).toEqual([...chainIds].sort())
+    for (const chainId of chainIds) {
+      expect(getLauncherAddresses(chainId)?.lbpStrategy).toBe(getAddress(V330_LBP_STRATEGIES[chainId]!))
+    }
+    // The strategy must be a valid v4 hook address, mined per chain — so never shared.
+    expect(new Set(Object.values(V330_LBP_STRATEGIES)).size).toBe(chainIds.length)
   })
 })
 
@@ -152,12 +166,13 @@ const FEES_ON_SPLITTER_V311 = '0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653'
 const FEES_ON_SPLITTER_20260805 = '0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf'
 const FEES_OFF_SPLITTER_C3F9506 = '0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'
 const FEES_OFF_SPLITTER_20260805 = '0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359'
+const FEES_ON_SPLITTER_V330 = '0x9411fa7F956f64aa7981AA27cB3bC6eC0415449C'
+const FEES_OFF_SPLITTER_V330 = '0x882Ae5e2095435A62Fd1BBDEfcb637f5CeAFc0ee'
 
-// The five canonical Robinhood strategy generations from the liquidity-launcher dev README, in
-// registry (append) order. Pool shape is per-generation: every generation up to and including
+// The six canonical Robinhood strategy generations from the liquidity-launcher deployment README,
+// in registry (append) order. Pool shape is per-generation: every generation up to and including
 // v3.1.1 is (spacing 60, initialTick 198,060, minLaunchTick -208,980); the 2026-08-05 full-redeploy
-// pair was recompiled to (25, 198,050, -160,100) — all values read back on-chain from the deployed
-// strategies' getters (2026-08-05).
+// pair was recompiled to (25, 198,050, -160,100), which v3.3.0 carries forward.
 const LEGACY_POOL_SHAPE = { tickSpacing: 60, initialTick: 198060, minLaunchTick: -208980 } as const
 const REDEPLOY_POOL_SHAPE = { tickSpacing: 25, initialTick: 198050, minLaunchTick: -160100 } as const
 const ROBINHOOD_STRATEGY_GENERATIONS = [
@@ -193,8 +208,8 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     offSplitter: FEES_OFF_SPLITTER_C3F9506,
     poolShape: LEGACY_POOL_SHAPE,
   },
-  // 2026-08-05 full 4663 stack redeploy (current) — new strategies, new splitters on both sides,
-  // and a recompiled pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100)
+  // 2026-08-05 full 4663 stack redeploy — new strategies, new splitters on both sides, and a
+  // recompiled pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100)
   {
     on: '0x23f8209572b4a1C2AD88A42749E830791Fb027f1',
     off: '0xAD44D55E7f8337C3cE113fBb591486E85be104b2',
@@ -202,12 +217,20 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     offSplitter: FEES_OFF_SPLITTER_20260805,
     poolShape: REDEPLOY_POOL_SHAPE,
   },
+  // v3.3.0 (current) — new strategies and new splitters on both sides, same pool shape
+  {
+    on: '0x7c48DDe3B447381F4d986334679b3Afc7F2D35C2',
+    off: '0xC9566675b1Ea42861546f3c5B74Ace2c79c49572',
+    onSplitter: FEES_ON_SPLITTER_V330,
+    offSplitter: FEES_OFF_SPLITTER_V330,
+    poolShape: REDEPLOY_POOL_SHAPE,
+  },
 ] as const
 
 describe('Instant Launch deployment registry', () => {
-  it('carries all five canonical Robinhood strategy generations from the liquidity-launcher dev README', () => {
+  it('carries all six canonical Robinhood strategy generations from the liquidity-launcher README', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ROBINHOOD)
-    expect(deployments).toHaveLength(10)
+    expect(deployments).toHaveLength(ROBINHOOD_STRATEGY_GENERATIONS.length * 2)
     ROBINHOOD_STRATEGY_GENERATIONS.forEach((generation, index) => {
       const on = deployments[index * 2]
       const off = deployments[index * 2 + 1]
@@ -236,12 +259,12 @@ describe('Instant Launch deployment registry', () => {
     expect(getInstantLaunchContracts(SupportedChainId.MAINNET)).toBeUndefined()
   })
 
-  it('getInstantLaunchStrategy selects the current (2026-08-05 full-redeploy) deployment per variant', () => {
+  it('getInstantLaunchStrategy selects the current (v3.3.0) deployment per variant', () => {
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })?.strategy).toBe(
-      getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1')
+      getAddress('0x7c48DDe3B447381F4d986334679b3Afc7F2D35C2')
     )
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })?.strategy).toBe(
-      getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2')
+      getAddress('0xC9566675b1Ea42861546f3c5B74Ace2c79c49572')
     )
   })
 
@@ -276,8 +299,8 @@ describe('Instant Launch deployment registry', () => {
 
   it('carries the Robinhood singletons (vault, compounding recipient, launcher)', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ROBINHOOD)
-    expect(contracts?.beneficiaryVault).toBe(getAddress('0xd35E9CA72F64C7F93BE30fad67524323396B36D7'))
-    expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
+    expect(contracts?.beneficiaryVault).toBe(getAddress('0x26d2F7AcB07707034406a0dC458351Bb63C02553'))
+    expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xf585b5D728A8fdE743027307BF5F3556E3B9C58D'))
     expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
   })
 
@@ -296,15 +319,19 @@ describe('Instant Launch deployment registry', () => {
 })
 
 describe('Arc (5042) deployment', () => {
-  // Independent literals (not read back from the registry) so a registry edit cannot silently move them.
-  const ARC_FEES_ON_STRATEGY = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
-  const ARC_FEES_OFF_STRATEGY = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
+  // Independent literals (not read back from the registry) so a registry edit cannot silently move
+  // them. Arc's periphery did not redeploy in v3.3.0, so both generations share the splitters.
+  const ARC_GENERATIONS = [
+    { on: '0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056', off: '0xff301aCB22816D210d75D71F31Ac13C771093EF3' }, // 2026-09-01 initial-tick redeploy
+    { on: '0x0C7adf7AF6375374d3bfbb838492892Aa3AdaE65', off: '0x3d4C91ca6de46801c7524bfFAd6Ef9353c6827C3' }, // v3.3.0 (current)
+  ] as const
+  const ARC_CURRENT = ARC_GENERATIONS[ARC_GENERATIONS.length - 1]!
   const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
   const ARC_FEES_OFF_SPLITTER = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 
   it('carries the Arc launcher stack', () => {
     const addresses = getLauncherAddresses(SupportedChainId.ARC)!
-    expect(addresses.lbpStrategy).toBe(getAddress('0xe9f36bcc222a6d2e459529D787f8c060d543A000'))
+    expect(addresses.lbpStrategy).toBe(getAddress('0x542BCDA1015485ef0B1cD11B835DC58DF5102000'))
     // Arc keeps the shared TokenSplitter, unlike Robinhood's full-redeploy one.
     expect(addresses.tokenSplitter).toBe(getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd'))
     expect(addresses.positionManager).toBe(getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B'))
@@ -319,38 +346,46 @@ describe('Arc (5042) deployment', () => {
     expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
-  it('registers one Instant Launch generation', () => {
+  it('registers both Arc generations, keeping the superseded one resolvable (append-only)', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
-    expect(deployments).toHaveLength(2)
-    const [on, off] = deployments
-    expect(on!.strategy).toBe(ARC_FEES_ON_STRATEGY)
-    expect(on!.feeSplitter).toBe(ARC_FEES_ON_SPLITTER)
-    expect(on!.creatorFeesEnabled).toBe(true)
-    expect(on!.creatorFeeNativeBps).toBe(4000)
-    expect(off!.strategy).toBe(ARC_FEES_OFF_STRATEGY)
-    expect(off!.feeSplitter).toBe(ARC_FEES_OFF_SPLITTER)
-    expect(off!.creatorFeesEnabled).toBe(false)
-    for (const variant of [on!, off!]) {
-      expect(variant.tickSpacing).toBe(25)
-      expect(variant.initialTick).toBe(122050)
-      expect(variant.initialTick % variant.tickSpacing).toBe(0)
-      expect(variant.minLaunchTick).toBe(-160100)
-    }
+    expect(deployments).toHaveLength(ARC_GENERATIONS.length * 2)
+    ARC_GENERATIONS.forEach((generation, index) => {
+      const on = deployments[index * 2]
+      const off = deployments[index * 2 + 1]
+      expect(on!.strategy).toBe(getAddress(generation.on))
+      expect(on!.feeSplitter).toBe(ARC_FEES_ON_SPLITTER)
+      expect(on!.creatorFeesEnabled).toBe(true)
+      expect(on!.creatorFeeNativeBps).toBe(4000)
+      expect(off!.strategy).toBe(getAddress(generation.off))
+      expect(off!.feeSplitter).toBe(ARC_FEES_OFF_SPLITTER)
+      expect(off!.creatorFeesEnabled).toBe(false)
+      // Pool shape is unchanged across both Arc generations.
+      for (const variant of [on!, off!]) {
+        expect(variant.tickSpacing).toBe(25)
+        expect(variant.initialTick).toBe(122050)
+        expect(variant.initialTick % variant.tickSpacing).toBe(0)
+        expect(variant.minLaunchTick).toBe(-160100)
+      }
+      // The superseded generation classifies but is never selected for new launches.
+      expect(getInstantLaunchDeployment(generation.on)?.chainId).toBe(SupportedChainId.ARC)
+      expect(getInstantLaunchDeployment(generation.off)?.chainId).toBe(SupportedChainId.ARC)
+    })
     expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })?.strategy).toBe(
-      ARC_FEES_ON_STRATEGY
+      getAddress(ARC_CURRENT.on)
     )
     expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: false })?.strategy).toBe(
-      ARC_FEES_OFF_STRATEGY
+      getAddress(ARC_CURRENT.off)
     )
   })
 
-  it('carries the Arc singletons (vault, compounding recipient)', () => {
+  it('carries the Arc singletons (vault, compounding recipient) — unchanged in v3.3.0', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ARC)
     expect(contracts?.beneficiaryVault).toBe(getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db'))
   })
 
   it('resolves the Arc position recipients per variant', () => {
+    // Arc's splitters serve both generations, so v3.3.0 moves neither recipient.
     expect(getCreatorFeesPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_ON_SPLITTER)
     expect(getAutocompoundPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_OFF_SPLITTER)
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_ON_SPLITTER)).toBe(true)
@@ -364,8 +399,8 @@ describe('Arc (5042) deployment', () => {
 describe('creator-fees position recipient', () => {
   // Independent literal (not read back from the registry) so a registry edit cannot silently move
   // the recipient: the current fees-enabled Robinhood FeeSplitter.
-  const FEES_ON_SPLITTER = getAddress('0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf')
-  const FEES_OFF_SPLITTER = getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359')
+  const FEES_ON_SPLITTER = getAddress('0x9411fa7F956f64aa7981AA27cB3bC6eC0415449C')
+  const FEES_OFF_SPLITTER = getAddress('0x882Ae5e2095435A62Fd1BBDEfcb637f5CeAFc0ee')
 
   it('resolves to the fees-enabled Robinhood FeeSplitter (registry-literal pin)', () => {
     expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).toBe(FEES_ON_SPLITTER)
@@ -396,11 +431,11 @@ describe('creator-fees position recipient', () => {
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER)).toBe(false)
   })
 
-  it('still classifies the superseded c3f9506 and v3.1.1 fees-on splitters (append-only classifier)', () => {
+  it('still classifies every superseded fees-on splitter (append-only classifier)', () => {
     // Each redeploy moves the current recipient — but launches that migrated their LP position to
     // an earlier splitter did so permanently, and must keep classifying as creator-fees launches.
     // Selection moves; classification does not.
-    for (const superseded of [FEES_ON_SPLITTER_C3F9506, FEES_ON_SPLITTER_V311]) {
+    for (const superseded of [FEES_ON_SPLITTER_C3F9506, FEES_ON_SPLITTER_V311, FEES_ON_SPLITTER_20260805]) {
       expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, superseded)).toBe(true)
       expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).not.toBe(getAddress(superseded))
     }
@@ -417,8 +452,8 @@ describe('creator-fees position recipient', () => {
 describe('autocompound position recipient', () => {
   // Independent literal (not read back from the registry) so a registry edit cannot silently move
   // the recipient: the current fees-off Robinhood FeeSplitter.
-  const FEES_ON_SPLITTER = getAddress('0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf')
-  const FEES_OFF_SPLITTER = getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359')
+  const FEES_ON_SPLITTER = getAddress('0x9411fa7F956f64aa7981AA27cB3bC6eC0415449C')
+  const FEES_OFF_SPLITTER = getAddress('0x882Ae5e2095435A62Fd1BBDEfcb637f5CeAFc0ee')
 
   it('resolves to the fees-off Robinhood FeeSplitter (registry-literal pin)', () => {
     expect(getAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD)).toBe(FEES_OFF_SPLITTER)
@@ -451,11 +486,13 @@ describe('autocompound position recipient', () => {
     expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_ON_SPLITTER)).toBe(false)
   })
 
-  it('still classifies the superseded c3f9506 fees-off splitter (append-only classifier)', () => {
-    // The 2026-08-05 full redeploy is the first generation that moves the fees-off splitter —
-    // launches parked at the c3f9506 one stay there permanently and must keep classifying.
-    expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER_C3F9506)).toBe(true)
-    expect(getAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD)).not.toBe(getAddress(FEES_OFF_SPLITTER_C3F9506))
+  it('still classifies every superseded fees-off splitter (append-only classifier)', () => {
+    // Launches parked at an earlier fees-off splitter stay there permanently and must keep
+    // classifying. Selection moves; classification does not.
+    for (const superseded of [FEES_OFF_SPLITTER_C3F9506, FEES_OFF_SPLITTER_20260805]) {
+      expect(isAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD, superseded)).toBe(true)
+      expect(getAutocompoundPositionRecipient(SupportedChainId.ROBINHOOD)).not.toBe(getAddress(superseded))
+    }
   })
 
   it('stays disjoint from the creator-fees classifier on both splitters', () => {
