@@ -17,6 +17,7 @@ import {
   QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   QUICK_LAUNCH_GRADUATION_FDV_USD,
   QUICK_LAUNCH_GRADUATION_RAISE_USD,
+  QUICK_LAUNCH_LEGACY_DURATION_SECONDS,
   QUICK_LAUNCH_LP_FEE,
   QUICK_LAUNCH_POOL_TICK_SPACING,
   QUICK_LAUNCH_PRESET,
@@ -36,7 +37,7 @@ import {
 
 const CHAIN = SupportedChainId.BASE // 2s blocks
 const START = 1_000_000n
-// A 4h window as a block count on Base.
+// The preset (1h) window as a block count on Base.
 const END = START + getQuickLaunchDurationBlocks(CHAIN)
 
 // An auction built straight from the preset.
@@ -56,8 +57,10 @@ function presetAuction(overrides: Partial<QuickLaunchMatchParams> = {}): QuickLa
 describe('QUICK_LAUNCH_PRESET', () => {
   it('encodes the canonical defining values', () => {
     expect(QUICK_LAUNCH_PRESET.auctionType).toBe('CCA')
-    expect(QUICK_LAUNCH_PRESET.durationSeconds).toBe(14_400)
-    expect(QUICK_LAUNCH_DURATION_SECONDS).toBe(14_400)
+    // Literals on purpose — deriving them from the constants would make this test unfalsifiable.
+    expect(QUICK_LAUNCH_PRESET.durationSeconds).toBe(3_600)
+    expect(QUICK_LAUNCH_DURATION_SECONDS).toBe(3_600)
+    expect(QUICK_LAUNCH_LEGACY_DURATION_SECONDS).toBe(14_400)
     expect(QUICK_LAUNCH_PRESET.totalSupplyRaw).toBe(10n ** 27n)
     expect(QUICK_LAUNCH_PRESET.auctionSupplyRaw).toBe(5n * 10n ** 26n)
     expect(QUICK_LAUNCH_PRESET.reservedForLpRaw).toBe(5n * 10n ** 26n)
@@ -92,9 +95,14 @@ describe('isQuickLaunch — near-misses do NOT match', () => {
     expect(isQuickLaunch(presetAuction({ totalSupplyRaw: 500_000_000n * 10n ** 18n }))).toBe(false)
   })
 
-  it('wrong duration (2h instead of 4h)', () => {
+  it('wrong duration (30m — half the preset window)', () => {
     const halfWindow = getQuickLaunchDurationBlocks(CHAIN) / 2n
     expect(isQuickLaunch(presetAuction({ endBlock: START + halfWindow }))).toBe(false)
+  })
+
+  it('wrong duration (2h — between the 1h preset and the legacy 4h window)', () => {
+    const twoHourWindow = getQuickLaunchDurationBlocks(CHAIN) * 2n
+    expect(isQuickLaunch(presetAuction({ endBlock: START + twoHourWindow }))).toBe(false)
   })
 
   it('wrong raise denomination (an ERC20, not native)', () => {
@@ -120,17 +128,84 @@ describe('isQuickLaunch — near-misses do NOT match', () => {
   })
 })
 
-describe('isQuickLaunch — duration policy', () => {
-  it('rejects historical 1h auctions by default (4h-only)', () => {
-    const oneHourWindow = getQuickLaunchDurationBlocks(CHAIN) / 4n
-    expect(isQuickLaunch(presetAuction({ endBlock: START + oneHourWindow }))).toBe(false)
+describe('getQuickLaunchDurationBlocks', () => {
+  // Block counts are literals: 3600s at the chain's block time, not re-derived from the constant.
+  it('is 36,000 blocks on a 0.1s/block chain (Robinhood, 4663)', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.ROBINHOOD)).toBe(36_000n)
   })
 
-  it('recognizes historical 30m/1h/4h auctions when explicitly opted in', () => {
-    const oneHourWindow = BigInt(Math.round(3600 / getBlockTimeSeconds(CHAIN)))
+  it('is 300 blocks on a 12s/block chain (mainnet)', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.MAINNET)).toBe(300n)
+  })
+
+  it('is 1,800 blocks on a 2s/block chain (Base)', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE)).toBe(1_800n)
+  })
+})
+
+describe('isQuickLaunch — duration policy', () => {
+  // Windows are literal block counts (1h / 4h at the chain's block time), not derived from the constants.
+  const ROBINHOOD_ONE_HOUR_BLOCKS = 36_000n
+  const MAINNET_ONE_HOUR_BLOCKS = 300n
+  const BASE_ONE_HOUR_BLOCKS = 1_800n
+  const BASE_FOUR_HOUR_BLOCKS = 7_200n
+  const BASE_THIRTY_MIN_BLOCKS = 900n
+
+  it('matches a 1h auction on a 0.1s/block chain (Robinhood: 36,000 blocks)', () => {
+    const auction = presetAuction({
+      chainId: SupportedChainId.ROBINHOOD,
+      startBlock: START,
+      endBlock: START + ROBINHOOD_ONE_HOUR_BLOCKS,
+    })
+    expect(isQuickLaunch(auction)).toBe(true)
+  })
+
+  it('matches a 1h auction on a 12s/block chain (mainnet: 300 blocks)', () => {
+    const auction = presetAuction({
+      chainId: SupportedChainId.MAINNET,
+      startBlock: START,
+      endBlock: START + MAINNET_ONE_HOUR_BLOCKS,
+    })
+    expect(isQuickLaunch(auction)).toBe(true)
+  })
+
+  it('still matches a legacy 4h auction with the default options', () => {
+    expect(isQuickLaunch(presetAuction({ endBlock: START + BASE_FOUR_HOUR_BLOCKS }))).toBe(true)
+  })
+
+  it('rejects a 4h auction when the caller narrows to the 1h window', () => {
     expect(
-      isQuickLaunch(presetAuction({ endBlock: START + oneHourWindow }), {
-        allowedDurationsSeconds: [1800, 3600, 14400],
+      isQuickLaunch(presetAuction({ endBlock: START + BASE_FOUR_HOUR_BLOCKS }), { allowedDurationsSeconds: [3_600] })
+    ).toBe(false)
+  })
+
+  it('rejects a 1h auction when the caller narrows to the legacy 4h window', () => {
+    expect(
+      isQuickLaunch(presetAuction({ endBlock: START + BASE_ONE_HOUR_BLOCKS }), { allowedDurationsSeconds: [14_400] })
+    ).toBe(false)
+  })
+
+  it('applies the ±10% band per allowed entry', () => {
+    // 1h ± 9% passes, ± 11% fails.
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 1_962n }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 1_638n }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 1_998n }))).toBe(false)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 1_602n }))).toBe(false)
+    // 4h ± 9% passes, ± 11% fails — the 1h band does not stretch to cover the gap.
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 7_848n }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 6_552n }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 7_992n }))).toBe(false)
+    expect(isQuickLaunch(presetAuction({ endBlock: START + 6_408n }))).toBe(false)
+  })
+
+  it('rejects historical 30m auctions by default', () => {
+    expect(isQuickLaunch(presetAuction({ endBlock: START + BASE_THIRTY_MIN_BLOCKS }))).toBe(false)
+  })
+
+  it('recognizes historical 30m auctions when explicitly opted in', () => {
+    expect(
+      isQuickLaunch(presetAuction({ endBlock: START + BASE_THIRTY_MIN_BLOCKS }), {
+        allowedDurationsSeconds: [1_800, 3_600, 14_400],
       })
     ).toBe(true)
   })
