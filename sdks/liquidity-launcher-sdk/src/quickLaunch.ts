@@ -31,8 +31,15 @@ import type { LockRecipientInput } from './lock'
 // Defining preset constants
 // ---------------------------------------------------------------------------
 
-/** Quick launches run for 4h only (14400s). Supersedes the earlier 30m/1h/4h set. */
-export const QUICK_LAUNCH_DURATION_SECONDS = 14_400
+/** Auction window a new quick launch is created with: 1h (3600s). */
+export const QUICK_LAUNCH_DURATION_SECONDS = 3_600
+
+/**
+ * The 4h (14400s) auction window earlier quick launches were created with. Launches with this window
+ * exist on-chain and are still quick launches, so {@link isQuickLaunch} accepts it by default — see
+ * {@link QuickLaunchMatchOptions.allowedDurationsSeconds}.
+ */
+export const QUICK_LAUNCH_LEGACY_DURATION_SECONDS = 14_400
 
 /** Fixed, standardized total supply: 1,000,000,000 (1B) whole tokens (minted via the Token Factory). */
 export const QUICK_LAUNCH_TOTAL_SUPPLY = 1_000_000_000n
@@ -75,8 +82,8 @@ export const QUICK_LAUNCH_GRADUATION_RAISE_USD = QUICK_LAUNCH_GRADUATION_FDV_USD
 /**
  * The graduation-FDV values (USD) a quick launch may carry. Grandfathers the historical $5k cohort
  * alongside the current $10k preset ({@link QUICK_LAUNCH_GRADUATION_FDV_USD}), the same escape-hatch
- * shape as the {@link QuickLaunchMatchOptions.allowedDurationsSeconds} override that grandfathers the
- * POC 30m/1h windows. USD-denominated on purpose: the gate is chain-agnostic, so a legit $5k launch
+ * shape as {@link QuickLaunchMatchOptions.allowedDurationsSeconds}, which grandfathers the legacy 4h
+ * window. USD-denominated on purpose: the gate is chain-agnostic, so a legit $5k launch
  * on any chain (e.g. ~378 AVAX) passes, while a raw-native threshold would wrongly demote every
  * non-ETH chain. See {@link isQuickLaunch}.
  */
@@ -201,7 +208,7 @@ export const PERMANENT_UNLOCK_BLOCK_THRESHOLD = 200_000_000_000n
  */
 export const QUICK_LAUNCH_SEARCHER_BURN_THRESHOLD_PERCENT = 0.05
 
-/** Default fractional tolerance when comparing a derived auction duration to the 4h target (±10%). */
+/** Default fractional tolerance when comparing a derived auction duration to an allowed target (±10%). */
 export const QUICK_LAUNCH_DURATION_TOLERANCE_RATIO = 0.1
 
 // ---------------------------------------------------------------------------
@@ -316,7 +323,7 @@ export const QUICK_LAUNCH_PRESET: QuickLaunchPreset = {
   },
 }
 
-/** The 4h window as a block count on `chainId` (uses the chain's block time). */
+/** The {@link QUICK_LAUNCH_DURATION_SECONDS} window as a block count on `chainId` (uses the chain's block time). */
 export function getQuickLaunchDurationBlocks(chainId: number): bigint {
   return BigInt(Math.round(QUICK_LAUNCH_DURATION_SECONDS / getBlockTimeSeconds(chainId)))
 }
@@ -476,12 +483,14 @@ export interface QuickLaunchMatchOptions {
   /** Fractional tolerance on the duration comparison. Default {@link QUICK_LAUNCH_DURATION_TOLERANCE_RATIO}. */
   durationToleranceRatio?: number
   /**
-   * Durations (seconds) accepted as quick-launch. Defaults to the current canonical preset (4h only).
+   * Durations (seconds) accepted as quick-launch, each within {@link durationToleranceRatio}. Defaults
+   * to `[QUICK_LAUNCH_DURATION_SECONDS, QUICK_LAUNCH_LEGACY_DURATION_SECONDS]`: the current 1h window
+   * and the legacy 4h window.
    *
-   * POLICY: the create preset is 4h-only going forward, so new launches must match exactly 4h. This
-   * matcher also classifies auctions that already exist on-chain; the earlier POC created 30m/1h/4h
-   * auctions. Recognizing those historical windows is opt-in via this override
-   * (`[1800, 3600, 14400]`) so callers make the choice explicitly — the default stays strict on 4h.
+   * Both are accepted by default because this matcher also classifies auctions that already exist
+   * on-chain: a consumer that upgrades without passing options must not silently stop recognising 4h
+   * quick launches. Callers that need a stricter window — e.g. a backend applying a cutover date —
+   * pass their own list (`[QUICK_LAUNCH_DURATION_SECONDS]`).
    */
   allowedDurationsSeconds?: readonly number[]
   /**
@@ -510,9 +519,9 @@ export interface QuickLaunchMatchOptions {
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,
- * and the 4h duration. The 50/50 LP reserve and the permanent lock (buyback-&-burn, or a
- * structurally permanent `'burn'` / `'creatorFees'` mode) are matched only
- * when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
+ * and an allowed duration ({@link QuickLaunchMatchOptions.allowedDurationsSeconds}). The 50/50 LP
+ * reserve and the permanent lock (buyback-&-burn, or a structurally permanent `'burn'` /
+ * `'creatorFees'` mode) are matched only when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
  * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
  * only turn a match into a non-match, classifying without them is a safe over-approximation that a
  * later pass can tighten.
@@ -532,7 +541,7 @@ export interface QuickLaunchMatchOptions {
 export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaunchMatchOptions = {}): boolean {
   const {
     durationToleranceRatio = QUICK_LAUNCH_DURATION_TOLERANCE_RATIO,
-    allowedDurationsSeconds = [QUICK_LAUNCH_DURATION_SECONDS],
+    allowedDurationsSeconds = [QUICK_LAUNCH_DURATION_SECONDS, QUICK_LAUNCH_LEGACY_DURATION_SECONDS],
     allowedGraduationFdvUsd = QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
     graduationFdvToleranceRatio = QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   } = options
