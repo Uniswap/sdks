@@ -95,6 +95,54 @@ describe('CurrencyAmount', () => {
     })
   })
 
+  describe('comparators', () => {
+    const tokenA = new Token(1, ADDRESS_ONE, 18)
+    const tokenB = new Token(1, '0x0000000000000000000000000000000000000002', 18)
+
+    it('lessThan returns true when first amount is smaller', () => {
+      const a = CurrencyAmount.fromRawAmount(tokenA, 1)
+      const b = CurrencyAmount.fromRawAmount(tokenA, 2)
+      expect(a.lessThan(b)).toBe(true)
+      expect(b.lessThan(a)).toBe(false)
+    })
+
+    it('equalTo returns true for equal amounts of the same currency', () => {
+      const a = CurrencyAmount.fromRawAmount(tokenA, 100)
+      const b = CurrencyAmount.fromRawAmount(tokenA, 100)
+      expect(a.equalTo(b)).toBe(true)
+    })
+
+    it('greaterThan returns true when first amount is larger', () => {
+      const a = CurrencyAmount.fromRawAmount(tokenA, 5)
+      const b = CurrencyAmount.fromRawAmount(tokenA, 1)
+      expect(a.greaterThan(b)).toBe(true)
+    })
+
+    it('comparison against the literal 0 sentinel works without currency check', () => {
+      const zero = CurrencyAmount.fromRawAmount(tokenA, 0)
+      const nonZero = CurrencyAmount.fromRawAmount(tokenA, 1)
+      expect(zero.equalTo(0)).toBe(true)
+      expect(nonZero.greaterThan(0)).toBe(true)
+      expect(zero.lessThan(0)).toBe(false)
+    })
+
+    it('only the literal 0 sentinel is accepted as a non-CurrencyAmount operand', () => {
+      const amount = CurrencyAmount.fromRawAmount(tokenA, 1)
+      // @ts-expect-error — non-zero BigintIsh is rejected by the narrowed type
+      expect(() => amount.greaterThan(JSBI.BigInt(5))).toThrow()
+      // @ts-expect-error — strings are rejected by the narrowed type
+      expect(() => amount.equalTo('1')).toThrow()
+    })
+
+    it('throws CURRENCY when comparing different currencies', () => {
+      const a = CurrencyAmount.fromRawAmount(tokenA, 1)
+      const b = CurrencyAmount.fromRawAmount(tokenB, 1)
+      expect(() => a.lessThan(b)).toThrow('CURRENCY')
+      expect(() => a.equalTo(b)).toThrow('CURRENCY')
+      expect(() => a.greaterThan(b)).toThrow('CURRENCY')
+    })
+  })
+
   describe('#toExact', () => {
     it('does not throw for sig figs > currency.decimals', () => {
       const token = new Token(1, ADDRESS_ONE, 0)
