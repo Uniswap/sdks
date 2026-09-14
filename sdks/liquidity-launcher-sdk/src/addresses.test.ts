@@ -323,7 +323,7 @@ describe('Arc (5042) deployment', () => {
   // them. Arc's periphery did not redeploy in v3.3.0, so both generations share the splitters.
   const ARC_GENERATIONS = [
     { on: '0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056', off: '0xff301aCB22816D210d75D71F31Ac13C771093EF3' }, // 2026-09-01 initial-tick redeploy
-    { on: '0x0C7adf7AF6375374d3bfbb838492892Aa3AdaE65', off: '0x3d4C91ca6de46801c7524bfFAd6Ef9353c6827C3' }, // v3.3.0 (current)
+    { on: '0x78429369103a9b8a545d11705bf04b4A4403fcc2', off: '0xA5FFB8B08429a95A75a893717049b6c8A8d5e961' }, // v3.3.0 (current; 2026-09-14 redeploy)
   ] as const
   const ARC_CURRENT = ARC_GENERATIONS[ARC_GENERATIONS.length - 1]!
   const ARC_FEES_ON_SPLITTER = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')

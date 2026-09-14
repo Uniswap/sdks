@@ -364,11 +364,12 @@ const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf585b5D728A8fdE74302
 // USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated 198,050.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_20260901 = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901 = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
-// v3.3.0 (contracts 1c59049). Unlike Robinhood, Arc's periphery did not redeploy: both v3.3.0
-// strategies pin the same v3.2.0 FeeSplitters, vault and compounding recipient as the 2026-09-01
-// generation, so those constants serve both generations.
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_V330 = getAddress('0x0C7adf7AF6375374d3bfbb838492892Aa3AdaE65')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_V330 = getAddress('0x3d4C91ca6de46801c7524bfFAd6Ef9353c6827C3')
+// v3.3.0 (contracts 1c59049), redeployed 2026-09-14 with the protocolFeeController fix (LP-1727);
+// the 2026-09-08 v3.3.0 pair launched nothing and is dropped. Unlike Robinhood, Arc's periphery did
+// not redeploy: both strategies pin the same v3.2.0 FeeSplitters, vault and compounding recipient
+// as the 2026-09-01 generation, so those constants serve both generations.
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_V330 = getAddress('0x78429369103a9b8a545d11705bf04b4A4403fcc2')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_V330 = getAddress('0xA5FFB8B08429a95A75a893717049b6c8A8d5e961')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
 const UERC20_BENEFICIARY_VAULT_ARC = getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af')
