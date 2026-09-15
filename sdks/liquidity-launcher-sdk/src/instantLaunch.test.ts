@@ -82,8 +82,7 @@ describe('getInstantLaunchAddresses', () => {
 
   it('resolves on Arc to the buyback-and-burn pair for new launches', () => {
     const launcher = getLauncherAddresses(SupportedChainId.ARC)!
-    // Independent literals: the creation default must be the buyback-and-burn generation, not the
-    // superseded 2026-09-14 pair that stays registered for its existing launches.
+    // Independent literals: the creation default must be the buyback-and-burn generation.
     const current = {
       true: { strategy: '0x58E5099f22008bc280152c13b636c88d0fE3E132', splitter: '0xdaA7C2e833Ba71a206f56276b58926A33fB37C33' },
       false: { strategy: '0x36F8c87047b212589eD66524Bb69cE62B1f00B2d', splitter: '0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616' },

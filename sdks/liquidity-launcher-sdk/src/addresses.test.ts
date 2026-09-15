@@ -320,8 +320,8 @@ describe('Instant Launch deployment registry', () => {
 
 describe('Arc (5042) deployment', () => {
   // Independent literals (not read back from the registry) so a registry edit cannot silently move
-  // them. The first two generations share the v3.2.0 splitters; the buyback-and-burn generation
-  // brings its own.
+  // them. The 2026-09-01 generation uses the v3.2.0 splitters; the v3.3.0 buyback-and-burn
+  // generation brings its own.
   const ARC_V320_FEES_ON_SPLITTER = '0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607'
   const ARC_V320_FEES_OFF_SPLITTER = '0xCDDC6103dD64dd05Cf634166326a21Be06B3165A'
   const ARC_GENERATIONS = [
@@ -329,13 +329,6 @@ describe('Arc (5042) deployment', () => {
     {
       on: '0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056',
       off: '0xff301aCB22816D210d75D71F31Ac13C771093EF3',
-      onSplitter: ARC_V320_FEES_ON_SPLITTER,
-      offSplitter: ARC_V320_FEES_OFF_SPLITTER,
-    },
-    // v3.3.0, 2026-09-14 redeploy (protocolFeeController fix)
-    {
-      on: '0x78429369103a9b8a545d11705bf04b4A4403fcc2',
-      off: '0xA5FFB8B08429a95A75a893717049b6c8A8d5e961',
       onSplitter: ARC_V320_FEES_ON_SPLITTER,
       offSplitter: ARC_V320_FEES_OFF_SPLITTER,
     },
@@ -368,7 +361,7 @@ describe('Arc (5042) deployment', () => {
     expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
-  it('registers both Arc generations, keeping the superseded one resolvable (append-only)', () => {
+  it('registers both Arc generations and selects the buyback-and-burn pair for new launches', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
     expect(deployments).toHaveLength(ARC_GENERATIONS.length * 2)
     ARC_GENERATIONS.forEach((generation, index) => {
@@ -400,6 +393,20 @@ describe('Arc (5042) deployment', () => {
     )
   })
 
+  it('drops the superseded 2026-09-14 v3.3.0 compounding pair', () => {
+    // Replaced outright by the buyback-and-burn pair rather than appended, so these strategies no
+    // longer resolve. Their v3.2.0 splitters still classify through the 2026-09-01 generation.
+    const dropped = [
+      '0x78429369103a9b8a545d11705bf04b4A4403fcc2',
+      '0xA5FFB8B08429a95A75a893717049b6c8A8d5e961',
+    ].map((address) => getAddress(address))
+    const registered = getInstantLaunchDeployments(SupportedChainId.ARC).map((deployment) => deployment.strategy)
+    for (const strategy of dropped) {
+      expect(getInstantLaunchDeployment(strategy)).toBeUndefined()
+      expect(registered).not.toContain(strategy)
+    }
+  })
+
   it('carries the Arc singletons (vault, compounding recipient) — unchanged by the buyback-and-burn pair', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ARC)
     expect(contracts?.beneficiaryVault).toBe(getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af'))
@@ -409,7 +416,7 @@ describe('Arc (5042) deployment', () => {
   })
 
   it('resolves the Arc position recipients per variant', () => {
-    // The buyback-and-burn generation moves both recipients to its own splitters; the superseded
+    // The buyback-and-burn generation moves both recipients to its own splitters; the 2026-09-01
     // v3.2.0 splitters still classify.
     expect(getCreatorFeesPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_ON_SPLITTER)
     expect(getAutocompoundPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_OFF_SPLITTER)
