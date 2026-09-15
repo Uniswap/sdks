@@ -66,6 +66,27 @@ export class CurrencyAmount<T extends Currency> extends Fraction {
     return CurrencyAmount.fromFractionalAmount(this.currency, divided.numerator, divided.denominator)
   }
 
+  public lessThan(other: CurrencyAmount<T> | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) {
+      invariant(this.currency.equals(other.currency), 'CURRENCY')
+    }
+    return super.lessThan(other)
+  }
+
+  public equalTo(other: CurrencyAmount<T> | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) {
+      invariant(this.currency.equals(other.currency), 'CURRENCY')
+    }
+    return super.equalTo(other)
+  }
+
+  public greaterThan(other: CurrencyAmount<T> | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) {
+      invariant(this.currency.equals(other.currency), 'CURRENCY')
+    }
+    return super.greaterThan(other)
+  }
+
   public toSignificant(
     significantDigits: number = 6,
     format?: object,
