@@ -25,6 +25,7 @@ import {
   TICK_DATA_LENS_V2,
 } from './addresses'
 import { SupportedChainId } from './chains'
+import { getInstantLaunchAddresses } from './instantLaunch'
 
 describe('getLauncherAddresses', () => {
   it('returns the Unichain LBPStrategy singleton', () => {
@@ -427,6 +428,29 @@ describe('Arc (5042) deployment', () => {
     expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, getAddress(ARC_V320_FEES_OFF_SPLITTER))).toBe(true)
     // Chain-scoped: the Robinhood splitters never classify on Arc.
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, FEES_ON_SPLITTER_20260805)).toBe(false)
+  })
+
+  it('never hands the v3.2.0 splitters to a new launch; they stay classification-only', () => {
+    // The 2026-09-01 splitters are not safe to launch on. Every creation-path selector must return
+    // the buyback-and-burn splitter for both variants, while the classifiers keep recognizing the
+    // old ones so the 2026-09-01 launches still resolve.
+    const v320Splitters = [ARC_V320_FEES_ON_SPLITTER, ARC_V320_FEES_OFF_SPLITTER].map((address) => getAddress(address))
+    for (const creatorFeesEnabled of [true, false] as const) {
+      const current = creatorFeesEnabled ? ARC_FEES_ON_SPLITTER : ARC_FEES_OFF_SPLITTER
+      const selected = [
+        getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled })?.feeSplitter,
+        getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled })?.feeSplitter,
+        creatorFeesEnabled
+          ? getCreatorFeesPositionRecipient(SupportedChainId.ARC)
+          : getAutocompoundPositionRecipient(SupportedChainId.ARC),
+      ]
+      for (const splitter of selected) {
+        expect(splitter).toBe(current)
+        expect(v320Splitters).not.toContain(splitter)
+      }
+    }
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, v320Splitters[0]!)).toBe(true)
+    expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, v320Splitters[1]!)).toBe(true)
   })
 })
 
