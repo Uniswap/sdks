@@ -67,6 +67,8 @@ export interface InstantLaunchAddresses {
   beneficiaryVault: Address
   /** CompoundingClaimRecipient singleton — the autocompound recipient of every FeeSplitter. */
   compoundingClaimRecipient: Address
+  /** BuybackAndBurnRecipient singleton, where the chain's current FeeSplitters forward to it. */
+  buybackAndBurnRecipient?: Address
   /** Which variant this stack is ({@link InstantLaunchDeployment.creatorFeesEnabled}). */
   creatorFeesEnabled: boolean
 }
@@ -92,6 +94,7 @@ export function getInstantLaunchAddresses(
     feeSplitter: deployment.feeSplitter,
     beneficiaryVault: contracts.beneficiaryVault,
     compoundingClaimRecipient: contracts.compoundingClaimRecipient,
+    buybackAndBurnRecipient: contracts.buybackAndBurnRecipient,
     creatorFeesEnabled: deployment.creatorFeesEnabled,
   }
 }
