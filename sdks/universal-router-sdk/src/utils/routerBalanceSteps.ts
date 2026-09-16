@@ -35,7 +35,12 @@ export function stepSpendsToken(step: SwapStep, inputTokenAddress: string): bool
   }
 }
 
-function isInputSwap(action: V4Action, tokenAddress: string): boolean {
+// The SETTLE that funds a v4 step's input-token swaps (SETTLE_ALL is refused upstream).
+export function isInputSettle(action: V4Action, tokenAddress: string): boolean {
+  return action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
+}
+
+export function isInputSwap(action: V4Action, tokenAddress: string): boolean {
   return (
     (action.action === 'SWAP_EXACT_IN' && action.currencyIn.toLowerCase() === tokenAddress) ||
     (action.action === 'SWAP_EXACT_IN_SINGLE' && v4ActionSpendsToken(action, tokenAddress))
@@ -52,7 +57,7 @@ function swapAmountIn(action: V4Action): BigNumber {
 // plan funds them with a single concrete settle. Zero when nothing concrete is present
 // (sentinels / open-delta), which the split logic treats as "not comparable".
 function v4StepSpendAmount(actions: V4Action[], tokenAddress: string): BigNumber {
-  const settle = actions.find((action) => action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress)
+  const settle = actions.find((action) => isInputSettle(action, tokenAddress))
   if (settle && settle.action === 'SETTLE') {
     const amount = BigNumber.from(settle.amount)
     if (amount.gt(0) && !amount.eq(CONTRACT_BALANCE)) {
@@ -65,13 +70,12 @@ function v4StepSpendAmount(actions: V4Action[], tokenAddress: string): BigNumber
 }
 
 function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[] {
-  const hasInputSettle = actions.some(
-    (action) => action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
-  )
+  const hasInputSettle = actions.some((action) => isInputSettle(action, tokenAddress))
 
-  // The settle that funds the swaps now takes the router's whole balance.
+  // The settle that funds the swaps now takes the router's whole balance. Caller order is
+  // preserved, so validateEncodeSwaps requires that settle to precede the input swaps.
   const settled: V4Action[] = actions.map((action) =>
-    action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
+    isInputSettle(action, tokenAddress)
       ? { ...action, amount: CONTRACT_BALANCE.toString(), payerIsUser: false }
       : action
   )
@@ -133,9 +137,7 @@ function clearPayerIsUser(step: SwapStep, tokenAddress: string): SwapStep {
       return {
         ...step,
         v4Actions: step.v4Actions.map((action) =>
-          action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
-            ? { ...action, payerIsUser: false }
-            : action
+          isInputSettle(action, tokenAddress) ? { ...action, payerIsUser: false } : action
         ),
       }
     default:

@@ -14,7 +14,7 @@ import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encode
 import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
 import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
-import { stepSpendsToken } from './routerBalanceSteps'
+import { isInputSettle, isInputSwap, stepSpendsToken } from './routerBalanceSteps'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -186,6 +186,19 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         !nativeBalanceInput || index === 0 || !stepSpendsToken(step, ETH_ADDRESS),
         'ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED'
       )
+      // The rewrite keeps the caller's v4 action order and turns the input settle into
+      // SETTLE(CONTRACT_BALANCE) with the swap on the open delta. A swap that runs before
+      // that settle has nothing to spend and reverts on-chain, so require settle first.
+      // (A step with no input settle gets one prepended by the rewrite.)
+      if (step.type === 'V4_SWAP' && stepSpendsToken(step, balanceInputTokenAddress)) {
+        const token = balanceInputTokenAddress.toLowerCase()
+        const settleIndex = step.v4Actions.findIndex((action) => isInputSettle(action, token))
+        const swapIndex = step.v4Actions.findIndex((action) => isInputSwap(action, token))
+        invariant(
+          settleIndex < 0 || swapIndex < 0 || settleIndex < swapIndex,
+          'ROUTER_BALANCE_INPUT_V4_SETTLE_BEFORE_SWAP'
+        )
+      }
     })
   }
 
