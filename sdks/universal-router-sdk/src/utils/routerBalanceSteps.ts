@@ -121,16 +121,38 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
   ]
 }
 
-function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
+// The router holds the funds, so no spender leg may pull from the user: a payerIsUser
+// flag left over from a wallet-mode plan would encode as permit2.transferFrom(msg.sender)
+// on-chain. Amounts are left untouched; this is used for the fixed legs of a split.
+function clearPayerIsUser(step: SwapStep, tokenAddress: string): SwapStep {
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':
     case 'V3_SWAP_EXACT_IN':
-      // The router holds the funds: a payerIsUser flag from a wallet-mode plan must not survive.
-      return { ...step, amountIn: CONTRACT_BALANCE.toString(), payerIsUser: false }
+      return { ...step, payerIsUser: false }
     case 'V4_SWAP':
-      return { ...step, v4Actions: applyToV4Actions(step.v4Actions, tokenAddress) }
+      return {
+        ...step,
+        v4Actions: step.v4Actions.map((action) =>
+          action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
+            ? { ...action, payerIsUser: false }
+            : action
+        ),
+      }
     default:
       // validateEncodeSwaps refuses exact-out and unexpected shapes before this runs
+      invariant(false, 'ROUTER_BALANCE_INPUT_UNSUPPORTED_STEP')
+  }
+}
+
+function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
+  const cleared = clearPayerIsUser(step, tokenAddress)
+  switch (cleared.type) {
+    case 'V2_SWAP_EXACT_IN':
+    case 'V3_SWAP_EXACT_IN':
+      return { ...cleared, amountIn: CONTRACT_BALANCE.toString() }
+    case 'V4_SWAP':
+      return { ...cleared, v4Actions: applyToV4Actions(cleared.v4Actions, tokenAddress) }
+    default:
       invariant(false, 'ROUTER_BALANCE_INPUT_UNSUPPORTED_STEP')
   }
 }
@@ -199,7 +221,8 @@ export function applyRouterBalanceInputToSteps(swapSteps: SwapStep[], inputToken
     if (index === remainderIndex) {
       return
     }
-    reordered.push(step)
+    // fixed legs keep their quoted amounts but are funded from router custody too
+    reordered.push(spenderIndexes.includes(index) ? clearPayerIsUser(step, tokenAddress) : step)
     // insert the remainder right after the last other spender
     if (
       index === lastSpenderIndex ||

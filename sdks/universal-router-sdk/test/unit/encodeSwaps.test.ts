@@ -2675,6 +2675,46 @@ describe('encodeSwaps', () => {
       expect(swap[4]).to.equal(false)
     })
 
+    it('forces payerIsUser to false on every leg of a split, not just the remainder', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        buildV3ExactInStep({ amountIn: '900000', payerIsUser: true }, [USDC, DAI, WETH], [500, 3000]),
+        buildV3ExactInStep({ amountIn: '100000', payerIsUser: true }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const fixedLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(fixedLeg[1].toString()).to.equal('100000')
+      expect(fixedLeg[4]).to.equal(false)
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(remainderLeg[4]).to.equal(false)
+    })
+
+    it('forces payerIsUser to false on a fixed V4 leg SETTLE while keeping its amount', () => {
+      const v4Leg: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '100000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '100000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [v4Leg, buildV3ExactInStep({ amountIn: '900000' })])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect(parsed.actions[0].actionName).to.equal('SETTLE')
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal('100000')
+      expect(parsed.actions[0].params[2].value).to.equal(false)
+    })
+
     it('encodes a v3 balance swap with no ingress and CONTRACT_BALANCE on hop 0', () => {
       const result = SwapRouter.encodeSwaps(balanceSpec(), [buildV3ExactInStep()])
       const { inputs } = decodeExecute(result.calldata)
