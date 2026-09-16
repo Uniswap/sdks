@@ -2795,6 +2795,28 @@ describe('encodeSwaps', () => {
       expect(swapParams.amountIn.toString()).to.equal('0')
     })
 
+    it('refuses a v4 step whose input SETTLE comes after the swap', () => {
+      const swap: V4Action = {
+        action: 'SWAP_EXACT_IN',
+        currencyIn: USDC.address,
+        path: [{ intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' }],
+        amountIn: '0',
+        amountOutMinimum: '0',
+      }
+      const settle: V4Action = { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: false }
+      const take: V4Action = { action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' }
+
+      const swapFirst: V4Swap = { type: 'V4_SWAP', v4Actions: [swap, settle, take] }
+      expect(() => validateEncodeSwaps(balanceSpec(), [swapFirst])).to.throw(
+        'ROUTER_BALANCE_INPUT_V4_SETTLE_BEFORE_SWAP'
+      )
+
+      const settleFirst: V4Swap = { type: 'V4_SWAP', v4Actions: [settle, swap, take] }
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [settleFirst])
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.SWEEP])
+    })
+
     it('rewrites an existing v4 SETTLE of the input token instead of adding a second', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
