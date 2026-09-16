@@ -35,25 +35,81 @@ export function stepSpendsToken(step: SwapStep, inputTokenAddress: string): bool
   }
 }
 
+function isInputSwap(action: V4Action, tokenAddress: string): boolean {
+  return (
+    (action.action === 'SWAP_EXACT_IN' && action.currencyIn.toLowerCase() === tokenAddress) ||
+    (action.action === 'SWAP_EXACT_IN_SINGLE' && v4ActionSpendsToken(action, tokenAddress))
+  )
+}
+
+function swapAmountIn(action: V4Action): BigNumber {
+  return action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_IN_SINGLE'
+    ? BigNumber.from(action.amountIn)
+    : BigNumber.from(0)
+}
+
+// Sum of the fixed amounts the input-spending swaps take, or the settle amount when the
+// plan funds them with a single concrete settle. Zero when nothing concrete is present
+// (sentinels / open-delta), which the split logic treats as "not comparable".
+function v4StepSpendAmount(actions: V4Action[], tokenAddress: string): BigNumber {
+  const settle = actions.find((action) => action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress)
+  if (settle && settle.action === 'SETTLE') {
+    const amount = BigNumber.from(settle.amount)
+    if (amount.gt(0) && !amount.eq(CONTRACT_BALANCE)) {
+      return amount
+    }
+  }
+  return actions
+    .filter((action) => isInputSwap(action, tokenAddress))
+    .reduce((total, action) => total.add(swapAmountIn(action)), BigNumber.from(0))
+}
+
 function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[] {
   const hasInputSettle = actions.some(
     (action) => action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
   )
 
-  const transformed: V4Action[] = actions.map((action) => {
-    // The settle that funds the swap now takes the router's whole balance.
-    if (action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress) {
-      return { ...action, amount: CONTRACT_BALANCE.toString(), payerIsUser: false }
+  // The settle that funds the swaps now takes the router's whole balance.
+  const settled: V4Action[] = actions.map((action) =>
+    action.action === 'SETTLE' && action.currency.toLowerCase() === tokenAddress
+      ? { ...action, amount: CONTRACT_BALANCE.toString(), payerIsUser: false }
+      : action
+  )
+
+  // Exactly one input swap may consume the open delta (amountIn 0). With several input
+  // swaps (a split inside the step) the others keep their quoted slices and the largest
+  // moves after them, so it absorbs the delivery variance and the fixed slices are never
+  // starved.
+  const swapIndexes = settled
+    .map((action, index) => (isInputSwap(action, tokenAddress) ? index : -1))
+    .filter((index) => index >= 0)
+  let transformed: V4Action[] = settled
+  if (swapIndexes.length === 1) {
+    transformed = settled.map((action, index) => (index === swapIndexes[0] ? { ...action, amountIn: 0 } : action))
+  } else if (swapIndexes.length > 1) {
+    let remainderIndex = swapIndexes[0]
+    for (const index of swapIndexes) {
+      if (swapAmountIn(settled[index]).gt(swapAmountIn(settled[remainderIndex]))) {
+        remainderIndex = index
+      }
     }
-    // With the settle sized by CONTRACT_BALANCE, the swap consumes the open delta.
-    if (action.action === 'SWAP_EXACT_IN' && action.currencyIn.toLowerCase() === tokenAddress) {
-      return { ...action, amountIn: 0 }
-    }
-    if (action.action === 'SWAP_EXACT_IN_SINGLE' && v4ActionSpendsToken(action, tokenAddress)) {
-      return { ...action, amountIn: 0 }
-    }
-    return action
-  })
+    const remainder: V4Action = { ...settled[remainderIndex], amountIn: 0 } as V4Action
+    const lastSwapIndex = swapIndexes[swapIndexes.length - 1]
+    const reordered: V4Action[] = []
+    settled.forEach((action, index) => {
+      if (index === remainderIndex) {
+        return
+      }
+      reordered.push(action)
+      if (
+        index === lastSwapIndex ||
+        (lastSwapIndex === remainderIndex && index === swapIndexes[swapIndexes.length - 2])
+      ) {
+        reordered.push(remainder)
+      }
+    })
+    transformed = reordered
+  }
 
   if (hasInputSettle) {
     return transformed
@@ -69,7 +125,8 @@ function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':
     case 'V3_SWAP_EXACT_IN':
-      return { ...step, amountIn: CONTRACT_BALANCE.toString() }
+      // The router holds the funds: a payerIsUser flag from a wallet-mode plan must not survive.
+      return { ...step, amountIn: CONTRACT_BALANCE.toString(), payerIsUser: false }
     case 'V4_SWAP':
       return { ...step, v4Actions: applyToV4Actions(step.v4Actions, tokenAddress) }
     default:
@@ -78,19 +135,27 @@ function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
   }
 }
 
-// The remainder leg of a split: the largest spender by amountIn, which
-// absorbs all delivery variance. V4 spenders are refused in splits (their
-// spend amount lives in settle/open-delta actions, not a comparable field).
-function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[]): number {
+// The remainder leg of a split: the largest spender by input amount, which absorbs all
+// delivery variance. A v4 leg's spend is read from its input settle (or the sum of its
+// input swaps); a leg with no concrete amount cannot be compared and is refused.
+function stepSpendAmount(step: SwapStep, tokenAddress: string): BigNumber {
+  switch (step.type) {
+    case 'V2_SWAP_EXACT_IN':
+    case 'V3_SWAP_EXACT_IN':
+      return BigNumber.from(step.amountIn)
+    case 'V4_SWAP':
+      return v4StepSpendAmount(step.v4Actions, tokenAddress)
+    default:
+      return BigNumber.from(0)
+  }
+}
+
+function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[], tokenAddress: string): number {
   let remainderIndex = spenderIndexes[0]
   let remainderAmount = BigNumber.from(-1)
   for (const index of spenderIndexes) {
-    const step = swapSteps[index]
-    invariant(
-      step.type === 'V2_SWAP_EXACT_IN' || step.type === 'V3_SWAP_EXACT_IN',
-      'ROUTER_BALANCE_INPUT_V4_SPLIT_UNSUPPORTED'
-    )
-    const amount = BigNumber.from(step.amountIn)
+    const amount = stepSpendAmount(swapSteps[index], tokenAddress)
+    invariant(amount.gt(0) && !amount.eq(CONTRACT_BALANCE), 'ROUTER_BALANCE_INPUT_SPLIT_LEG_AMOUNT_UNKNOWN')
     if (amount.gt(remainderAmount)) {
       remainderAmount = amount
       remainderIndex = index
@@ -103,7 +168,8 @@ function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[]): nu
  * Rewrites a step plan to spend the router's entire input-token balance.
  *
  * Single spender: its v2/v3 exact-in amount becomes the CONTRACT_BALANCE
- * sentinel (a v4 spender settles CONTRACT_BALANCE and swaps the open delta).
+ * sentinel (a v4 spender settles CONTRACT_BALANCE; one of its input swaps
+ * consumes the open delta while any others keep their quoted slices).
  *
  * Split routes (multiple spenders of the input token): every spender but the
  * largest keeps its quoted amount, funded from router custody; the largest is
@@ -124,7 +190,7 @@ export function applyRouterBalanceInputToSteps(swapSteps: SwapStep[], inputToken
     )
   }
 
-  const remainderIndex = pickRemainderIndex(swapSteps, spenderIndexes)
+  const remainderIndex = pickRemainderIndex(swapSteps, spenderIndexes, tokenAddress)
   const remainder = rewriteSpendingStep(swapSteps[remainderIndex], tokenAddress)
   const lastSpenderIndex = spenderIndexes[spenderIndexes.length - 1]
 
