@@ -8,6 +8,7 @@ import {
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
   ZERO_ADDRESS,
+  ETH_ADDRESS,
 } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 import { getCurrencyAddress } from './getCurrencyAddress'
@@ -161,8 +162,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     // At least one step must spend the (wrapped) input token. Splits are
     // allowed: the transform keeps every spender's quoted amount except the
     // largest, which is rewritten to CONTRACT_BALANCE and moved last among the
-    // spenders. V4 spenders in a split are refused (their spend amount is not
-    // comparable), which the transform enforces.
+    // spenders (a v4 leg's spend is read from its input settle or swaps).
     const balanceInputTokenAddress = nativeBalanceInput
       ? spec.routing.inputToken.wrapped.address
       : getCurrencyAddress(spec.routing.inputToken)
@@ -176,11 +176,15 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
         'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
       )
-      // The native plan's single wrap is steps[0]; a second wrap (or any wrap in an
-      // ERC20 plan) would double-spend the router's native balance.
+      // A wrap at hop 0 of an ERC20 plan means the plan expects native input. Wraps later
+      // in the plan are routers wrapping intermediate ETH (a v4 leg paid out native and the
+      // next leg wants WETH) and only touch what that leg produced.
+      invariant(step.type !== 'WRAP_ETH' || index > 0 || nativeBalanceInput, 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+      // Native mode wraps the whole balance at hop 0, so a later leg that still expects raw
+      // ETH (routers can feed v4 pools native directly) would find nothing to spend.
       invariant(
-        step.type !== 'WRAP_ETH' || (nativeBalanceInput && index === 0),
-        nativeBalanceInput ? 'ROUTER_BALANCE_INPUT_DUPLICATE_WRAP' : 'ROUTER_BALANCE_INPUT_NATIVE_INPUT'
+        !nativeBalanceInput || index === 0 || !stepSpendsToken(step, ETH_ADDRESS),
+        'ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED'
       )
     })
   }
@@ -211,9 +215,17 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
 
   // per-step: capability-gate by UR version, recipients must be router custody (or the spec
   // recipient under allowDirectTransfers), per-hop arrays must match hop counts
+  // Router-balance funding rewrites the spender legs and clears any payerIsUser flag a
+  // wallet-mode router plan carried, so the flag is tolerated only on those legs.
+  const balanceInputAddress = spec.routerBalanceInput
+    ? spec.routing.inputToken.isNative
+      ? spec.routing.inputToken.wrapped.address
+      : getCurrencyAddress(spec.routing.inputToken)
+    : undefined
   for (const step of swapSteps) {
     if (!spec.allowDirectTransfers) {
-      invariant(!hasUserPaidFlag(step), 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
+      const rewrittenSpender = balanceInputAddress !== undefined && stepSpendsToken(step, balanceInputAddress)
+      invariant(!hasUserPaidFlag(step) || rewrittenSpender, 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
       if (step.type === 'V4_SWAP') {
         for (const action of step.v4Actions) {
           invariant(action.action !== 'SETTLE_ALL', 'SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')
