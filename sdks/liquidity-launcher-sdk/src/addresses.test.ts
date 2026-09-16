@@ -320,29 +320,18 @@ describe('Instant Launch deployment registry', () => {
 })
 
 describe('Arc (5042) deployment', () => {
-  // Independent literals (not read back from the registry) so a registry edit cannot silently move
-  // them. The 2026-09-01 generation uses the v3.2.0 splitters; the v3.3.0 buyback-and-burn
-  // generation brings its own.
-  const ARC_V320_FEES_ON_SPLITTER = '0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607'
   const ARC_V320_FEES_OFF_SPLITTER = '0xCDDC6103dD64dd05Cf634166326a21Be06B3165A'
   const ARC_GENERATIONS = [
-    // 2026-09-01 initial-tick redeploy
     {
-      on: '0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056',
       off: '0xff301aCB22816D210d75D71F31Ac13C771093EF3',
-      onSplitter: ARC_V320_FEES_ON_SPLITTER,
       offSplitter: ARC_V320_FEES_OFF_SPLITTER,
     },
-    // v3.3.0 buyback-and-burn (current)
     {
-      on: '0x58E5099f22008bc280152c13b636c88d0fE3E132',
       off: '0x36F8c87047b212589eD66524Bb69cE62B1f00B2d',
-      onSplitter: '0xdaA7C2e833Ba71a206f56276b58926A33fB37C33',
       offSplitter: '0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616',
     },
   ] as const
   const ARC_CURRENT = ARC_GENERATIONS[ARC_GENERATIONS.length - 1]!
-  const ARC_FEES_ON_SPLITTER = getAddress(ARC_CURRENT.onSplitter)
   const ARC_FEES_OFF_SPLITTER = getAddress(ARC_CURRENT.offSplitter)
 
   it('carries the Arc launcher stack', () => {
@@ -362,95 +351,62 @@ describe('Arc (5042) deployment', () => {
     expect(selectTokenFactory(addresses)).toEqual({ factory: arcFactory, kind: 'uerc20' })
   })
 
-  it('registers both Arc generations and selects the buyback-and-burn pair for new launches', () => {
+  it('registers only the Arc fees-off generations and selects buyback-and-burn for new launches', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ARC)
-    expect(deployments).toHaveLength(ARC_GENERATIONS.length * 2)
+    expect(deployments).toHaveLength(ARC_GENERATIONS.length)
     ARC_GENERATIONS.forEach((generation, index) => {
-      const on = deployments[index * 2]
-      const off = deployments[index * 2 + 1]
-      expect(on!.strategy).toBe(getAddress(generation.on))
-      expect(on!.feeSplitter).toBe(getAddress(generation.onSplitter))
-      expect(on!.creatorFeesEnabled).toBe(true)
-      expect(on!.creatorFeeNativeBps).toBe(4000)
+      const off = deployments[index]
       expect(off!.strategy).toBe(getAddress(generation.off))
       expect(off!.feeSplitter).toBe(getAddress(generation.offSplitter))
       expect(off!.creatorFeesEnabled).toBe(false)
-      // Pool shape is unchanged across all Arc generations.
-      for (const variant of [on!, off!]) {
-        expect(variant.tickSpacing).toBe(25)
-        expect(variant.initialTick).toBe(122050)
-        expect(variant.initialTick % variant.tickSpacing).toBe(0)
-        expect(variant.minLaunchTick).toBe(-160100)
-      }
-      // The superseded generation classifies but is never selected for new launches.
-      expect(getInstantLaunchDeployment(generation.on)?.chainId).toBe(SupportedChainId.ARC)
+      expect(off!.tickSpacing).toBe(25)
+      expect(off!.initialTick).toBe(122050)
+      expect(off!.initialTick % off!.tickSpacing).toBe(0)
+      expect(off!.minLaunchTick).toBe(-160100)
       expect(getInstantLaunchDeployment(generation.off)?.chainId).toBe(SupportedChainId.ARC)
     })
-    expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })?.strategy).toBe(
-      getAddress(ARC_CURRENT.on)
-    )
     expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: false })?.strategy).toBe(
       getAddress(ARC_CURRENT.off)
     )
+    expect(getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled: true })).toBeUndefined()
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ARC)).toBeUndefined()
   })
 
-  it('drops the superseded 2026-09-14 v3.3.0 compounding pair', () => {
-    // Replaced outright by the buyback-and-burn pair rather than appended, so these strategies no
-    // longer resolve. Their v3.2.0 splitters still classify through the 2026-09-01 generation.
+  it('does not register any Arc fees-on strategy, splitter, or vault', () => {
     const dropped = [
-      '0x78429369103a9b8a545d11705bf04b4A4403fcc2',
-      '0xA5FFB8B08429a95A75a893717049b6c8A8d5e961',
+      '0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056',
+      '0x58E5099f22008bc280152c13b636c88d0fE3E132',
+      '0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607',
+      '0xdaA7C2e833Ba71a206f56276b58926A33fB37C33',
+      '0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af',
     ].map((address) => getAddress(address))
-    const registered = getInstantLaunchDeployments(SupportedChainId.ARC).map((deployment) => deployment.strategy)
-    for (const strategy of dropped) {
-      expect(getInstantLaunchDeployment(strategy)).toBeUndefined()
-      expect(registered).not.toContain(strategy)
+    const registered = [
+      ...getInstantLaunchDeployments(SupportedChainId.ARC).flatMap((deployment) => [
+        deployment.strategy,
+        deployment.feeSplitter,
+      ]),
+      getInstantLaunchContracts(SupportedChainId.ARC)?.beneficiaryVault,
+    ]
+    for (const address of dropped) {
+      expect(getInstantLaunchDeployment(address)).toBeUndefined()
+      expect(registered).not.toContain(address)
     }
+    expect(getInstantLaunchContracts(SupportedChainId.ARC)?.beneficiaryVault).toBeUndefined()
   })
 
-  it('carries the Arc singletons (vault, compounding recipient) — unchanged by the buyback-and-burn pair', () => {
+  it('carries the Arc fees-off singletons (compounding recipient, buyback-and-burn)', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ARC)
-    expect(contracts?.beneficiaryVault).toBe(getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db'))
     expect(contracts?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
     expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.buybackAndBurnRecipient).toBeUndefined()
   })
 
-  it('resolves the Arc position recipients per variant', () => {
-    // The buyback-and-burn generation moves both recipients to its own splitters; the 2026-09-01
-    // v3.2.0 splitters still classify.
-    expect(getCreatorFeesPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_ON_SPLITTER)
+  it('resolves the Arc autocompound position recipient and never a creator-fees recipient', () => {
     expect(getAutocompoundPositionRecipient(SupportedChainId.ARC)).toBe(ARC_FEES_OFF_SPLITTER)
-    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_ON_SPLITTER)).toBe(true)
-    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_OFF_SPLITTER)).toBe(false)
     expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, ARC_FEES_OFF_SPLITTER)).toBe(true)
-    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, getAddress(ARC_V320_FEES_ON_SPLITTER))).toBe(true)
     expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, getAddress(ARC_V320_FEES_OFF_SPLITTER))).toBe(true)
-    // Chain-scoped: the Robinhood splitters never classify on Arc.
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, ARC_FEES_OFF_SPLITTER)).toBe(false)
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, FEES_ON_SPLITTER_20260805)).toBe(false)
-  })
-
-  it('never hands the v3.2.0 splitters to a new launch; they stay classification-only', () => {
-    // The 2026-09-01 splitters are not safe to launch on. Every creation-path selector must return
-    // the buyback-and-burn splitter for both variants, while the classifiers keep recognizing the
-    // old ones so the 2026-09-01 launches still resolve.
-    const v320Splitters = [ARC_V320_FEES_ON_SPLITTER, ARC_V320_FEES_OFF_SPLITTER].map((address) => getAddress(address))
-    for (const creatorFeesEnabled of [true, false] as const) {
-      const current = creatorFeesEnabled ? ARC_FEES_ON_SPLITTER : ARC_FEES_OFF_SPLITTER
-      const selected = [
-        getInstantLaunchStrategy(SupportedChainId.ARC, { creatorFeesEnabled })?.feeSplitter,
-        getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled })?.feeSplitter,
-        creatorFeesEnabled
-          ? getCreatorFeesPositionRecipient(SupportedChainId.ARC)
-          : getAutocompoundPositionRecipient(SupportedChainId.ARC),
-      ]
-      for (const splitter of selected) {
-        expect(splitter).toBe(current)
-        expect(v320Splitters).not.toContain(splitter)
-      }
-    }
-    expect(isCreatorFeesPositionRecipient(SupportedChainId.ARC, v320Splitters[0]!)).toBe(true)
-    expect(isAutocompoundPositionRecipient(SupportedChainId.ARC, v320Splitters[1]!)).toBe(true)
   })
 })
 

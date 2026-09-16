@@ -360,22 +360,18 @@ const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x26d2F7AcB07707034406a0d
 // surface of the older generations' splitters.
 const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf585b5D728A8fdE743027307BF5F3556E3B9C58D')
 
-// Arc (5042) Instant Launch stack. Arc's native currency is 18-decimal USDC, so initialTick is
-// USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated 198,050.
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_20260901 = getAddress('0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056')
+// Arc (5042) Instant Launch stack — fees-off only. Arc's native currency is 18-decimal USDC, so
+// initialTick is USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated
+// 198,050. There is no fees-on FeeSplitter / InstantLaunchStrategy / UERC20BeneficiaryVault on Arc
+// in this SDK; creator-fee Instant Launch and auction `positionRecipient` routing are Robinhood-only.
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901 = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
-// v3.2.0 FeeSplitters, vault and compounding recipient: the 2026-09-01 generation pins these.
-const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC = getAddress('0xC2F1D91599d7CB04E6BB156AB3D10972cC2da607')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
-const UERC20_BENEFICIARY_VAULT_ARC = getAddress('0x3892aB3Dcf62785Ee3077ea008486c3a6bCf51Af')
 const COMPOUNDING_CLAIM_RECIPIENT_ARC = getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db')
-// v3.3.0 buyback-and-burn pair (2026-09-15, current): same launcher, vault and pool shape as
-// 2026-09-01, but new FeeSplitters whose non-creator share goes to the BuybackAndBurnRecipient
-// instead of compounding. Replaces the 2026-09-08 and 2026-09-14 v3.3.0 compounding pairs, which
-// are dropped from the registry: launches made through them no longer resolve here.
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_V330 = getAddress('0x58E5099f22008bc280152c13b636c88d0fE3E132')
+// v3.3.0 buyback-and-burn fees-off (2026-09-15, current): same launcher and pool shape as 2026-09-01,
+// but a new FeeSplitter whose 100% fee share goes to the BuybackAndBurnRecipient instead of
+// compounding. Replaces the 2026-09-08 and 2026-09-14 v3.3.0 compounding pairs, which are dropped
+// from the registry: launches made through them no longer resolve here.
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_V330 = getAddress('0x36F8c87047b212589eD66524Bb69cE62B1f00B2d')
-const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC_V330 = getAddress('0xdaA7C2e833Ba71a206f56276b58926A33fB37C33')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC_V330 = getAddress('0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616')
 const BUYBACK_AND_BURN_RECIPIENT_ARC = getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C')
 
@@ -441,9 +437,10 @@ export interface InstantLaunchChainContracts {
   /**
    * UERC20BeneficiaryVault — registers each fees-on launch's beneficiary as a transferable ERC721
    * and vaults the creator's share of split fees. Also lets the creator of a launcher-created
-   * uERC20 claim unregistered positions via the token's graffiti.
+   * uERC20 claim unregistered positions via the token's graffiti. Optional: omitted on chains with
+   * no fees-on FeeSplitter (Arc).
    */
-  beneficiaryVault: Address
+  beneficiaryVault?: Address
   /**
    * CompoundingClaimRecipient — the protocol/autocompound split recipient of every FeeSplitter on
    * the chain. Its `Claimed` events prove same-transaction liquidity compounding.
@@ -623,19 +620,6 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   },
   {
     chainId: SupportedChainId.ARC,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_20260901,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC,
-    creatorFeesEnabled: true,
-    creatorFeeNativeBps: 4000,
-    creatorFeeTokenBps: 0,
-    tickSpacing: 25,
-    initialTick: 122050,
-    minLaunchTick: -160100,
-    description:
-      'Instant Launch with creator fees (Arc/5042, 2026-09-01): native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc CompoundingClaimRecipient',
-  },
-  {
-    chainId: SupportedChainId.ARC,
     strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901,
     feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC,
     creatorFeesEnabled: false,
@@ -646,19 +630,6 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     minLaunchTick: -160100,
     description:
       'Instant Launch without creator fees (Arc/5042, 2026-09-01): native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
-  },
-  {
-    chainId: SupportedChainId.ARC,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ARC_V330,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ARC_V330,
-    creatorFeesEnabled: true,
-    creatorFeeNativeBps: 4000,
-    creatorFeeTokenBps: 0,
-    tickSpacing: 25,
-    initialTick: 122050,
-    minLaunchTick: -160100,
-    description:
-      'Instant Launch with creator fees (Arc/5042 v3.3.0 buyback-and-burn, current): unchanged native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100); new FeeSplitter forwarding 40% of native fees to the Arc UERC20BeneficiaryVault, 60% native + 100% token to the Arc BuybackAndBurnRecipient',
   },
   {
     chainId: SupportedChainId.ARC,
@@ -684,8 +655,6 @@ export const INSTANT_LAUNCH_CONTRACTS: Partial<Record<number, InstantLaunchChain
   },
   [SupportedChainId.ARC]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
-    beneficiaryVault: UERC20_BENEFICIARY_VAULT_ARC,
-    // Claim surface of the v3.2.0 splitters (2026-09-01 generation).
     compoundingClaimRecipient: COMPOUNDING_CLAIM_RECIPIENT_ARC,
     buybackAndBurnRecipient: BUYBACK_AND_BURN_RECIPIENT_ARC,
   },

@@ -80,22 +80,17 @@ describe('getInstantLaunchAddresses', () => {
     expect(isInstantLaunchSupportedChain(SupportedChainId.MAINNET)).toBe(false)
   })
 
-  it('resolves on Arc to the buyback-and-burn pair for new launches', () => {
+  it('resolves on Arc to the fees-off buyback-and-burn pair, with no fees-on stack', () => {
     const launcher = getLauncherAddresses(SupportedChainId.ARC)!
-    // Independent literals: the creation default must be the buyback-and-burn generation.
-    const current = {
-      true: { strategy: '0x58E5099f22008bc280152c13b636c88d0fE3E132', splitter: '0xdaA7C2e833Ba71a206f56276b58926A33fB37C33' },
-      false: { strategy: '0x36F8c87047b212589eD66524Bb69cE62B1f00B2d', splitter: '0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616' },
-    } as const
-    for (const creatorFeesEnabled of [true, false] as const) {
-      const stack = getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled })
-      expect(stack?.strategy).toBe(getAddress(current[`${creatorFeesEnabled}`].strategy))
-      expect(stack?.feeSplitter).toBe(getAddress(current[`${creatorFeesEnabled}`].splitter))
-      expect(stack?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
-      expect(stack?.uerc20Factory).toBe(getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6'))
-      expect(stack?.liquidityLauncher).toBe(launcher.liquidityLauncher)
-      expect(stack?.creatorFeesEnabled).toBe(creatorFeesEnabled)
-    }
+    const off = getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled: false })
+    expect(off?.strategy).toBe(getAddress('0x36F8c87047b212589eD66524Bb69cE62B1f00B2d'))
+    expect(off?.feeSplitter).toBe(getAddress('0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616'))
+    expect(off?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
+    expect(off?.beneficiaryVault).toBeUndefined()
+    expect(off?.uerc20Factory).toBe(getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6'))
+    expect(off?.liquidityLauncher).toBe(launcher.liquidityLauncher)
+    expect(off?.creatorFeesEnabled).toBe(false)
+    expect(getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled: true })).toBeUndefined()
     expect(isInstantLaunchSupportedChain(SupportedChainId.ARC)).toBe(true)
   })
 })
