@@ -20,6 +20,7 @@ import {
 } from '../../src/types/encodeSwaps'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
+import { applyRouterBalanceInputToSteps } from '../../src/utils/routerBalanceSteps'
 import { encodeFee1e18 } from '../../src/utils/numbers'
 import {
   CONTRACT_BALANCE,
@@ -1940,6 +1941,60 @@ describe('encodeSwaps', () => {
       expect(() =>
         validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [...nativeSteps(), rawEthV4])
       ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED')
+    })
+
+    it('rejects a spender step carrying a user-paid settle in another currency', () => {
+      // The step spends the input token, so the rewrite owns it — but the second
+      // settle is in an unrelated currency the rewrite has no business funding.
+      // Excusing the whole step would encode permit2.transferFrom(msg.sender) for
+      // WETH, and on this arm msg.sender is the filler, not the swapper.
+      const foreignPull: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+          { action: 'SETTLE', currency: WETH.address, amount: '1000000000000000000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(balanceSpec(), [foreignPull])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('still tolerates a user-paid settle in the input token, which the rewrite clears', () => {
+      const inputPull: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(balanceSpec(), [inputPull])).to.not.throw()
+      const [rewritten] = applyRouterBalanceInputToSteps([inputPull], USDC.address)
+      expect(rewritten.type).to.equal('V4_SWAP')
+      if (rewritten.type === 'V4_SWAP') {
+        rewritten.v4Actions
+          .filter((action) => action.action === 'SETTLE')
+          .forEach((action) => {
+            expect((action as any).payerIsUser).to.equal(false)
+          })
+      }
     })
 
     it('rejects a WRAP_ETH at hop 0 of an ERC20 balance plan', () => {
