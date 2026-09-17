@@ -366,7 +366,10 @@ const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf585b5D728A8fdE74302
 // in this SDK; creator-fee Instant Launch and auction `positionRecipient` routing are Robinhood-only.
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901 = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
-const COMPOUNDING_CLAIM_RECIPIENT_ARC = getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db')
+// The 2026-09-01 Arc FeeSplitter forwarded to CompoundingClaimRecipient `0xBE5A26C5…`. That
+// recipient is not a current-generation singleton (Arc's v3.3.0 splitters buy back and burn
+// instead), so it is not registered on INSTANT_LAUNCH_CONTRACTS — only mentioned here as the
+// historical claim surface of the still-registered v3.2.0 splitter.
 // v3.3.0 buyback-and-burn fees-off (2026-09-15, current): same launcher and pool shape as 2026-09-01,
 // but a new FeeSplitter whose 100% fee share goes to the BuybackAndBurnRecipient instead of
 // compounding. Replaces the 2026-09-08 and 2026-09-14 v3.3.0 compounding pairs, which are dropped
@@ -442,10 +445,11 @@ export interface InstantLaunchChainContracts {
    */
   beneficiaryVault?: Address
   /**
-   * CompoundingClaimRecipient — the protocol/autocompound split recipient of every FeeSplitter on
-   * the chain. Its `Claimed` events prove same-transaction liquidity compounding.
+   * CompoundingClaimRecipient — the protocol/autocompound split recipient of the chain's current
+   * FeeSplitters. Its `Claimed` events prove same-transaction liquidity compounding. Optional:
+   * omitted on chains whose current splitters do not compound (Arc — buyback-and-burn).
    */
-  compoundingClaimRecipient: Address
+  compoundingClaimRecipient?: Address
   /**
    * BuybackAndBurnRecipient — the non-creator split recipient of the buyback-and-burn FeeSplitters
    * (Arc's current generation). Optional: only where such splitters are deployed.
@@ -655,7 +659,6 @@ export const INSTANT_LAUNCH_CONTRACTS: Partial<Record<number, InstantLaunchChain
   },
   [SupportedChainId.ARC]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
-    compoundingClaimRecipient: COMPOUNDING_CLAIM_RECIPIENT_ARC,
     buybackAndBurnRecipient: BUYBACK_AND_BURN_RECIPIENT_ARC,
   },
 }

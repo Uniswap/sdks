@@ -49,7 +49,8 @@ import type { Uerc20Metadata } from './types'
  * The fully-resolved Instant Launch stack for one (chain, creator-fee variant) pair: the
  * launcher-side contracts every launch uses plus the variant's strategy deployment and the chain
  * singletons. {@link getInstantLaunchAddresses} only resolves where the strategy variant is
- * deployed; `beneficiaryVault` is omitted on chains with no fees-on FeeSplitter.
+ * deployed; `beneficiaryVault` and `compoundingClaimRecipient` are omitted on chains that do not
+ * deploy those singletons (Arc has neither a fees-on vault nor a current compounding recipient).
  */
 export interface InstantLaunchAddresses {
   /** LiquidityLauncher singleton — the `multicall` entrypoint the wallet calls. */
@@ -66,8 +67,11 @@ export interface InstantLaunchAddresses {
    * with no fees-on FeeSplitter (Arc).
    */
   beneficiaryVault?: Address
-  /** CompoundingClaimRecipient singleton — the autocompound recipient of every FeeSplitter. */
-  compoundingClaimRecipient: Address
+  /**
+   * CompoundingClaimRecipient singleton — the autocompound recipient of the chain's current
+   * FeeSplitters. Optional: omitted on chains whose current splitters do not compound (Arc).
+   */
+  compoundingClaimRecipient?: Address
   /** BuybackAndBurnRecipient singleton, where the chain's current FeeSplitters forward to it. */
   buybackAndBurnRecipient?: Address
   /** Which variant this stack is ({@link InstantLaunchDeployment.creatorFeesEnabled}). */

@@ -25,7 +25,6 @@ import {
   TICK_DATA_LENS_V2,
 } from './addresses'
 import { SupportedChainId } from './chains'
-import { getInstantLaunchAddresses } from './instantLaunch'
 
 describe('getLauncherAddresses', () => {
   it('returns the Unichain LBPStrategy singleton', () => {
@@ -394,9 +393,9 @@ describe('Arc (5042) deployment', () => {
     expect(getInstantLaunchContracts(SupportedChainId.ARC)?.beneficiaryVault).toBeUndefined()
   })
 
-  it('carries the Arc fees-off singletons (compounding recipient, buyback-and-burn)', () => {
+  it('carries the Arc fees-off singletons (buyback-and-burn, no compounding recipient)', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ARC)
-    expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0xBE5A26C5E7ABC4f049971e18214301931e23D1Db'))
+    expect(contracts?.compoundingClaimRecipient).toBeUndefined()
     expect(contracts?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
     expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.buybackAndBurnRecipient).toBeUndefined()
   })

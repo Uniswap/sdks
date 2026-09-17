@@ -87,6 +87,7 @@ describe('getInstantLaunchAddresses', () => {
     expect(off?.feeSplitter).toBe(getAddress('0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616'))
     expect(off?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
     expect(off?.beneficiaryVault).toBeUndefined()
+    expect(off?.compoundingClaimRecipient).toBeUndefined()
     expect(off?.uerc20Factory).toBe(getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6'))
     expect(off?.liquidityLauncher).toBe(launcher.liquidityLauncher)
     expect(off?.creatorFeesEnabled).toBe(false)
