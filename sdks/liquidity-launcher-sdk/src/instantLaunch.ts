@@ -48,8 +48,9 @@ import type { Uerc20Metadata } from './types'
 /**
  * The fully-resolved Instant Launch stack for one (chain, creator-fee variant) pair: the
  * launcher-side contracts every launch uses plus the variant's strategy deployment and the chain
- * singletons. All fields required — {@link getInstantLaunchAddresses} only resolves where the whole
- * stack is deployed.
+ * singletons. {@link getInstantLaunchAddresses} only resolves where the strategy variant is
+ * deployed; `beneficiaryVault` and `compoundingClaimRecipient` are omitted on chains that do not
+ * deploy those singletons (Arc has neither a fees-on vault nor a current compounding recipient).
  */
 export interface InstantLaunchAddresses {
   /** LiquidityLauncher singleton — the `multicall` entrypoint the wallet calls. */
@@ -62,11 +63,15 @@ export interface InstantLaunchAddresses {
   feeSplitter: Address
   /**
    * UERC20BeneficiaryVault singleton — the fee-beneficiary ERC721 registry + the creator share's
-   * vault. Only the fees-on strategy registers beneficiaries with it, but it is a chain singleton.
+   * vault. Only the fees-on strategy registers beneficiaries with it. Optional: omitted on chains
+   * with no fees-on FeeSplitter (Arc).
    */
-  beneficiaryVault: Address
-  /** CompoundingClaimRecipient singleton — the autocompound recipient of every FeeSplitter. */
-  compoundingClaimRecipient: Address
+  beneficiaryVault?: Address
+  /**
+   * CompoundingClaimRecipient singleton — the autocompound recipient of the chain's current
+   * FeeSplitters. Optional: omitted on chains whose current splitters do not compound (Arc).
+   */
+  compoundingClaimRecipient?: Address
   /** BuybackAndBurnRecipient singleton, where the chain's current FeeSplitters forward to it. */
   buybackAndBurnRecipient?: Address
   /** Which variant this stack is ({@link InstantLaunchDeployment.creatorFeesEnabled}). */
@@ -210,7 +215,8 @@ export function buildInstantLaunchTransaction(params: BuildInstantLaunchParams):
     if (
       isAddressEqual(params.feeBeneficiary, ZERO_ADDRESS) ||
       isAddressEqual(params.feeBeneficiary, addresses.liquidityLauncher) ||
-      isAddressEqual(params.feeBeneficiary, addresses.beneficiaryVault)
+      (addresses.beneficiaryVault !== undefined &&
+        isAddressEqual(params.feeBeneficiary, addresses.beneficiaryVault))
     ) {
       throw new LauncherSdkError('INVALID_INPUT', `Invalid Instant Launch fee beneficiary: ${params.feeBeneficiary}`)
     }
