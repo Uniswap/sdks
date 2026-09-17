@@ -263,8 +263,16 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     : undefined
   for (const step of swapSteps) {
     if (!spec.allowDirectTransfers) {
-      const rewrittenSpender = balanceInputAddress !== undefined && stepSpendsToken(step, balanceInputAddress)
-      invariant(!hasUserPaidFlag(step) || rewrittenSpender, 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
+      // The router-balance rewrite clears payerIsUser on the spender steps, so a flag a
+      // wallet-mode plan carried there is tolerated. The waiver is per-PULL, not
+      // per-step: a spender step may also carry a settle in some other currency, which
+      // the rewrite has no business funding, and excusing the whole step would let that
+      // settle reach the chain and pull the executing filler's balance via Permit2.
+      const rewrittenPulls =
+        balanceInputAddress !== undefined &&
+        stepSpendsToken(step, balanceInputAddress) &&
+        stepUserPaidPulls(step).every((pull) => pull.token?.toLowerCase() === balanceInputAddress.toLowerCase())
+      invariant(!hasUserPaidFlag(step) || rewrittenPulls, 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
       if (step.type === 'V4_SWAP') {
         for (const action of step.v4Actions) {
           invariant(action.action !== 'SETTLE_ALL', 'SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')
