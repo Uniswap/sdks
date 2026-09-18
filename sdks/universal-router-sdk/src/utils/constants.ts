@@ -54,8 +54,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 25999984,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x0542093271A31f6FC1DADB232bd59eeb27de780F',
-        creationBlock: 25733844,
+        address: '0xab863E752Bf67D8DCDD929EaAe9Be9dc83Fb3BbB',
+        creationBlock: 26006366,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -95,8 +95,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 11726370,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x54C707Df83f03bc9cA64ED2CcF9C99B63FD854b7',
-        creationBlock: 11468175,
+        address: '0x5093f1CDED83d99FfEd6602dA6260672ae16787c',
+        creationBlock: 11732372,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -638,21 +638,14 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x112908dac86e20e7241b0927479ea3bf935d1fa0',
         creationBlock: 4580586,
       },
-      // No standalone v2.1.1 router is deployed on Ink. v2.2.0 is a strict
-      // superset of v2.1.1 (adds permissioned-pool support, no change to any
-      // existing command/struct/behavior), so the v2.2.0 deployment serves
-      // v2.1.1 callers byte-for-byte. Aliased to the v2.2.0 address/block.
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
-        creationBlock: 47542762,
-      },
+      // No v2.1.1 router is deployed on Ink
       [UniversalRouterVersion.V2_1_2]: {
         address: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
         creationBlock: 56186042,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
-        creationBlock: 47542762,
+        address: '0x8BbCAEb326AD590521a921C9e457Ee09F336B48c',
+        creationBlock: 56261823,
       },
     },
     // SwapProxy on Ink is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
