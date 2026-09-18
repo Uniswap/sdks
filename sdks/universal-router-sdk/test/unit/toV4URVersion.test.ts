@@ -7,6 +7,7 @@ describe('toV4URVersion', () => {
   it('maps each UR version to the matching v4-sdk URVersion', () => {
     expect(toV4URVersion(UniversalRouterVersion.V2_0)).to.equal(URVersion.V2_0)
     expect(toV4URVersion(UniversalRouterVersion.V2_1_1)).to.equal(URVersion.V2_1_1)
+    expect(toV4URVersion(UniversalRouterVersion.V2_1_2)).to.equal(URVersion.V2_1_2)
     expect(toV4URVersion(UniversalRouterVersion.V2_2_0)).to.equal(URVersion.V2_2_0)
   })
 

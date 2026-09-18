@@ -12,7 +12,10 @@ describe('Universal Router Constants', () => {
   // only the chain numbers that have a router deployed
   const chainIds = Object.keys(CHAIN_CONFIGS).map(Number)
   const versions = Object.keys(CHAIN_CONFIGS[1].routerConfigs) as unknown as UniversalRouterVersion[]
+  // chains whose only pre-2.1.2 router is V2_1_1 (no V1_2, no V2_0)
   const v211OnlyChainIds = [5042, 4663]
+  // MegaETH skipped 2.1.1 entirely: 2.0 -> 2.1.2
+  const MEGAETH_CHAIN_ID = 4326
 
   describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
@@ -134,6 +137,61 @@ describe('Universal Router Constants', () => {
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(47542762)
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
         UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_2_0, 57073)
+      )
+    })
+  })
+
+  describe('V2_1_2', () => {
+    it('is deployed on every chain that has V2_1_1, plus MegaETH', () => {
+      const with211 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_1])
+      const with212 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_2])
+      expect(with212).to.have.lengthOf(24)
+      // every 2.1.1 chain got 2.1.2, and MegaETH is the only chain with 2.1.2 but no 2.1.1
+      expect(with211.filter((id) => !with212.includes(id))).to.deep.equal([])
+      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([MEGAETH_CHAIN_ID])
+    })
+
+    it('has no V2_1_1 on MegaETH to fall back to', () => {
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, MEGAETH_CHAIN_ID)).to.throw(
+        `Universal Router version 2.1.1 not deployed on chain ${MEGAETH_CHAIN_ID}`
+      )
+    })
+
+    it('was deployed after V2_1_1 on every chain that had it', () => {
+      chainIds.forEach((chainId) => {
+        if (!CHAIN_CONFIGS[chainId].routerConfigs[UniversalRouterVersion.V2_1_2]) return
+        if (!CHAIN_CONFIGS[chainId].routerConfigs[UniversalRouterVersion.V2_1_1]) return
+        expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_2, chainId)).to.be.greaterThan(
+          UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, chainId)
+        )
+      })
+    })
+
+    it('returns the deployed V2_1_2 address on mainnet and sepolia', () => {
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 1)).to.equal(
+        '0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85'
+      )
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 11155111)).to.equal(
+        '0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3'
+      )
+    })
+
+    // unlike 2.1.1, Ink has a standalone 2.1.2 router rather than an alias
+    it('is a standalone deployment on Ink (57073), not aliased to V2_2_0', () => {
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 57073)).to.equal(
+        '0x661E93cca42AfacB172121EF892830cA3b70F08d'
+      )
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 57073)).to.not.equal(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_2_0, 57073)
+      )
+    })
+
+    it('is deployed on arc and robinhood, which previously had only V2_1_1', () => {
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 5042)).to.equal(
+        '0x8702463e73f74d0b6765aBceb314Ef07aCb92650'
+      )
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, 4663)).to.equal(
+        '0x204FAca1764B154221e35c0d20aBb3c525710498'
       )
     })
   })
