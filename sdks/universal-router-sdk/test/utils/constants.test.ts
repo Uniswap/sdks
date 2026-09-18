@@ -16,6 +16,7 @@ describe('Universal Router Constants', () => {
   const v211OnlyChainIds = [5042, 4663]
   // MegaETH skipped 2.1.1 entirely: 2.0 -> 2.1.2
   const MEGAETH_CHAIN_ID = 4326
+  const INK_CHAIN_ID = 57073
 
   describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
@@ -72,12 +73,9 @@ describe('Universal Router Constants', () => {
       )
     })
 
-    it('should alias Ink (57073) V2_1_1 to the deployed V2_2_0 router', () => {
-      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
-        '0x28bd21bb4ea4fda370d8d7544992038375d8d456'
-      )
-      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
-        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_2_0, 57073)
+    it('should throw for Ink (57073) V2_1_1, which is not deployed there', () => {
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 57073)).to.throw(
+        'Universal Router version 2.1.1 not deployed on chain 57073'
       )
     })
   })
@@ -133,22 +131,22 @@ describe('Universal Router Constants', () => {
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 4663)).to.equal(18127)
     })
 
-    it('should alias Ink (57073) V2_1_1 creation block to the deployed V2_2_0 router', () => {
-      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(47542762)
-      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
-        UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_2_0, 57073)
+    it('should throw for Ink (57073) V2_1_1 creation block, which is not deployed there', () => {
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.throw(
+        'Universal Router version 2.1.1 not deployed on chain 57073'
       )
     })
   })
 
   describe('V2_1_2', () => {
-    it('is deployed on every chain that has V2_1_1, plus MegaETH', () => {
+    it('is deployed on every chain that has V2_1_1, plus MegaETH and Ink', () => {
       const with211 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_1])
       const with212 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_2])
       expect(with212).to.have.lengthOf(24)
-      // every 2.1.1 chain got 2.1.2, and MegaETH is the only chain with 2.1.2 but no 2.1.1
+      // every 2.1.1 chain got 2.1.2. MegaETH never had a 2.1.1, and Ink's was an
+      // alias to v2.2.0 that has since been removed, so both have 2.1.2 without 2.1.1.
       expect(with211.filter((id) => !with212.includes(id))).to.deep.equal([])
-      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([MEGAETH_CHAIN_ID])
+      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([MEGAETH_CHAIN_ID, INK_CHAIN_ID])
     })
 
     it('has no V2_1_1 on MegaETH to fall back to', () => {
