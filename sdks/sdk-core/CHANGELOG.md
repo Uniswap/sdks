@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.3
+
+### Patch Changes
+
+- 358d9de: Update permissioned PositionManager addresses (redeploy with DELIVERY_GAS_LIMIT)
+
 ## 7.19.2
 
 ### Patch Changes
