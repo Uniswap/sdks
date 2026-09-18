@@ -1,12 +1,15 @@
 import { Ether, Percent, Token } from '@uniswap/sdk-core'
 import { ethers } from 'ethers'
+import JSBI from 'jsbi'
 import {
   EMPTY_BYTES,
   EMPTY_HOOK,
   FeeAmount,
   CANNOT_BURN,
+  CANNOT_COMBINE_NATIVE_OPTIONS,
   NATIVE_NOT_SET,
   OPEN_DELTA,
+  SETTLE_CURRENCY_NOT_IN_POOL,
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
@@ -45,6 +48,40 @@ describe('PositionManager', () => {
     0,
     []
   )
+
+  // a 6-decimal ERC20 predeploy backed 1:1 by an 18-decimal native balance (e.g. a USDC gas token)
+  const nativeBackedErc20 = new Token(1, '0x3600000000000000000000000000000000000000', 6, 'USDC', 'USD Coin')
+  // sorts after nativeBackedErc20, so nativeBackedErc20 is currency0 in this pool
+  const currency4 = new Token(1, '0x4000000000000000000000000000000000000004', 18, 't4', 'currency4')
+
+  // nativeBackedErc20 is currency0
+  const pool_usdc_4 = new Pool(
+    nativeBackedErc20,
+    currency4,
+    fee,
+    tickSpacing,
+    EMPTY_HOOK,
+    SQRT_PRICE_1_1.toString(),
+    0,
+    0,
+    []
+  )
+
+  // nativeBackedErc20 is currency1
+  const pool_0_usdc = new Pool(
+    currency0,
+    nativeBackedErc20,
+    fee,
+    tickSpacing,
+    EMPTY_HOOK,
+    SQRT_PRICE_1_1.toString(),
+    0,
+    0,
+    []
+  )
+
+  // scales a 6-decimal amount up to 18 native decimals
+  const NATIVE_VALUE_SCALE = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(12))
 
   const tokenId = 1
   const slippageTolerance = new Percent(1, 100)
@@ -419,6 +456,199 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
+    })
+
+    it('succeeds for mint with settleFromNativeValue', () => {
+      const position: Position = new Position({
+        pool: pool_usdc_4,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 5000000,
+      })
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        settleFromNativeValue: { currency: nativeBackedErc20, nativeDecimals: 18 },
+      })
+
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_usdc_4.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        5000000,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      // Expect no SETTLE_PAIR: the native-backed leg is settled by the position manager (funded by msg.value),
+      // the other leg is settled by the user, and the unused native-backed value is swept back
+      planner.addAction(Actions.SETTLE, [toAddress(nativeBackedErc20), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(currency4), OPEN_DELTA, true])
+      planner.addAction(Actions.SWEEP, [toAddress(nativeBackedErc20), MSG_SENDER])
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      // msg.value is the slippage-adjusted maximum scaled from 6 currency decimals up to 18 native decimals
+      expect(value).toEqual(toHex(JSBI.multiply(amount0Max, NATIVE_VALUE_SCALE)))
+    })
+
+    it('succeeds for increase with settleFromNativeValue', () => {
+      const position: Position = new Position({
+        pool: pool_usdc_4,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 666,
+      })
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        tokenId,
+        slippageTolerance,
+        deadline,
+        settleFromNativeValue: { currency: nativeBackedErc20, nativeDecimals: 18 },
+      })
+
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      planner.addAction(Actions.INCREASE_LIQUIDITY, [
+        tokenId.toString(),
+        666,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE, [toAddress(nativeBackedErc20), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(currency4), OPEN_DELTA, true])
+      planner.addAction(Actions.SWEEP, [toAddress(nativeBackedErc20), MSG_SENDER])
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      expect(value).toEqual(toHex(JSBI.multiply(amount0Max, NATIVE_VALUE_SCALE)))
+    })
+
+    it('succeeds for mint with settleFromNativeValue when the currency is currency1', () => {
+      const position: Position = new Position({
+        pool: pool_0_usdc,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 5000000,
+      })
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        settleFromNativeValue: { currency: nativeBackedErc20, nativeDecimals: 18 },
+      })
+
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_0_usdc.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        5000000,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE, [toAddress(nativeBackedErc20), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(currency0), OPEN_DELTA, true])
+      planner.addAction(Actions.SWEEP, [toAddress(nativeBackedErc20), MSG_SENDER])
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      // the native-backed currency is currency1, so msg.value is scaled from amount1Max
+      expect(value).toEqual(toHex(JSBI.multiply(amount1Max, NATIVE_VALUE_SCALE)))
+    })
+
+    it('succeeds for settleFromNativeValue with batchPermit for the other currency', () => {
+      const position: Position = new Position({
+        pool: pool_usdc_4,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 1,
+      })
+
+      const batchPermit: BatchPermitOptions = {
+        owner: mockOwner,
+        permitBatch: {
+          details: [],
+          sigDeadline: deadline,
+          spender: mockSpender,
+        },
+        signature: mockBytes32,
+      }
+
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        batchPermit,
+        settleFromNativeValue: { currency: nativeBackedErc20, nativeDecimals: 18 },
+      })
+
+      const calldataList = Multicall.decodeMulticall(calldata)
+      // Expect permitBatch to be called correctly
+      expect(calldataList[0]).toEqual(
+        V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
+          batchPermit.owner,
+          batchPermit.permitBatch,
+          batchPermit.signature,
+        ])
+      )
+
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_usdc_4.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE, [toAddress(nativeBackedErc20), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(currency4), OPEN_DELTA, true])
+      planner.addAction(Actions.SWEEP, [toAddress(nativeBackedErc20), MSG_SENDER])
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+      expect(value).toEqual(toHex(JSBI.multiply(amount0Max, NATIVE_VALUE_SCALE)))
+    })
+
+    it('throws if settleFromNativeValue is combined with useNative', () => {
+      expect(() =>
+        V4PositionManager.addCallParameters(
+          new Position({
+            pool: pool_1_eth,
+            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+            liquidity: 8888888,
+          }),
+          {
+            recipient,
+            slippageTolerance,
+            deadline,
+            useNative: currency_native,
+            settleFromNativeValue: { currency: currency1, nativeDecimals: 18 },
+          }
+        )
+      ).toThrow(CANNOT_COMBINE_NATIVE_OPTIONS)
+    })
+
+    it('throws if the settleFromNativeValue currency is not in the pool', () => {
+      expect(() =>
+        V4PositionManager.addCallParameters(
+          new Position({
+            pool: pool_0_1,
+            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+            liquidity: 8888888,
+          }),
+          {
+            recipient,
+            slippageTolerance,
+            deadline,
+            settleFromNativeValue: { currency: nativeBackedErc20, nativeDecimals: 18 },
+          }
+        )
+      ).toThrow(SETTLE_CURRENCY_NOT_IN_POOL)
     })
   })
 
