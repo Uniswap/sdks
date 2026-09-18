@@ -1,5 +1,27 @@
 # @uniswap/universal-router-sdk
 
+## 5.12.0
+
+### Minor Changes
+
+- 4a67d47: Add Universal Router v2.1.2 addresses (#736)
+
+  Adds the `UniversalRouterVersion.V2_1_2` enum member (mirrored as `URVersion.V2_1_2` in v4-sdk) and the v2.1.2 Universal Router deployment config — router address and creation block — across the 24 supported chains. Consumers can now resolve v2.1.2 routers via `UNIVERSAL_ROUTER_ADDRESS`/`CHAIN_CONFIGS` and select the version through `SwapOptions.urVersion`; #736 landed the addresses on `main` without a changeset, so this releases them.
+
+### Patch Changes
+
+- 4a67d47: Update Universal Router v2.2.0 addresses (#738)
+
+  Repoints the v2.2.0 Universal Router deployment config on Ethereum mainnet (1), Ethereum Sepolia (11155111) and Ink (57073) to the corrected router addresses, and removes Ink's `V2_1_1` entry. That entry was an alias pointing at Ink's old v2.2.0 router rather than a real v2.1.1 deployment, so `getUniversalRouterAddress(UniversalRouterVersion.V2_1_1, 57073)` no longer resolves and now throws — callers on Ink should use `V2_1_2` or `V2_2_0`. #738 landed these changes on `main` without a changeset, so this releases them.
+
+- Updated dependencies [358d9de]
+- Updated dependencies [4a67d47]
+  - @uniswap/sdk-core@7.19.3
+  - @uniswap/v4-sdk@2.4.0
+  - @uniswap/router-sdk@2.11.5
+  - @uniswap/v2-sdk@4.21.4
+  - @uniswap/v3-sdk@3.31.4
+
 ## 5.11.5
 
 ### Patch Changes
