@@ -122,7 +122,10 @@ export async function getPool(tokenA: Token, tokenB: Token, feeAmount: FeeAmount
 export function swapOptions(options: Partial<SwapOptions>): SwapOptions {
   // If theres a fee this counts as "slippage" for the amount out, so take it into account
   let slippageTolerance = new Percent(5, 100)
-  if (!!options.fee) slippageTolerance = slippageTolerance.add(options.fee.fee)
+  const fees = options.fee ? (Array.isArray(options.fee) ? options.fee : [options.fee]) : []
+  for (const fee of fees) {
+    slippageTolerance = slippageTolerance.add(fee.fee)
+  }
   return Object.assign(
     {
       slippageTolerance,
