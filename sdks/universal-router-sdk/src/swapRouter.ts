@@ -35,6 +35,7 @@ import {
 import { getCurrencyAddress } from './utils/getCurrencyAddress'
 import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
+import { applyRouterBalanceInputToSteps } from './utils/routerBalanceSteps'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
 import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
@@ -180,10 +181,28 @@ export abstract class SwapRouter {
       routing: { inputToken, outputToken },
     } = normalizedSpec
 
+    // Router-balance funding: assert the floor before anything else runs, so an
+    // under-funded router reverts up front rather than swapping a short amount.
+    if (normalizedSpec.routerBalanceInput?.minimumAmount !== undefined) {
+      planner.addCommand(
+        CommandType.BALANCE_CHECK_ERC20,
+        [
+          // BALANCE_CHECK_ERC20 reads `owner` verbatim (no sentinel resolution), so it
+          // needs the router's real address; validateEncodeSwaps requires chainId.
+          UNIVERSAL_ROUTER_ADDRESS(normalizedSpec.urVersion, normalizedSpec.chainId!),
+          getCurrencyAddress(inputToken),
+          normalizedSpec.routerBalanceInput.minimumAmount,
+        ],
+        false,
+        normalizedSpec.urVersion
+      )
+    }
+
     // Ingress: pull funds into the router. Native input is paid as msg.value at the bottom
     // instead of via Permit2 — as is a native-ERC20 gas-token input (nativeErc20Input);
-    // ApproveProxy ingress is handled by the outer wrapper at the end.
-    if (normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
+    // ApproveProxy ingress is handled by the outer wrapper at the end. A router-balance
+    // swap is funded by a third party in the same transaction, so it has no ingress at all.
+    if (normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2 && !normalizedSpec.routerBalanceInput) {
       if (normalizedSpec.permit) {
         encodePermit(planner, normalizedSpec.permit)
       }
@@ -202,7 +221,14 @@ export abstract class SwapRouter {
       }
     }
 
-    for (const step of swapSteps) {
+    // With router-balance funding the delivered amount is unknown at encode time, so the
+    // input-spending first hop is rewritten to the CONTRACT_BALANCE sentinel (v4: settle
+    // the whole balance, swap the open delta).
+    const stepsToEncode = normalizedSpec.routerBalanceInput
+      ? applyRouterBalanceInputToSteps(swapSteps, getCurrencyAddress(inputToken))
+      : swapSteps
+
+    for (const step of stepsToEncode) {
       encodeSwapStep(planner, step, normalizedSpec.urVersion)
     }
 
