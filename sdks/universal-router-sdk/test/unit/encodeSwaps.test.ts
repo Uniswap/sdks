@@ -20,6 +20,7 @@ import {
 } from '../../src/types/encodeSwaps'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
+import { applyRouterBalanceInputToSteps } from '../../src/utils/routerBalanceSteps'
 import { encodeFee1e18 } from '../../src/utils/numbers'
 import {
   CONTRACT_BALANCE,
@@ -1893,20 +1894,160 @@ describe('encodeSwaps', () => {
       ).to.throw('ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
     })
 
-    it('rejects native input', () => {
+    const nativeRouting = {
+      inputToken: ETH,
+      outputToken: USDC,
+      amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+      quote: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+    }
+    const nativeSteps = (): SwapStep[] => [
+      { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1000000000000000000' },
+      buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC]),
+    ]
+
+    it('rejects a native input whose plan does not lead with WRAP_ETH', () => {
       expect(() =>
-        validateEncodeSwaps(
-          buildSpec(
-            { routerBalanceInput: {} },
-            {
-              inputToken: ETH,
-              amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
-              quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
-            }
-          ),
-          [buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, WETH])]
-        )
+        validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [
+          buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC]),
+        ])
+      ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
+    })
+
+    it('accepts a mid-route WRAP_ETH in a native plan (a leg paid out ETH, the next wants WETH)', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [
+          ...nativeSteps(),
+          { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: CONTRACT_BALANCE.toString() },
+        ])
+      ).to.not.throw()
+    })
+
+    it('rejects a native plan whose later leg still spends raw ETH after the wrap', () => {
+      const rawEthV4: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: ETH_ADDRESS, amount: '500000000000000000', payerIsUser: false },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: ETH_ADDRESS,
+            path: [
+              { intermediateCurrency: USDC.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '500000000000000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, nativeRouting), [...nativeSteps(), rawEthV4])
+      ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED')
+    })
+
+    it('rejects a spender step carrying a user-paid settle in another currency', () => {
+      // The step spends the input token, so the rewrite owns it — but the second
+      // settle is in an unrelated currency the rewrite has no business funding.
+      // Excusing the whole step would encode permit2.transferFrom(msg.sender) for
+      // WETH, and on this arm msg.sender is the filler, not the swapper.
+      const foreignPull: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+          { action: 'SETTLE', currency: WETH.address, amount: '1000000000000000000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(balanceSpec(), [foreignPull])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('still tolerates a user-paid settle in the input token, which the rewrite clears', () => {
+      const inputPull: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(balanceSpec(), [inputPull])).to.not.throw()
+      const [rewritten] = applyRouterBalanceInputToSteps([inputPull], USDC.address)
+      expect(rewritten.type).to.equal('V4_SWAP')
+      if (rewritten.type === 'V4_SWAP') {
+        rewritten.v4Actions
+          .filter((action) => action.action === 'SETTLE')
+          .forEach((action) => {
+            expect((action as any).payerIsUser).to.equal(false)
+          })
+      }
+    })
+
+    it('rejects a WRAP_ETH at hop 0 of an ERC20 balance plan', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec(), [
+          { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1' },
+          buildV3ExactInStep(),
+        ])
       ).to.throw('ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+    })
+
+    it('accepts a mid-route WRAP_ETH in an ERC20 balance plan', () => {
+      expect(() =>
+        validateEncodeSwaps(balanceSpec(), [
+          buildV3ExactInStep(),
+          { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: CONTRACT_BALANCE.toString() },
+        ])
+      ).to.not.throw()
+    })
+
+    it('encodes a native balance swap: full wrap, post-wrap floor, dust sweep, zero value', () => {
+      const result = SwapRouter.encodeSwaps(
+        buildSpec({ routerBalanceInput: { minimumAmount: '990000000000000000' }, chainId: 1 }, nativeRouting),
+        nativeSteps()
+      )
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(result.value).to.equal('0x00')
+      expect(commandTypes).to.deep.equal([
+        CommandType.WRAP_ETH,
+        CommandType.BALANCE_CHECK_ERC20,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+
+      const wrap = defaultAbiCoder.decode(['address', 'uint256'], inputs[0])
+      expect(wrap[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(wrap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+
+      const check = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[1])
+      expect(check[1].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(check[2].toString()).to.equal('990000000000000000')
+
+      const swap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[2])
+      expect(swap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(swap[4]).to.equal(false)
+
+      const dust = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(dust[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(dust[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(dust[2].toString()).to.equal('0')
     })
 
     it('rejects permits', () => {
@@ -1935,22 +2076,173 @@ describe('encodeSwaps', () => {
       ).to.throw('ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
     })
 
-    it('rejects split routes: two steps spending the input token', () => {
-      expect(() =>
-        validateEncodeSwaps(balanceSpec(), [
-          buildV3ExactInStep({ amountIn: '100000' }),
-          buildV3ExactInStep({ amountIn: '900000' }, [USDC, DAI, WETH], [500, 3000]),
-        ])
-      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    // Split routes: the fixed legs keep their quoted amounts and the largest
+    // leg is rewritten to CONTRACT_BALANCE and moved last, absorbing all
+    // delivery variance.
+    it('encodes a split: fixed leg first, CONTRACT_BALANCE remainder last', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        // largest leg deliberately FIRST so the reorder is exercised
+        buildV3ExactInStep({ amountIn: '900000' }, [USDC, DAI, WETH], [500, 3000]),
+        buildV3ExactInStep({ amountIn: '100000' }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+      const firstLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(firstLeg[1].toString()).to.equal('100000')
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(remainderLeg[4]).to.equal(false)
     })
 
-    it('rejects plans whose input-spending step is not first', () => {
-      expect(() =>
-        validateEncodeSwaps(balanceSpec(), [
-          buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
-          buildV3ExactInStep({}, [USDC, DAI]),
-        ])
-      ).to.throw('ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    it('accepts a plan whose single spending step is not first', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
+        buildV3ExactInStep({}, [USDC, DAI]),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const spender = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(spender[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+    })
+
+    it('encodes a split whose largest leg is V4: v3 slice fixed first, V4 settles CONTRACT_BALANCE last', () => {
+      const v4Leg = (amountIn: string): SwapStep => ({
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: amountIn, payerIsUser: false },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn,
+            amountOutMinimum: '0',
+          },
+        ],
+      })
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        v4Leg('900000'),
+        buildV3ExactInStep({ amountIn: '100000' }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_IN, CommandType.V4_SWAP, CommandType.SWEEP])
+      const fixedLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(fixedLeg[1].toString()).to.equal('100000')
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[1], URVersion.V2_0)
+      expect(parsed.actions[0].actionName).to.equal('SETTLE')
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(((parsed.actions[1].params[0].value as any).amountIn as BigNumber).toString()).to.equal('0')
+    })
+
+    it('encodes a split whose V4 leg is the fixed slice and the v3 leg the remainder', () => {
+      const v4Leg = (amountIn: string): SwapStep => ({
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: amountIn, payerIsUser: false },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn,
+            amountOutMinimum: '0',
+          },
+        ],
+      })
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        v4Leg('100000'),
+        buildV3ExactInStep({ amountIn: '900000' }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal('100000')
+      expect(((parsed.actions[1].params[0].value as any).amountIn as BigNumber).toString()).to.equal('100000')
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+    })
+
+    it('encodes a v4 first hop with two input swaps: fixed slice first, open-delta swap last', () => {
+      const swap = (amountIn: string, intermediate: string): V4Action => ({
+        action: 'SWAP_EXACT_IN',
+        currencyIn: USDC.address,
+        path: [{ intermediateCurrency: intermediate, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' }],
+        amountIn,
+        amountOutMinimum: '0',
+      })
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: false },
+          swap('600000', WETH.address),
+          swap('400000', WETH.address),
+        ],
+      }
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [step])
+      const { inputs } = decodeExecute(result.calldata)
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect(parsed.actions.map((a) => a.actionName)).to.deep.equal(['SETTLE', 'SWAP_EXACT_IN', 'SWAP_EXACT_IN'])
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+      // the smaller slice keeps its quoted amount; the largest swap consumes the open delta and runs last
+      expect(((parsed.actions[1].params[0].value as any).amountIn as BigNumber).toString()).to.equal('400000')
+      expect(((parsed.actions[2].params[0].value as any).amountIn as BigNumber).toString()).to.equal('0')
+    })
+
+    it('forces payerIsUser to false on a spender leg that arrived flagged', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [buildV3ExactInStep({ payerIsUser: true })])
+      const { inputs } = decodeExecute(result.calldata)
+      const swap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(swap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(swap[4]).to.equal(false)
+    })
+
+    it('forces payerIsUser to false on every leg of a split, not just the remainder', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        buildV3ExactInStep({ amountIn: '900000', payerIsUser: true }, [USDC, DAI, WETH], [500, 3000]),
+        buildV3ExactInStep({ amountIn: '100000', payerIsUser: true }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const fixedLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[0])
+      expect(fixedLeg[1].toString()).to.equal('100000')
+      expect(fixedLeg[4]).to.equal(false)
+      const remainderLeg = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[1])
+      expect(remainderLeg[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(remainderLeg[4]).to.equal(false)
+    })
+
+    it('forces payerIsUser to false on a fixed V4 leg SETTLE while keeping its amount', () => {
+      const v4Leg: SwapStep = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '100000', payerIsUser: true },
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [
+              { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+            ],
+            amountIn: '100000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [v4Leg, buildV3ExactInStep({ amountIn: '900000' })])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+      const parsed = V4BaseActionsParser.parseCalldata(inputs[0], URVersion.V2_0)
+      expect(parsed.actions[0].actionName).to.equal('SETTLE')
+      expect((parsed.actions[0].params[1].value as BigNumber).toString()).to.equal('100000')
+      expect(parsed.actions[0].params[2].value).to.equal(false)
     })
 
     it('encodes a v3 balance swap with no ingress and CONTRACT_BALANCE on hop 0', () => {
@@ -2031,6 +2323,28 @@ describe('encodeSwaps', () => {
       expect(parsed.actions[1].actionName).to.equal('SWAP_EXACT_IN')
       const swapParams = parsed.actions[1].params[0].value as any
       expect(swapParams.amountIn.toString()).to.equal('0')
+    })
+
+    it('refuses a v4 step whose input SETTLE comes after the swap', () => {
+      const swap: V4Action = {
+        action: 'SWAP_EXACT_IN',
+        currencyIn: USDC.address,
+        path: [{ intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' }],
+        amountIn: '0',
+        amountOutMinimum: '0',
+      }
+      const settle: V4Action = { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: false }
+      const take: V4Action = { action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' }
+
+      const swapFirst: V4Swap = { type: 'V4_SWAP', v4Actions: [swap, settle, take] }
+      expect(() => validateEncodeSwaps(balanceSpec(), [swapFirst])).to.throw(
+        'ROUTER_BALANCE_INPUT_V4_SETTLE_BEFORE_SWAP'
+      )
+
+      const settleFirst: V4Swap = { type: 'V4_SWAP', v4Actions: [settle, swap, take] }
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [settleFirst])
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.SWEEP])
     })
 
     it('rewrites an existing v4 SETTLE of the input token instead of adding a second', () => {

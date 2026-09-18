@@ -8,12 +8,13 @@ import {
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
   ZERO_ADDRESS,
+  ETH_ADDRESS,
 } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
 import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
-import { stepSpendsToken } from './routerBalanceSteps'
+import { isInputSettle, isInputSwap, stepSpendsToken } from './routerBalanceSteps'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -138,7 +139,6 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
   // fixed-amount wallet-funded swap instead.
   if (spec.routerBalanceInput) {
     invariant(spec.tradeType === TradeType.EXACT_INPUT, 'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
-    invariant(!spec.routing.inputToken.isNative, 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
     invariant(!spec.nativeErc20Input, 'ROUTER_BALANCE_INPUT_NATIVE_ERC20_CONFLICT')
     invariant(!spec.permit, 'ROUTER_BALANCE_INPUT_PERMIT_CONFLICT')
     invariant(spec.tokenTransferMode !== TokenTransferMode.ApproveProxy, 'ROUTER_BALANCE_INPUT_PROXY_CONFLICT')
@@ -151,21 +151,55 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       invariant(!!spec.chainId, 'ROUTER_BALANCE_INPUT_MINIMUM_REQUIRES_CHAIN_ID')
     }
 
-    // One CONTRACT_BALANCE cannot address two legs of the same currency: the first drains it
-    // and the second resolves to zero. Exactly one step may spend the input token, and it
-    // must be the first, so the transform has an unambiguous hop 0.
-    const balanceInputTokenAddress = getCurrencyAddress(spec.routing.inputToken)
-    const spenderIndexes = swapSteps
+    const nativeBalanceInput = spec.routing.inputToken.isNative
+    // Native input is funded as msg.value on execute() (raw transfers to the router
+    // revert) and must be wrapped in full before anything spends it, so the plan has to
+    // lead with a WRAP_ETH; the spender checks below then run against the wrapped token.
+    if (nativeBalanceInput) {
+      invariant(swapSteps[0]?.type === 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_REQUIRES_WRAP')
+    }
+
+    // At least one step must spend the (wrapped) input token. Splits are
+    // allowed: the transform keeps every spender's quoted amount except the
+    // largest, which is rewritten to CONTRACT_BALANCE and moved last among the
+    // spenders (a v4 leg's spend is read from its input settle or swaps).
+    const balanceInputTokenAddress = nativeBalanceInput
+      ? spec.routing.inputToken.wrapped.address
+      : getCurrencyAddress(spec.routing.inputToken)
+    const spendableSteps = nativeBalanceInput ? swapSteps.slice(1) : swapSteps
+    const spenderIndexes = spendableSteps
       .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
       .filter((index) => index >= 0)
-    invariant(spenderIndexes.length === 1 && spenderIndexes[0] === 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
-    for (const step of swapSteps) {
+    invariant(spenderIndexes.length > 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+    swapSteps.forEach((step, index) => {
       invariant(
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
         'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
       )
-      invariant(step.type !== 'WRAP_ETH', 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
-    }
+      // A wrap at hop 0 of an ERC20 plan means the plan expects native input. Wraps later
+      // in the plan are routers wrapping intermediate ETH (a v4 leg paid out native and the
+      // next leg wants WETH) and only touch what that leg produced.
+      invariant(step.type !== 'WRAP_ETH' || index > 0 || nativeBalanceInput, 'ROUTER_BALANCE_INPUT_NATIVE_INPUT')
+      // Native mode wraps the whole balance at hop 0, so a later leg that still expects raw
+      // ETH (routers can feed v4 pools native directly) would find nothing to spend.
+      invariant(
+        !nativeBalanceInput || index === 0 || !stepSpendsToken(step, ETH_ADDRESS),
+        'ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED'
+      )
+      // The rewrite keeps the caller's v4 action order and turns the input settle into
+      // SETTLE(CONTRACT_BALANCE) with the swap on the open delta. A swap that runs before
+      // that settle has nothing to spend and reverts on-chain, so require settle first.
+      // (A step with no input settle gets one prepended by the rewrite.)
+      if (step.type === 'V4_SWAP' && stepSpendsToken(step, balanceInputTokenAddress)) {
+        const token = balanceInputTokenAddress.toLowerCase()
+        const settleIndex = step.v4Actions.findIndex((action) => isInputSettle(action, token))
+        const swapIndex = step.v4Actions.findIndex((action) => isInputSwap(action, token))
+        invariant(
+          settleIndex < 0 || swapIndex < 0 || settleIndex < swapIndex,
+          'ROUTER_BALANCE_INPUT_V4_SETTLE_BEFORE_SWAP'
+        )
+      }
+    })
   }
 
   // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
@@ -194,9 +228,25 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
 
   // per-step: capability-gate by UR version, recipients must be router custody (or the spec
   // recipient under allowDirectTransfers), per-hop arrays must match hop counts
+  // Router-balance funding rewrites the spender legs and clears any payerIsUser flag a
+  // wallet-mode router plan carried, so the flag is tolerated only on those legs.
+  const balanceInputAddress = spec.routerBalanceInput
+    ? spec.routing.inputToken.isNative
+      ? spec.routing.inputToken.wrapped.address
+      : getCurrencyAddress(spec.routing.inputToken)
+    : undefined
   for (const step of swapSteps) {
     if (!spec.allowDirectTransfers) {
-      invariant(!hasUserPaidFlag(step), 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
+      // The router-balance rewrite clears payerIsUser on the spender steps, so a flag a
+      // wallet-mode plan carried there is tolerated. The waiver is per-PULL, not
+      // per-step: a spender step may also carry a settle in some other currency, which
+      // the rewrite has no business funding, and excusing the whole step would let that
+      // settle reach the chain and pull the executing filler's balance via Permit2.
+      const rewrittenPulls =
+        balanceInputAddress !== undefined &&
+        stepSpendsToken(step, balanceInputAddress) &&
+        stepUserPaidPulls(step).every((pull) => pull.token?.toLowerCase() === balanceInputAddress.toLowerCase())
+      invariant(!hasUserPaidFlag(step) || rewrittenPulls, 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
       if (step.type === 'V4_SWAP') {
         for (const action of step.v4Actions) {
           invariant(action.action !== 'SETTLE_ALL', 'SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')

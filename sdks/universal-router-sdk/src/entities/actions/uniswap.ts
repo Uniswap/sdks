@@ -91,10 +91,13 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
    * that deposits into the router and swaps atomically. Distinct from `useRouterBalance`,
    * which keeps the fixed quoted `amountIn`.
    *
-   * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary),
-   * an ERC20 input, and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported
-   * for v2, v3, v4 and mixed routes.
-   * Incompatible with native input, `inputTokenPermit`, `nativeErc20Input`, and
+   * Requires an explicit `recipient` (the caller of `execute()` is not the beneficiary)
+   * and `TradeType.EXACT_INPUT` on a single (non-split) route. Supported for v2, v3, v4
+   * and mixed routes. A native input is funded by attaching msg.value to `execute()`
+   * (raw transfers to the router revert) and is wrapped in full via
+   * `WRAP_ETH(CONTRACT_BALANCE)`, with a trailing ETH dust sweep to the recipient; it
+   * requires a route that wraps, so pure-native v4 routes are unsupported.
+   * Incompatible with `inputTokenPermit`, `nativeErc20Input`, and
    * `TokenTransferMode.ApproveProxy`.
    */
   routerBalanceInput?: RouterBalanceInput
@@ -154,17 +157,34 @@ export class UniswapTrade implements Command {
           'Explicit recipient address required with routerBalanceInput (SENDER_AS_RECIPIENT resolves to the caller, who is not the swapper)'
         )
       }
-      if (this.trade.inputAmount.currency.isNative) {
-        throw new Error('routerBalanceInput requires an ERC20 input token')
+      // The Dispatcher maps recipient sentinels: address(2) resolves to the router itself —
+      // unwrapWETH9 then skips the transfer and a native-out execute() SUCCEEDS with the
+      // ETH stranded in the permissionless router — and address(0) burns. Both are
+      // format-valid addresses, so upstream shape checks pass them straight through.
+      if (options.recipient === ROUTER_AS_RECIPIENT || BigNumber.from(options.recipient).isZero()) {
+        throw new Error('routerBalanceInput recipient cannot be a UR sentinel or the zero address')
+      }
+      // Native input is funded as msg.value on execute() — raw transfers to the router
+      // revert (its receive() only accepts ETH from WETH) — and wrapped in full by the
+      // route's WRAP_ETH. Routes that consume native directly (pure-native v4) have no
+      // wrap step to size with CONTRACT_BALANCE, so they stay unsupported.
+      if (this.trade.inputAmount.currency.isNative && !this.inputRequiresWrap) {
+        throw new Error('routerBalanceInput with a native input requires a route that wraps to WETH')
       }
       if (this.trade.tradeType !== TradeType.EXACT_INPUT) {
         throw new Error('routerBalanceInput requires TradeType.EXACT_INPUT')
       }
-      // CONTRACT_BALANCE resolves to the router's whole balance at execution, so it cannot
-      // address two legs of the same currency: the first would drain it and the second
-      // would resolve to zero.
-      if (this.trade.swaps.length > 1) {
-        throw new Error('routerBalanceInput does not support split routes')
+      // Split routes: CONTRACT_BALANCE resolves to the router's whole balance,
+      // so exactly ONE leg (the largest, encoded last) spends it; the other
+      // legs keep their quoted amounts from router custody. With a native
+      // input every leg must consume the wrapped token, since the single
+      // WRAP_ETH funds them all.
+      if (
+        this.trade.swaps.length > 1 &&
+        this.trade.inputAmount.currency.isNative &&
+        this.trade.swaps.some((swap) => (swap.route as { pathInput?: Currency }).pathInput?.isNative)
+      ) {
+        throw new Error('routerBalanceInput split routes with a native input require every leg to wrap to WETH')
       }
       if (options.inputTokenPermit) {
         throw new Error('routerBalanceInput does not use Permit2; remove inputTokenPermit')
@@ -313,9 +333,11 @@ export class UniswapTrade implements Command {
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
-    // Input floor first, so an under-funded router reverts before any swap runs.
+    // Input floor first, so an under-funded router reverts before any swap runs. A native
+    // balance input has no balance-check command, so its floor is asserted post-wrap as WETH.
+    const balanceInputIsNative = !!this.options.routerBalanceInput && this.trade.inputAmount.currency.isNative
     const minimumRouterBalance = this.options.routerBalanceInput?.minimumAmount
-    if (minimumRouterBalance !== undefined) {
+    if (minimumRouterBalance !== undefined && !balanceInputIsNative) {
       // BALANCE_CHECK_ERC20 reads `owner` verbatim, without the sentinel resolution the
       // recipient params get, so this must be the router's real address.
       planner.addCommand(CommandType.BALANCE_CHECK_ERC20, [
@@ -330,8 +352,19 @@ export class UniswapTrade implements Command {
       // TODO: optimize if only one v2 pool we can directly send this to the pool
       planner.addCommand(CommandType.WRAP_ETH, [
         ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
+        // Balance input: wrap everything the router holds (attached msg.value plus any
+        // stray native), so no value is left behind — UR never refunds msg.value.
+        this.options.routerBalanceInput
+          ? CONTRACT_BALANCE
+          : this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
+      if (minimumRouterBalance !== undefined && balanceInputIsNative) {
+        planner.addCommand(CommandType.BALANCE_CHECK_ERC20, [
+          UNIVERSAL_ROUTER_ADDRESS(this.options.urVersion ?? UniversalRouterVersion.V2_0, this.options.chainId!),
+          this.trade.inputAmount.currency.wrapped.address,
+          minimumRouterBalance,
+        ])
+      }
     } else if (this.inputRequiresUnwrap) {
       if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
         // send wrapped token to router to unwrap via Permit2
@@ -354,21 +387,44 @@ export class UniswapTrade implements Command {
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
     const routerMustCustody =
-      performAggregatedSlippageCheck || this.outputRequiresTransition || hasFeeOption(this.options)
+      performAggregatedSlippageCheck ||
+      this.outputRequiresTransition ||
+      hasFeeOption(this.options) ||
+      // Balance-swap splits: the remainder leg's output varies with delivery,
+      // so the minimum is enforced on the aggregate sweep, never per leg.
+      (!!this.options.routerBalanceInput && this.trade.swaps.length > 1)
 
-    for (const swap of this.trade.swaps) {
+    // Balance-swap splits: the fixed legs run first with their quoted amounts
+    // (per-leg options drop routerBalanceInput, so they encode normally from
+    // router custody); the largest leg runs LAST and spends CONTRACT_BALANCE,
+    // absorbing all delivery variance. The fill only reverts when delivery
+    // cannot cover the fixed legs, so the tolerance is the largest leg's share.
+    let swapsInOrder = this.trade.swaps
+    let remainderSwap: (typeof swapsInOrder)[number] | undefined
+    if (this.options.routerBalanceInput && swapsInOrder.length > 1) {
+      remainderSwap = swapsInOrder.reduce((largest, swap) =>
+        swap.inputAmount.greaterThan(largest.inputAmount) ? swap : largest
+      )
+      swapsInOrder = [...swapsInOrder.filter((swap) => swap !== remainderSwap), remainderSwap]
+    }
+
+    for (const swap of swapsInOrder) {
+      const legOptions =
+        remainderSwap !== undefined && swap !== remainderSwap
+          ? { ...this.options, routerBalanceInput: undefined }
+          : this.options
       switch (swap.route.protocol) {
         case Protocol.V2:
-          addV2Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV2Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V3:
-          addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV3Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV4Swap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
-          addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addMixedSwap(planner, swap, this.trade.tradeType, legOptions, this.payerIsUser, routerMustCustody)
           break
         default:
           throw new Error('UNSUPPORTED_TRADE_PROTOCOL')
@@ -468,7 +524,12 @@ export class UniswapTrade implements Command {
       }
     }
 
-    if (this.options.safeMode) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
+    // Native balance input always sweeps trailing ETH dust to the recipient: the funder is
+    // a third party, so anything left on the router would otherwise be stranded or swept
+    // by a stranger.
+    if (this.options.safeMode || (this.options.routerBalanceInput && this.trade.inputAmount.currency.isNative)) {
+      planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
+    }
   }
 }
 
