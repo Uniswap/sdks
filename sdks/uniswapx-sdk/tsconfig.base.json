@@ -7,6 +7,7 @@
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
+    "inlineSources": true,
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
