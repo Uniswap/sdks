@@ -592,10 +592,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x48fd03529d2a91be835f07f6b72f53b4aad6093d',
         creationBlock: 7009661,
       },
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x47837eb80db5908eabba9105626d9b348bea7b02',
-        creationBlock: 7009661,
-      },
+      // MegaETH skipped v2.1.1: it went 2.0 -> 2.1.2.
       [UniversalRouterVersion.V2_1_2]: {
         address: '0xAedd1CF4C14e833140A61E9C0d2b73a64795c823',
         creationBlock: 26887500,

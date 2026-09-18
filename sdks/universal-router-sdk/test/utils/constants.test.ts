@@ -14,6 +14,8 @@ describe('Universal Router Constants', () => {
   const versions = Object.keys(CHAIN_CONFIGS[1].routerConfigs) as unknown as UniversalRouterVersion[]
   // chains whose only pre-2.1.2 router is V2_1_1 (no V1_2, no V2_0)
   const v211OnlyChainIds = [5042, 4663]
+  // MegaETH skipped 2.1.1 entirely: 2.0 -> 2.1.2
+  const MEGAETH_CHAIN_ID = 4326
 
   describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
@@ -140,18 +142,25 @@ describe('Universal Router Constants', () => {
   })
 
   describe('V2_1_2', () => {
-    // 2.1.2 shipped as a single coordinated deployment to every chain that already
-    // ran 2.1.1, so the two version sets must stay identical.
-    it('is deployed on exactly the chains that have V2_1_1', () => {
+    it('is deployed on every chain that has V2_1_1, plus MegaETH', () => {
       const with211 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_1])
       const with212 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_2])
-      expect(with212).to.deep.equal(with211)
       expect(with212).to.have.lengthOf(24)
+      // every 2.1.1 chain got 2.1.2, and MegaETH is the only chain with 2.1.2 but no 2.1.1
+      expect(with211.filter((id) => !with212.includes(id))).to.deep.equal([])
+      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([MEGAETH_CHAIN_ID])
     })
 
-    it('was deployed after V2_1_1 on every chain', () => {
+    it('has no V2_1_1 on MegaETH to fall back to', () => {
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, MEGAETH_CHAIN_ID)).to.throw(
+        `Universal Router version 2.1.1 not deployed on chain ${MEGAETH_CHAIN_ID}`
+      )
+    })
+
+    it('was deployed after V2_1_1 on every chain that had it', () => {
       chainIds.forEach((chainId) => {
         if (!CHAIN_CONFIGS[chainId].routerConfigs[UniversalRouterVersion.V2_1_2]) return
+        if (!CHAIN_CONFIGS[chainId].routerConfigs[UniversalRouterVersion.V2_1_1]) return
         expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_2, chainId)).to.be.greaterThan(
           UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, chainId)
         )
