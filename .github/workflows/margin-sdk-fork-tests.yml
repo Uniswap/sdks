@@ -1,0 +1,97 @@
+name: "Margin SDK Fork Tests"
+
+# END-TO-END GATE — runs the margin-sdk demo suite (demo/run-all.ts) against an anvil fork of
+# mainnet, exercising the SDK against the LIVE deployed margin stack.
+#
+# The demo flows route their swaps through a Universal Router with already-unlocked V4_SWAP
+# support (v4-periphery #491), which the canonical historical mainnet deployments predate — so the
+# suite deploys one onto the fork from a v4-periphery build. That build is what this job provides:
+# it clones v4-periphery at the commit the committed ABI bindings are pinned to and runs
+# `forge build`, exactly like the margin-sdk-abi-check gate, then points the suite at it via
+# V4_PERIPHERY_PATH.
+#
+# This lives outside the shared monorepo test job on purpose: `bun run test` for the package stays
+# unit-tests + package check (fast, no foundry, no v4-periphery checkout), and the expensive fork
+# suite runs only on PRs that touch the package.
+#
+# Without a fork RPC (`FORK_URL`) the suite skips cleanly and the job passes — see
+# sdks/margin-sdk/scripts/fork-tests.ts.
+
+on:
+  pull_request:
+    paths:
+      - "sdks/margin-sdk/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  margin-fork-tests:
+    name: Run the demo suite against an anvil mainnet fork
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout sdks
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 💽 Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0"
+
+      - name: 🪨 Install Foundry
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
+        with:
+          version: nightly
+
+      - name: 📌 Read the pinned v4-periphery commit from the bindings header
+        id: pin
+        run: |
+          # Same single source of truth as the ABI gate: the "Pinned to v4-periphery commit <sha>"
+          # line in the committed bindings. The Universal Router the demos deploy onto the fork
+          # therefore comes from the same build the ABIs are derived from.
+          sha=$(grep -oE 'Pinned to v4-periphery commit [0-9a-f]{40}' \
+            sdks/margin-sdk/src/generated/abis.ts | grep -oE '[0-9a-f]{40}')
+          if [ -z "$sha" ]; then echo "could not read pinned commit"; exit 1; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Pinned v4-periphery commit: $sha"
+
+      - name: ⬇️ Clone and build v4-periphery at the pinned commit
+        run: |
+          # Rewrite any SSH submodule URLs to https BEFORE submodule init so the runner (which has
+          # no SSH key) can fetch the public repos.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git clone https://github.com/Uniswap/v4-periphery.git "$RUNNER_TEMP/v4-periphery"
+          git -C "$RUNNER_TEMP/v4-periphery" fetch origin "$PINNED_SHA" || true
+          git -C "$RUNNER_TEMP/v4-periphery" checkout "$PINNED_SHA"
+          git -C "$RUNNER_TEMP/v4-periphery" submodule update --init --recursive
+          # Default profile — the demo suite starts anvil with --disable-code-size-limit precisely
+          # because this build's Universal Router runtime exceeds EIP-170.
+          forge build --root "$RUNNER_TEMP/v4-periphery"
+          test -f "$RUNNER_TEMP/v4-periphery/foundry-out/UniversalRouter.sol/UniversalRouter.json"
+        env:
+          PINNED_SHA: ${{ steps.pin.outputs.sha }}
+
+      - name: 🧪 Run the fork demo suite
+        working-directory: sdks/margin-sdk
+        env:
+          V4_PERIPHERY_PATH: ${{ runner.temp }}/v4-periphery
+          FORK_URL: ${{ secrets.FORK_URL }}
+        run: bun run test:fork
