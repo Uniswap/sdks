@@ -565,6 +565,17 @@ const INK_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
+// Abstract is V3-only (gov RFC "Deploy Uniswap v3 on Abstract"); no V2 or V4
+// deployment. All addresses verified on-chain against chain 2741.
+const ABSTRACT_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0xA1160e73B63F322ae88cC2d8E700833e71D0b2a1',
+  multicallAddress: '0x9CA4dcb2505fbf536F6c54AA0a77C79f4fBC35C0',
+  quoterAddress: '0x117Fc8DEf58147016f92bAE713533dDB828aBB7e',
+  nonfungiblePositionManagerAddress: '0xfA928D3ABc512383b8E5E77edd2d5678696084F9',
+  tickLensAddress: '0x9c7d30F93812f143b6Efa673DB8448EfCB9f747E',
+  swapRouter02Address: '0x2cB10Ac97F2C3dAEDEaB7b72DbaEb681891f51B8',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -602,6 +613,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ARC]: ARC_ADDRESSES,
   [ChainId.ROBINHOOD]: ROBINHOOD_ADDRESSES,
   [ChainId.INK]: INK_ADDRESSES,
+  [ChainId.ABSTRACT]: ABSTRACT_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
