@@ -58,7 +58,7 @@ export class SignatureProvider {
   async validatePermit(permit: PermitTransferFrom | PermitBatchTransferFrom): Promise<NonceValidationResult> {
     const [isExpiredResult, isNonceUsedResult] = await Promise.all([
       this.isExpired(permit.deadline),
-      this.isNonceUsed(permit.spender, permit.nonce),
+      this.isNonceUsed(permit.owner, permit.nonce),
     ])
 
     return {
