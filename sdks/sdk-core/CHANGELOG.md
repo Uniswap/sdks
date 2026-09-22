@@ -1,5 +1,17 @@
 # @uniswap/sdk-core
 
+## 7.19.3
+
+### Patch Changes
+
+- 358d9de: Update permissioned PositionManager addresses (redeploy with DELIVERY_GAS_LIMIT)
+
+## 7.19.2
+
+### Patch Changes
+
+- 9a52777: Arc (5042) average block time is 0.5s (measured on-chain), was 0.48.
+
 ## 7.19.1
 
 ### Patch Changes
