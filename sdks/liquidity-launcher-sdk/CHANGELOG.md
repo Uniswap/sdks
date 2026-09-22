@@ -1,5 +1,93 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 1.16.3
+
+### Patch Changes
+
+- Updated dependencies [358d9de]
+- Updated dependencies [4a67d47]
+  - @uniswap/sdk-core@7.19.3
+  - @uniswap/v4-sdk@2.4.0
+  - @uniswap/v3-sdk@3.31.4
+
+## 1.16.2
+
+### Patch Changes
+
+- 73e80d6: Replace the Arc (5042) v3.3.0 Instant Launch pair with the **buyback-and-burn** deploy: fees-on `0x58E5099f…` + FeeSplitter `0xdaA7C2e8…` (40% native to the vault, 60% native + 100% token to the BuybackAndBurnRecipient `0x5cEe9852…`), fees-off `0x36F8c870…` + FeeSplitter `0xE8113a9a…` (100% to the BuybackAndBurnRecipient). `getInstantLaunchStrategy(5042, …)` now returns these; `getCreatorFeesPositionRecipient(5042)` / `getAutocompoundPositionRecipient(5042)` move to the new splitters, so a new Arc auction / crowd launch must set the new address as its `MigratorParameters.positionRecipient`. Pool shape (`25 / 122,050 / -160,100`) and the creator-fee split are unchanged.
+
+  The 2026-09-14 compounding pair (`0x78429369…` / `0xA5FFB8B0…`) is **removed** from `INSTANT_LAUNCH_DEPLOYMENTS`, so `getInstantLaunchDeployment` no longer resolves those strategies. The 2026-09-01 generation stays, so `isCreatorFeesPositionRecipient` / `isAutocompoundPositionRecipient` still recognize the v3.2.0 splitters (`0xC2F1D915…` / `0xCDDC6103…`).
+
+  **Intentionally unchanged**: the Arc LBPStrategy `0x542BCDA1…`, UniversalRouterStrategy `0x0A122717…`, LiquidityLauncher `0x0000FffF…`, TokenSplitter `0x8B7DCeb5…`, UERC20BeneficiaryVault `0x3892aB3D…`, and `INSTANT_LAUNCH_CONTRACTS[5042].compoundingClaimRecipient` `0xBE5A26C5…` (still the claim surface of the v3.2.0 splitters). New optional `buybackAndBurnRecipient` on `InstantLaunchChainContracts` / `InstantLaunchAddresses`, set to `0x5cEe9852…` on Arc only (additive; `undefined` elsewhere). The VestingClaimRecipient `0xf914C6b4…` and InitializerHook `0x0A2Bf52D…` are not tracked by this SDK. No ABI or function-signature changes.
+
+## 1.16.1
+
+### Patch Changes
+
+- c5c8c3a: Redeploy the Arc (5042) **v3.3.0** Instant Launch strategy pair with the protocolFeeController fix (LP-1727): fees-on `0x78429369…` (was `0x0C7adf7A…`), fees-off `0xA5FFB8B0…` (was `0x3d4C91ca…`). The 2026-09-08 v3.3.0 pair never launched anything, so the `INSTANT_LAUNCH_DEPLOYMENTS` entries are **replaced in place** rather than a new generation appended — there are no indexed launches that reference the dropped strategies. Both 2026-09-08 strategies have zero on-chain logs from deployment to tip, so no launch, position or creator share references them. `getInstantLaunchStrategy(5042, …)` now returns the redeployed addresses; pool shape (`25 / 122,050 / -160,100`) and the creator-fee split are unchanged.
+
+  **Intentionally unchanged**: Arc's FeeSplitters (`0xC2F1D915…` / `0xCDDC6103…`), UERC20BeneficiaryVault `0x3892aB3D…` and CompoundingClaimRecipient `0xBE5A26C5…` (the redeployed strategies pin the same periphery, so neither Arc position recipient moves); the 2026-09-01 Arc generation (`0xfe7Be4Eb…` / `0xff301aCB…`), which has live launches; `INSTANT_LAUNCH_CONTRACTS[5042]`; the Arc LBPStrategy `0x542BCDA1…`. No ABI, type, or function-signature changes.
+
+## 1.16.0
+
+### Minor Changes
+
+- a6ea473: Quick launches move from a 4h to a 1h auction window.
+
+  - `QUICK_LAUNCH_DURATION_SECONDS` is now `3_600` (was `14_400`). `QUICK_LAUNCH_PRESET.durationSeconds` and `getQuickLaunchDurationBlocks` follow, so create flows built on the preset produce 1h auctions (36,000 blocks on Robinhood at 0.1s/block, 300 blocks on a 12s chain).
+  - New `QUICK_LAUNCH_LEGACY_DURATION_SECONDS = 14_400`: the window quick launches were created with before the 1h window.
+  - `isQuickLaunch` `allowedDurationsSeconds` now defaults to `[QUICK_LAUNCH_DURATION_SECONDS, QUICK_LAUNCH_LEGACY_DURATION_SECONDS]` (1h and 4h, each ±10%), so a consumer that upgrades without passing options keeps recognising the 4h quick launches already on-chain while also recognising new 1h ones. Callers that need a stricter window (e.g. a backend applying a cutover date) pass their own list, such as `[QUICK_LAUNCH_DURATION_SECONDS]`.
+
+  No other classifier checks change.
+
+## 1.15.0
+
+### Minor Changes
+
+- 12d2839: Register the Liquidity Launcher **v3.3.0** deployment set. Addresses come from the v3.3.0 deployment README supplied by the contracts side (Eric Zhong, 2026-09-10), taken as verified. Every "current" pointer for a redeployed contract moves; every prior generation stays registered (the registry is append-only — indexed launches permanently reference the strategy and splitter that created them), so historical classification is unchanged.
+
+  - **LBPStrategy rotates on all 10 supported chains** (contracts `1c59049`): Mainnet `0x2EEF0e2a…`, Unichain `0x48F55E7E…`, Base `0xf10124B0…`, Arbitrum One `0xc80f3f44…`, Avalanche `0x7575c948…`, XLayer `0xde758D7B…`, Robinhood `0xbf1aB81f…`, Arc `0x542BCDA1…`, Sepolia `0x95434E89…`, Base Sepolia `0x73ad5238…`. Existing auctions are unaffected — the strategy is resolved per auction downstream.
+  - **A sixth `INSTANT_LAUNCH_DEPLOYMENTS` generation is appended for Robinhood (4663)**: fees-on `0x7c48DDe3…` + FeeSplitter `0x9411fa7F…`, fees-off `0xC9566675…` + FeeSplitter `0x882Ae5e2…`. Both splitters move again, so `getCreatorFeesPositionRecipient` / `getAutocompoundPositionRecipient` (and their derived maps) return the new splitters — a new auction / crowd launch must set the new address as its `MigratorParameters.positionRecipient`. `isCreatorFeesPositionRecipient` / `isAutocompoundPositionRecipient` still recognize every superseded splitter.
+  - **A second `INSTANT_LAUNCH_DEPLOYMENTS` generation is appended for Arc (5042)**: fees-on `0x0C7adf7A…`, fees-off `0x3d4C91ca…`. Arc's periphery did **not** redeploy — both v3.3.0 strategies pin the same v3.2.0 FeeSplitters, UERC20BeneficiaryVault and CompoundingClaimRecipient as the 2026-09-01 generation — so neither Arc position recipient moves.
+  - **`INSTANT_LAUNCH_CONTRACTS[4663]`**: `beneficiaryVault` → `0x26d2F7Ac…` (was `0xd35E9CA7…`), `compoundingClaimRecipient` → `0xf585b5D7…` (was `0xf9526Dd3…`) (periphery `7ea523c`).
+  - Pool shape (`tickSpacing` / `initialTick` / `minLaunchTick`) is carried forward per chain from each chain's predecessor generation — Robinhood `25 / 198,050 / -160,100`, Arc `25 / 122,050 / -160,100`. The v3.3.0 README records no tick change.
+
+  **Intentionally unchanged**: the `UniversalRouterStrategy` on both Robinhood (4663 `0x1242c943…`) and Arc (5042 `0x0A122717…`) — it was not redeployed for v3.3.0 and the existing deploy stays compatible (Eric Zhong, 2026-09-10); the core LiquidityLauncher (still v3.2.0 `0x0000FffF…`), the shared TokenSplitter and Robinhood's v3.2.0 TokenSplitter, the CCA factory, token factories, position managers, Arc's periphery, and the BuybackAndBurn / VestingClaim recipients. `initializerHook` is still **not** tracked by this SDK — the v3.3.0 README lists per-chain InitializerHooks, but adding the field is a `LauncherAddresses` interface change needing `@Uniswap/apps-lp` sign-off. Ink (57073) is **not** added: the README lists an Ink LBPStrategy, but Ink is not in this SDK's `SupportedChainId`. No ABI, type, or function-signature changes.
+
+## 1.14.0
+
+### Minor Changes
+
+- cbc8229: `buildPositionDefinitions`: allow `CUSTOM_RANGE` liquidity percentages to sum to less than 100%.
+
+  Under-allocation was rejected with `INVALID_PRICE_RANGE` ("Custom price range liquidity percentages must sum to 100%"), on the assumption that unallocated LP budget had no destination position. It does: `PositionPlanner.resolve` always appends an implicit full-range position carrying whatever the definitions leave unspent, and the planner only reverts when the weights _exceed_ `MPS`. A caller allocating 45% across concentrated ranges now gets two definitions summing to 45% of `MPS_TOTAL`, and the remaining 55% of the budget goes to that full-range position on migration.
+
+  Over-allocation (`> 100%`) still throws, unchanged. No API surface change.
+
+## 1.13.0
+
+### Minor Changes
+
+- 9a52777: Arc (5042): Instant Launch strategy redeploy, uERC20 factory and block time.
+
+  - `INSTANT_LAUNCH_DEPLOYMENTS`: the Arc fees-on / fees-off `InstantLaunchStrategy` pair is now `0xfe7Be4EbBE6CcDfA57EE8c36fe9a767B033eB056` / `0xff301aCB22816D210d75D71F31Ac13C771093EF3` with `initialTick` `122050` (Arc's native currency is USDC, so the tick is USDC-denominated: ≈ $5k FDV on 1e9 supply). The previous pair (`0x26e78031…` / `0xe510927f…`, `initialTick` `198050`) is removed. `tickSpacing` 25, `minLaunchTick` -160100, FeeSplitters, vault and claim recipient are unchanged.
+  - `LAUNCHER_ADDRESSES[5042].uerc20Factory` = `0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6`: `selectTokenFactory(5042)` now resolves `{ kind: 'uerc20' }`, and `getInstantLaunchAddresses(5042, …)` / `isInstantLaunchSupportedChain(5042)` resolve.
+  - `BLOCK_TIME_SECONDS_BY_CHAIN[5042]` = `0.5` (measured on-chain; was the 12s default).
+  - `getQuickLaunchFloorPricePerToken` / `getQuickLaunchGraduationPricePerToken`: the price parameter is now `nativeUsdPrice`, the USD price of the chain's native currency (ETH on Robinhood, USDC ≈ 1 on Arc); `ethUsdPrice` is deprecated in favour of `nativeUsdPrice` (positional, so existing callers are unaffected). Docs now say "native currency"; no math changes.
+
+### Patch Changes
+
+- Updated dependencies [9a52777]
+  - @uniswap/sdk-core@7.19.2
+  - @uniswap/v3-sdk@3.31.3
+  - @uniswap/v4-sdk@2.3.3
+
+## 1.12.0
+
+### Minor Changes
+
+- e71b445: Add Arc (5042) to the deployment registries: launcher stack (redeployed LiquidityLauncher, LBPStrategy, shared TokenSplitter, UniversalRouterStrategy, v4 PositionManager) and the Instant Launch generation (fees-on/fees-off strategy + FeeSplitter pairs, UERC20BeneficiaryVault, CompoundingClaimRecipient). Arc deploys no token factory, so new-token launches stay unsupported there (`selectTokenFactory`/`getInstantLaunchAddresses` return undefined); everything else resolves.
+
 ## 1.11.0
 
 ### Minor Changes
