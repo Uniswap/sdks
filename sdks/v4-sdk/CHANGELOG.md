@@ -1,5 +1,27 @@
 # @uniswap/v4-sdk
 
+## 2.4.0
+
+### Minor Changes
+
+- 4a67d47: Add Universal Router v2.1.2 addresses (#736)
+
+  Adds the `UniversalRouterVersion.V2_1_2` enum member (mirrored as `URVersion.V2_1_2` in v4-sdk) and the v2.1.2 Universal Router deployment config — router address and creation block — across the 24 supported chains. Consumers can now resolve v2.1.2 routers via `UNIVERSAL_ROUTER_ADDRESS`/`CHAIN_CONFIGS` and select the version through `SwapOptions.urVersion`; #736 landed the addresses on `main` without a changeset, so this releases them.
+
+### Patch Changes
+
+- Updated dependencies [358d9de]
+  - @uniswap/sdk-core@7.19.3
+  - @uniswap/v3-sdk@3.31.4
+
+## 2.3.3
+
+### Patch Changes
+
+- Updated dependencies [9a52777]
+  - @uniswap/sdk-core@7.19.2
+  - @uniswap/v3-sdk@3.31.3
+
 ## 2.3.2
 
 ### Patch Changes

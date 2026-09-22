@@ -31,8 +31,15 @@ import type { LockRecipientInput } from './lock'
 // Defining preset constants
 // ---------------------------------------------------------------------------
 
-/** Quick launches run for 4h only (14400s). Supersedes the earlier 30m/1h/4h set. */
-export const QUICK_LAUNCH_DURATION_SECONDS = 14_400
+/** Auction window a new quick launch is created with: 1h (3600s). */
+export const QUICK_LAUNCH_DURATION_SECONDS = 3_600
+
+/**
+ * The 4h (14400s) auction window earlier quick launches were created with. Launches with this window
+ * exist on-chain and are still quick launches, so {@link isQuickLaunch} accepts it by default — see
+ * {@link QuickLaunchMatchOptions.allowedDurationsSeconds}.
+ */
+export const QUICK_LAUNCH_LEGACY_DURATION_SECONDS = 14_400
 
 /** Fixed, standardized total supply: 1,000,000,000 (1B) whole tokens (minted via the Token Factory). */
 export const QUICK_LAUNCH_TOTAL_SUPPLY = 1_000_000_000n
@@ -52,7 +59,7 @@ export const QUICK_LAUNCH_AUCTION_SUPPLY_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2
  */
 export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 2n
 
-/** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
+/** Raise denomination: the chain's native currency only (`address(0)` sentinel; ETH on most chains, USDC on Arc). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
 /** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
@@ -75,8 +82,8 @@ export const QUICK_LAUNCH_GRADUATION_RAISE_USD = QUICK_LAUNCH_GRADUATION_FDV_USD
 /**
  * The graduation-FDV values (USD) a quick launch may carry. Grandfathers the historical $5k cohort
  * alongside the current $10k preset ({@link QUICK_LAUNCH_GRADUATION_FDV_USD}), the same escape-hatch
- * shape as the {@link QuickLaunchMatchOptions.allowedDurationsSeconds} override that grandfathers the
- * POC 30m/1h windows. USD-denominated on purpose: the gate is chain-agnostic, so a legit $5k launch
+ * shape as {@link QuickLaunchMatchOptions.allowedDurationsSeconds}, which grandfathers the legacy 4h
+ * window. USD-denominated on purpose: the gate is chain-agnostic, so a legit $5k launch
  * on any chain (e.g. ~378 AVAX) passes, while a raw-native threshold would wrongly demote every
  * non-ETH chain. See {@link isQuickLaunch}.
  */
@@ -201,7 +208,7 @@ export const PERMANENT_UNLOCK_BLOCK_THRESHOLD = 200_000_000_000n
  */
 export const QUICK_LAUNCH_SEARCHER_BURN_THRESHOLD_PERCENT = 0.05
 
-/** Default fractional tolerance when comparing a derived auction duration to the 4h target (±10%). */
+/** Default fractional tolerance when comparing a derived auction duration to an allowed target (±10%). */
 export const QUICK_LAUNCH_DURATION_TOLERANCE_RATIO = 0.1
 
 // ---------------------------------------------------------------------------
@@ -254,7 +261,7 @@ export function isStructurallyPermanentLockMode(mode: QuickLaunchLockMode): bool
  * always 18 decimals, native raise is `address(0)` on every chain, the duration is a fixed real-time
  * window), so the preset is a frozen constant rather than a `getQuickLaunchPreset(chainId)` function.
  * The two values that ARE chain-dependent — the duration in blocks and the floor price — are
- * *derived* at build time from the chain block time / live ETH price, not stored here; see
+ * *derived* at build time from the chain block time / live native-currency USD price, not stored here; see
  * {@link getQuickLaunchDurationBlocks}.
  */
 export interface QuickLaunchPreset {
@@ -316,7 +323,7 @@ export const QUICK_LAUNCH_PRESET: QuickLaunchPreset = {
   },
 }
 
-/** The 4h window as a block count on `chainId` (uses the chain's block time). */
+/** The {@link QUICK_LAUNCH_DURATION_SECONDS} window as a block count on `chainId` (uses the chain's block time). */
 export function getQuickLaunchDurationBlocks(chainId: number): bigint {
   return BigInt(Math.round(QUICK_LAUNCH_DURATION_SECONDS / getBlockTimeSeconds(chainId)))
 }
@@ -327,24 +334,25 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
 
 /**
  * The preset floor as the CreateAuction `floor_price_raise_per_token` decimal:
- * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (native ETH)
- * at `ethUsdPrice`. Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
+ * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (the chain's
+ * native currency) at `nativeUsdPrice` — the USD price of that native currency (ETH on Robinhood;
+ * USDC ≈ 1 on Arc). Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
  * their own fallback.
  */
-export function getQuickLaunchFloorPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchFloorPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
  * The preset graduation threshold as the CreateAuction `graduation_price_raise_per_token`
  * decimal: {@link QUICK_LAUNCH_GRADUATION_FDV_USD} / 1B tokens, converted to the raise currency
- * (native ETH) at `ethUsdPrice` — the same derivation as the floor, over the FULL supply. The
+ * (the chain's native currency) at `nativeUsdPrice` — the same derivation as the floor, over the FULL supply. The
  * service turns it into `requiredCurrencyRaised = graduationPrice x soldSupply`, so the USD
  * raise this demands is graduation FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}
  * (= {@link QUICK_LAUNCH_GRADUATION_RAISE_USD}), never the FDV 1:1.
  */
-export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): string {
-  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+export function getQuickLaunchGraduationPricePerToken(nativeUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, nativeUsdPrice)
 }
 
 /**
@@ -475,12 +483,14 @@ export interface QuickLaunchMatchOptions {
   /** Fractional tolerance on the duration comparison. Default {@link QUICK_LAUNCH_DURATION_TOLERANCE_RATIO}. */
   durationToleranceRatio?: number
   /**
-   * Durations (seconds) accepted as quick-launch. Defaults to the current canonical preset (4h only).
+   * Durations (seconds) accepted as quick-launch, each within {@link durationToleranceRatio}. Defaults
+   * to `[QUICK_LAUNCH_DURATION_SECONDS, QUICK_LAUNCH_LEGACY_DURATION_SECONDS]`: the current 1h window
+   * and the legacy 4h window.
    *
-   * POLICY: the create preset is 4h-only going forward, so new launches must match exactly 4h. This
-   * matcher also classifies auctions that already exist on-chain; the earlier POC created 30m/1h/4h
-   * auctions. Recognizing those historical windows is opt-in via this override
-   * (`[1800, 3600, 14400]`) so callers make the choice explicitly — the default stays strict on 4h.
+   * Both are accepted by default because this matcher also classifies auctions that already exist
+   * on-chain: a consumer that upgrades without passing options must not silently stop recognising 4h
+   * quick launches. Callers that need a stricter window — e.g. a backend applying a cutover date —
+   * pass their own list (`[QUICK_LAUNCH_DURATION_SECONDS]`).
    */
   allowedDurationsSeconds?: readonly number[]
   /**
@@ -505,13 +515,13 @@ export interface QuickLaunchMatchOptions {
  *
  * Presumes a CCA (v2) auction — the caller should gate on the auction version first (e.g. via the
  * factory→lens registry in `addresses`), since `AuctionParameters` is inherently CCA. The floor /
- * clearing price is intentionally NOT matched: it is derived from the live ETH price and so is not a
+ * clearing price is intentionally NOT matched: it is derived from the live native-currency USD price and so is not a
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,
- * and the 4h duration. The 50/50 LP reserve and the permanent lock (buyback-&-burn, or a
- * structurally permanent `'burn'` / `'creatorFees'` mode) are matched only
- * when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
+ * and an allowed duration ({@link QuickLaunchMatchOptions.allowedDurationsSeconds}). The 50/50 LP
+ * reserve and the permanent lock (buyback-&-burn, or a structurally permanent `'burn'` /
+ * `'creatorFees'` mode) are matched only when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
  * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
  * only turn a match into a non-match, classifying without them is a safe over-approximation that a
  * later pass can tighten.
@@ -531,7 +541,7 @@ export interface QuickLaunchMatchOptions {
 export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaunchMatchOptions = {}): boolean {
   const {
     durationToleranceRatio = QUICK_LAUNCH_DURATION_TOLERANCE_RATIO,
-    allowedDurationsSeconds = [QUICK_LAUNCH_DURATION_SECONDS],
+    allowedDurationsSeconds = [QUICK_LAUNCH_DURATION_SECONDS, QUICK_LAUNCH_LEGACY_DURATION_SECONDS],
     allowedGraduationFdvUsd = QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
     graduationFdvToleranceRatio = QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   } = options
