@@ -6,6 +6,7 @@ export enum UniversalRouterVersion {
   V1_2 = '1.2',
   V2_0 = '2.0',
   V2_1_1 = '2.1.1',
+  V2_1_2 = '2.1.2',
   V2_2_0 = '2.2.0',
 }
 
@@ -52,9 +53,13 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x4C82D1fBFe28C977cBB58D8C7FF8FCF9F70a2cCA',
         creationBlock: 24680568,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85',
+        creationBlock: 25999984,
+      },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x0542093271A31f6FC1DADB232bd59eeb27de780F',
-        creationBlock: 25733844,
+        address: '0xab863E752Bf67D8DCDD929EaAe9Be9dc83Fb3BbB',
+        creationBlock: 26006366,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -89,9 +94,13 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x7DfD4F31be6814D2906BDE155c3e1B146EAc1468',
         creationBlock: 11343084,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3',
+        creationBlock: 11726370,
+      },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x54C707Df83f03bc9cA64ED2CcF9C99B63FD854b7',
-        creationBlock: 11468175,
+        address: '0x5093f1CDED83d99FfEd6602dA6260672ae16787c',
+        creationBlock: 11732372,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -111,6 +120,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 84336468,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xDc264714F68d84CF29BC605589405E78bDBE7C9f',
+        creationBlock: 93985021,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -145,6 +158,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 149097062,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xC09255D86DB563cBc11C2fCf4a0C512e160111B4',
+        creationBlock: 157042185,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -177,6 +194,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 442902181,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x2d01411773c8C24805306E89A41F7855C3c4Fe65',
+        creationBlock: 506233838,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -211,6 +232,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 61893766,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xe2023F3FA515cF070e07fD9d51c1d236e07843f4',
+        creationBlock: 77782041,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -244,6 +269,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 87208607,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xDc264714F68d84CF29BC605589405E78bDBE7C9f',
+        creationBlock: 122489907,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -262,6 +291,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 80616324,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
+        creationBlock: 95539189,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -296,6 +329,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7',
         creationBlock: 43501203,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xd6145b2D3F379919E8CdEda7B97e37c4b2Ca9c40',
+        creationBlock: 51446913,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -315,6 +352,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 32492192,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
+        creationBlock: 40435962,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -333,6 +374,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 43550401,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
+        creationBlock: 51493994,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -368,6 +413,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 27228771,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
+        creationBlock: 35173079,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -387,6 +436,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 46987997,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xDf38F24fE153761634Be942F9d859f3DBA857E95',
+        creationBlock: 62830804,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -405,6 +458,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 43044663,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xD1b797D92d87B688193A2B976eFc8D577D204343',
+        creationBlock: 58934463,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -440,6 +497,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 39035624,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x8702463e73f74d0b6765aBceb314Ef07aCb92650',
+        creationBlock: 46958874,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -458,6 +519,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 20352508,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
+        creationBlock: 28273507,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -478,6 +543,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 62239835,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xa6CE4F10d83dBdDAc17E68e1837ca9cE6a1b596e',
+        creationBlock: 105721635,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -492,6 +561,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 29782392,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xDc264714F68d84CF29BC605589405E78bDBE7C9f',
+        creationBlock: 32065952,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -508,6 +581,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 10065560,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x182a927119D56008d921126764bF884221b10f59',
+        creationBlock: 40003559,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -519,9 +596,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x48fd03529d2a91be835f07f6b72f53b4aad6093d',
         creationBlock: 7009661,
       },
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x47837eb80db5908eabba9105626d9b348bea7b02',
-        creationBlock: 7009661,
+      // MegaETH skipped v2.1.1: it went 2.0 -> 2.1.2.
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xAedd1CF4C14e833140A61E9C0d2b73a64795c823',
+        creationBlock: 26887500,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -534,6 +612,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
         creationBlock: 1950059,
       },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x8702463e73f74d0b6765aBceb314Ef07aCb92650',
+        creationBlock: 21402239,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -544,6 +626,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8876789976decbfcbbbe364623c63652db8c0904',
         creationBlock: 18127,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x204FAca1764B154221e35c0d20aBb3c525710498',
+        creationBlock: 65727895,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -556,17 +642,14 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x112908dac86e20e7241b0927479ea3bf935d1fa0',
         creationBlock: 4580586,
       },
-      // No standalone v2.1.1 router is deployed on Ink. v2.2.0 is a strict
-      // superset of v2.1.1 (adds permissioned-pool support, no change to any
-      // existing command/struct/behavior), so the v2.2.0 deployment serves
-      // v2.1.1 callers byte-for-byte. Aliased to the v2.2.0 address/block.
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
-        creationBlock: 47542762,
+      // No v2.1.1 router is deployed on Ink
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x661E93cca42AfacB172121EF892830cA3b70F08d',
+        creationBlock: 56186042,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
-        creationBlock: 47542762,
+        address: '0x8BbCAEb326AD590521a921C9e457Ee09F336B48c',
+        creationBlock: 56261823,
       },
     },
     // SwapProxy on Ink is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
@@ -583,6 +666,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 55072165,
+      },
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0x1cd182C94fcF42277B80DBB9060F88024809E61E',
+        creationBlock: 70914540,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,

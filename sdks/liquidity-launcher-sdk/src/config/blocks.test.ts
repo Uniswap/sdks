@@ -15,6 +15,11 @@ describe('getBlockTimeSeconds', () => {
     expect(getBlockTimeSeconds(SupportedChainId.ROBINHOOD)).toBeLessThan(DEFAULT_BLOCK_TIME_SECONDS)
   })
 
+  it('uses the Arc cadence', () => {
+    expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBe(0.5)
+    expect(getBlockTimeSeconds(SupportedChainId.ARC)).toBeLessThan(DEFAULT_BLOCK_TIME_SECONDS)
+  })
+
   it('keeps the expected cadence for the other launch chains and defaults unknown chains', () => {
     expect(getBlockTimeSeconds(SupportedChainId.MAINNET)).toBe(12)
     expect(getBlockTimeSeconds(SupportedChainId.BASE)).toBe(2)
@@ -40,6 +45,18 @@ describe('deriveBlocks — real-time auction window is honored', () => {
     })
     // 50400s / 0.1s = 504000 blocks; the 12s default would yield only 4200 (~7min of real time).
     expect(endBlock - startBlock).toBe(504_000n)
+  })
+
+  it('spans a 14h auction correctly on Arc', () => {
+    const { startBlock, endBlock } = deriveBlocks({
+      startTimeUnix: start,
+      endTimeUnix: end,
+      currentBlock: CURRENT_BLOCK,
+      nowUnix: NOW,
+      blockTimeSeconds: getBlockTimeSeconds(SupportedChainId.ARC),
+    })
+    // 50400s / 0.5s = 100800 blocks; the 12s default would yield only 4200 (~35min of real time).
+    expect(endBlock - startBlock).toBe(100_800n)
   })
 
   it('spans a 14h auction correctly on Arbitrum One', () => {
