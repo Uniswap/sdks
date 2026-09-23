@@ -2237,6 +2237,42 @@ describe('encodeSwaps', () => {
       expect(() => validateEncodeSwaps(balanceSpec(), steps)).to.throw('ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS')
     })
 
+    it('refuses a v4 exact-out action, which the open-delta ordering cannot see', () => {
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            { action: 'SETTLE', currency: USDC.address, amount: MAX_UINT256.toString() },
+            {
+              action: 'SWAP_EXACT_IN',
+              currencyIn: USDC.address,
+              path: [
+                { intermediateCurrency: DAI.address, fee: 100, tickSpacing: 1, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountIn: '1000000',
+              amountOutMinimum: '0',
+            },
+            {
+              action: 'SWAP_EXACT_OUT_SINGLE',
+              poolKey: {
+                currency0: USDC.address,
+                currency1: DAI.address,
+                fee: 100,
+                tickSpacing: 1,
+                hooks: ETH_ADDRESS,
+              },
+              zeroForOne: true,
+              amountOut: '1000',
+              amountInMaximum: '5000000',
+              hookData: '0x',
+            },
+            { action: 'TAKE', currency: DAI.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+          ],
+        },
+      ]
+      expect(() => validateEncodeSwaps(balanceSpec(), steps)).to.throw('ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY')
+    })
+
     it('refuses a WETH leg after the unwrap', () => {
       const steps = [...unwrapThenNativePlan(), buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI])]
       expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(
