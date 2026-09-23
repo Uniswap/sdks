@@ -81,20 +81,26 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
   )
 
   // Exactly one input swap may consume the open delta (amountIn 0). With several input
-  // swaps (a split inside the step) the others keep their quoted slices and the largest
+  // swaps (a split inside the step) the others keep their quoted slices and the remainder
   // moves after them, so it absorbs the delivery variance and the fixed slices are never
-  // starved.
+  // starved. A plan that already nominates its remainder (GuideStar writes intermediate
+  // steps that way) keeps that one rather than gaining a second.
   const swapIndexes = settled
     .map((action, index) => (isInputSwap(action, tokenAddress) ? index : -1))
     .filter((index) => index >= 0)
+  const openDeltaIndexes = swapIndexes.filter((index) => swapAmountIn(settled[index]).isZero())
+  invariant(openDeltaIndexes.length <= 1, 'ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS')
+
   let transformed: V4Action[] = settled
   if (swapIndexes.length === 1) {
     transformed = settled.map((action, index) => (index === swapIndexes[0] ? { ...action, amountIn: 0 } : action))
   } else if (swapIndexes.length > 1) {
-    let remainderIndex = swapIndexes[0]
-    for (const index of swapIndexes) {
-      if (swapAmountIn(settled[index]).gt(swapAmountIn(settled[remainderIndex]))) {
-        remainderIndex = index
+    let remainderIndex = openDeltaIndexes[0] ?? swapIndexes[0]
+    if (openDeltaIndexes.length === 0) {
+      for (const index of swapIndexes) {
+        if (swapAmountIn(settled[index]).gt(swapAmountIn(settled[remainderIndex]))) {
+          remainderIndex = index
+        }
       }
     }
     const remainder: V4Action = { ...settled[remainderIndex], amountIn: 0 } as V4Action
@@ -115,14 +121,26 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
     transformed = reordered
   }
 
-  if (hasInputSettle) {
-    return transformed
-  }
-  // No settle in the plan (addTrade-style shapes): fund the open delta explicitly.
-  return [
-    { action: 'SETTLE', currency: tokenAddress, amount: CONTRACT_BALANCE.toString(), payerIsUser: false },
-    ...transformed,
-  ]
+  const result = hasInputSettle
+    ? transformed
+    : // No settle in the plan (addTrade-style shapes): fund the open delta explicitly.
+      [
+        {
+          action: 'SETTLE',
+          currency: tokenAddress,
+          amount: CONTRACT_BALANCE.toString(),
+          payerIsUser: false,
+        } as V4Action,
+        ...transformed,
+      ]
+
+  // Two swaps consuming the same open delta means the first takes it all and the second
+  // gets nothing, which encodes cleanly and reverts on chain.
+  invariant(
+    result.filter((action) => isInputSwap(action, tokenAddress) && swapAmountIn(action).isZero()).length === 1,
+    'ROUTER_BALANCE_INPUT_OPEN_DELTA_NOT_UNIQUE'
+  )
+  return result
 }
 
 // The router holds the funds, so no leg of a spender step may pull from the user: a
