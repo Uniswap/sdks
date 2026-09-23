@@ -10,12 +10,13 @@ import {
   isAtLeastV2_1_1,
   ZERO_ADDRESS,
   ETH_ADDRESS,
+  CONTRACT_BALANCE,
 } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
 import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
-import { isInputSettle, isInputSwap, stepSpendsToken } from './routerBalanceSteps'
+import { isInputSettle, isInputSwap, stepSpendAmount, stepSpendsToken, v4SwapAmountIn } from './routerBalanceSteps'
 import { toFeeList } from './normalizeEncodeSwapsSpec'
 
 function hasPortionFee(spec: NormalizedSwapSpecification): boolean {
@@ -182,6 +183,35 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
       .filter((index) => index >= 0)
     invariant(spenderIndexes.length > 0, 'ROUTER_BALANCE_INPUT_SPLIT_ROUTE')
+
+    // Shapes the rewrite cannot express. Checked here so both encode paths get a typed
+    // refusal; the transform keeps the same assertions as a backstop.
+    if (unwrapDrainsInput) {
+      const nativeSpenders = swapSteps.filter(
+        (step, index) => index > unwrapIndex && stepSpendsToken(step, ETH_ADDRESS)
+      )
+      invariant(nativeSpenders.length > 0, 'ROUTER_BALANCE_INPUT_UNWRAP_WITHOUT_NATIVE_LEG')
+      invariant(nativeSpenders.length === 1, 'ROUTER_BALANCE_INPUT_UNWRAP_MULTIPLE_NATIVE_LEGS')
+    }
+    // A split needs a comparable amount on every leg to pick the one that absorbs the
+    // variance; a sentinel or zero leg leaves the choice undefined.
+    const remainderCurrency = (unwrapDrainsInput ? ETH_ADDRESS : balanceInputTokenAddress).toLowerCase()
+    const remainderSpenders = swapSteps.filter((step) => stepSpendsToken(step, remainderCurrency))
+    if (remainderSpenders.length > 1) {
+      for (const step of remainderSpenders) {
+        const amount = stepSpendAmount(step, remainderCurrency)
+        invariant(amount.gt(0) && !amount.eq(CONTRACT_BALANCE), 'ROUTER_BALANCE_INPUT_SPLIT_LEG_AMOUNT_UNKNOWN')
+      }
+    }
+    for (const step of swapSteps) {
+      if (step.type !== 'V4_SWAP') {
+        continue
+      }
+      const openDelta = step.v4Actions.filter(
+        (action) => isInputSwap(action, remainderCurrency) && v4SwapAmountIn(action).isZero()
+      )
+      invariant(openDelta.length <= 1, 'ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS')
+    }
     swapSteps.forEach((step, index) => {
       invariant(
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',

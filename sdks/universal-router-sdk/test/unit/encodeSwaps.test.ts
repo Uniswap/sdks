@@ -2709,6 +2709,59 @@ describe('encodeSwaps', () => {
       )
     })
 
+    it('refuses an unwrap with no native leg after it, at validate', () => {
+      const steps = unwrapThenNativePlan().slice(0, 4)
+      expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(
+        'ROUTER_BALANCE_INPUT_UNWRAP_WITHOUT_NATIVE_LEG'
+      )
+    })
+
+    it('refuses two native legs after the unwrap, at validate', () => {
+      const steps = [...unwrapThenNativePlan(), nativeV4Leg()]
+      expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(
+        'ROUTER_BALANCE_INPUT_UNWRAP_MULTIPLE_NATIVE_LEGS'
+      )
+    })
+
+    it('refuses a split leg with no comparable amount, at validate', () => {
+      const steps = [
+        buildV3ExactInStep({ amountIn: CONTRACT_BALANCE.toString() }),
+        buildV3ExactInStep({ amountIn: '1000000' }),
+      ]
+      expect(() => validateEncodeSwaps(balanceSpec(), steps)).to.throw('ROUTER_BALANCE_INPUT_SPLIT_LEG_AMOUNT_UNKNOWN')
+    })
+
+    it('refuses a v4 step with two nominated remainders, at validate', () => {
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            { action: 'SETTLE', currency: USDC.address, amount: MAX_UINT256.toString() },
+            {
+              action: 'SWAP_EXACT_IN',
+              currencyIn: USDC.address,
+              path: [
+                { intermediateCurrency: DAI.address, fee: 100, tickSpacing: 1, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountIn: '0',
+              amountOutMinimum: '0',
+            },
+            {
+              action: 'SWAP_EXACT_IN',
+              currencyIn: USDC.address,
+              path: [
+                { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountIn: '0',
+              amountOutMinimum: '0',
+            },
+            { action: 'TAKE', currency: DAI.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+          ],
+        },
+      ]
+      expect(() => validateEncodeSwaps(balanceSpec(), steps)).to.throw('ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS')
+    })
+
     it('refuses a WETH leg after the unwrap', () => {
       const steps = [...unwrapThenNativePlan(), buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI])]
       expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(

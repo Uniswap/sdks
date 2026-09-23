@@ -47,7 +47,7 @@ export function isInputSwap(action: V4Action, tokenAddress: string): boolean {
   )
 }
 
-function swapAmountIn(action: V4Action): BigNumber {
+export function v4SwapAmountIn(action: V4Action): BigNumber {
   return action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_IN_SINGLE'
     ? BigNumber.from(action.amountIn)
     : BigNumber.from(0)
@@ -66,7 +66,7 @@ function v4StepSpendAmount(actions: V4Action[], tokenAddress: string): BigNumber
   }
   return actions
     .filter((action) => isInputSwap(action, tokenAddress))
-    .reduce((total, action) => total.add(swapAmountIn(action)), BigNumber.from(0))
+    .reduce((total, action) => total.add(v4SwapAmountIn(action)), BigNumber.from(0))
 }
 
 function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[] {
@@ -88,7 +88,7 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
   const swapIndexes = settled
     .map((action, index) => (isInputSwap(action, tokenAddress) ? index : -1))
     .filter((index) => index >= 0)
-  const openDeltaIndexes = swapIndexes.filter((index) => swapAmountIn(settled[index]).isZero())
+  const openDeltaIndexes = swapIndexes.filter((index) => v4SwapAmountIn(settled[index]).isZero())
   invariant(openDeltaIndexes.length <= 1, 'ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS')
 
   let transformed: V4Action[] = settled
@@ -98,7 +98,7 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
     let remainderIndex = openDeltaIndexes[0] ?? swapIndexes[0]
     if (openDeltaIndexes.length === 0) {
       for (const index of swapIndexes) {
-        if (swapAmountIn(settled[index]).gt(swapAmountIn(settled[remainderIndex]))) {
+        if (v4SwapAmountIn(settled[index]).gt(v4SwapAmountIn(settled[remainderIndex]))) {
           remainderIndex = index
         }
       }
@@ -137,7 +137,7 @@ function applyToV4Actions(actions: V4Action[], tokenAddress: string): V4Action[]
   // Two swaps consuming the same open delta means the first takes it all and the second
   // gets nothing, which encodes cleanly and reverts on chain.
   invariant(
-    result.filter((action) => isInputSwap(action, tokenAddress) && swapAmountIn(action).isZero()).length === 1,
+    result.filter((action) => isInputSwap(action, tokenAddress) && v4SwapAmountIn(action).isZero()).length === 1,
     'ROUTER_BALANCE_INPUT_OPEN_DELTA_NOT_UNIQUE'
   )
   return result
@@ -185,7 +185,7 @@ function rewriteSpendingStep(step: SwapStep, tokenAddress: string): SwapStep {
 // The remainder leg of a split: the largest spender by input amount, which absorbs all
 // delivery variance. A v4 leg's spend is read from its input settle (or the sum of its
 // input swaps); a leg with no concrete amount cannot be compared and is refused.
-function stepSpendAmount(step: SwapStep, tokenAddress: string): BigNumber {
+export function stepSpendAmount(step: SwapStep, tokenAddress: string): BigNumber {
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':
     case 'V3_SWAP_EXACT_IN':
