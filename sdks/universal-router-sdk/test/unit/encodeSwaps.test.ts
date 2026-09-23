@@ -2522,6 +2522,93 @@ describe('encodeSwaps', () => {
       }
     })
 
+    // Scott's shape: WETH delivered, split across v3 legs, then the whole remaining
+    // balance unwrapped into a native v4 pool. The unwrap already claims everything,
+    // so promoting a v3 leg used to drain the pot and starve it.
+    const wethRouting = {
+      inputToken: WETH,
+      outputToken: DAI,
+      amount: CurrencyAmount.fromRawAmount(WETH, '10000000000000000000'),
+      quote: CurrencyAmount.fromRawAmount(DAI, '1000000000000000000'),
+    }
+    const nativeV4Leg = (): SwapStep => ({
+      type: 'V4_SWAP',
+      v4Actions: [
+        { action: 'SETTLE', currency: ETH_ADDRESS, amount: '129000000000000000', payerIsUser: false },
+        {
+          action: 'SWAP_EXACT_IN',
+          currencyIn: ETH_ADDRESS,
+          path: [{ intermediateCurrency: DAI.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' }],
+          amountIn: '129000000000000000',
+          amountOutMinimum: '0',
+        },
+      ],
+    })
+    const unwrapThenNativePlan = (): SwapStep[] => [
+      buildV3ExactInStep({ amountIn: '1810000000000000000' }, [WETH, DAI]),
+      buildV3ExactInStep({ amountIn: '7160000000000000000' }, [WETH, DAI]),
+      buildV3ExactInStep({ amountIn: '900000000000000000' }, [WETH, DAI]),
+      { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '129000000000000000' },
+      nativeV4Leg(),
+    ]
+
+    it('leaves the WETH legs fixed and makes the post-unwrap leg spend the balance', () => {
+      const steps = unwrapThenNativePlan()
+      expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.not.throw()
+
+      const rewritten = applyRouterBalanceInputToSteps(steps, WETH.address, WETH.address)
+
+      // order preserved, nothing promoted among the WETH legs
+      expect(rewritten.map((step) => step.type)).to.deep.equal([
+        'V3_SWAP_EXACT_IN',
+        'V3_SWAP_EXACT_IN',
+        'V3_SWAP_EXACT_IN',
+        'UNWRAP_WETH',
+        'V4_SWAP',
+      ])
+      expect(rewritten.slice(0, 3).map((step) => (step as V3SwapExactIn).amountIn)).to.deep.equal([
+        '1810000000000000000',
+        '7160000000000000000',
+        '900000000000000000',
+      ])
+      expect(rewritten[3]).to.deep.equal(steps[3])
+
+      const v4 = rewritten[4]
+      expect(v4.type).to.equal('V4_SWAP')
+      if (v4.type === 'V4_SWAP') {
+        const settle = v4.v4Actions.find((action) => action.action === 'SETTLE')
+        expect((settle as { amount: string }).amount).to.equal(CONTRACT_BALANCE.toString())
+        const swap = v4.v4Actions.find((action) => action.action === 'SWAP_EXACT_IN')
+        expect((swap as { amountIn: number }).amountIn).to.equal(0)
+      }
+    })
+
+    it('refuses a WETH leg after the unwrap', () => {
+      const steps = [...unwrapThenNativePlan(), buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI])]
+      expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(
+        'ROUTER_BALANCE_INPUT_WETH_LEG_AFTER_UNWRAP'
+      )
+    })
+
+    it('refuses an unwrap with no native leg after it', () => {
+      const steps = unwrapThenNativePlan().slice(0, 4)
+      expect(() => applyRouterBalanceInputToSteps(steps, WETH.address, WETH.address)).to.throw(
+        'ROUTER_BALANCE_INPUT_UNWRAP_WITHOUT_NATIVE_LEG'
+      )
+    })
+
+    it('still promotes the input leg when the unwrap drains an intermediate token', () => {
+      // USDC delivered: the unwrap eats WETH the USDC legs produced, not the input pot.
+      const steps = [
+        buildV3ExactInStep({ amountIn: '1000000' }),
+        { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '0' } as SwapStep,
+        nativeV4Leg(),
+      ]
+      const rewritten = applyRouterBalanceInputToSteps(steps, USDC.address, WETH.address)
+      expect((rewritten[0] as V3SwapExactIn).amountIn).to.equal(CONTRACT_BALANCE.toString())
+      expect(rewritten[2]).to.deep.equal(steps[2])
+    })
+
     it('rejects a WRAP_ETH at hop 0 of an ERC20 balance plan', () => {
       expect(() =>
         validateEncodeSwaps(balanceSpec(), [
