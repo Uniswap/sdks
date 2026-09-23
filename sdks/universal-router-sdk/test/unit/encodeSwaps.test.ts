@@ -2058,6 +2058,91 @@ describe('encodeSwaps', () => {
       }
     })
 
+    // Trimmed from a real GuideStar plan (10 WETH -> USDT, prod, 2026-09-22). Its ETH
+    // step already nominates a remainder with amountIn 0, which is how GuideStar writes
+    // intermediate steps; promoting the fixed 0.09 leg as well gave two open-delta swaps.
+    const guideStarEthStep = (): SwapStep => ({
+      type: 'V4_SWAP',
+      v4Actions: [
+        { action: 'SETTLE', currency: ETH_ADDRESS, amount: CONTRACT_BALANCE.toString() },
+        { action: 'SETTLE', currency: USDC.address, amount: CONTRACT_BALANCE.toString() },
+        {
+          action: 'SWAP_EXACT_IN_SINGLE',
+          poolKey: {
+            currency0: ETH_ADDRESS,
+            currency1: USDC.address,
+            fee: 100,
+            tickSpacing: 1,
+            hooks: ETH_ADDRESS,
+          },
+          zeroForOne: true,
+          amountIn: '90000000000000000',
+          amountOutMinimum: '247189110',
+          hookData: '0x',
+        },
+        {
+          action: 'SWAP_EXACT_IN_SINGLE',
+          poolKey: {
+            currency0: ETH_ADDRESS,
+            currency1: DAI.address,
+            fee: 100,
+            tickSpacing: 1,
+            hooks: ETH_ADDRESS,
+          },
+          zeroForOne: true,
+          amountIn: '0',
+          amountOutMinimum: '109856229',
+          hookData: '0x',
+        },
+        { action: 'TAKE', currency: DAI.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+      ],
+    })
+
+    const openDeltaEthSwaps = (step: SwapStep): number =>
+      step.type === 'V4_SWAP'
+        ? step.v4Actions.filter((action) => action.action === 'SWAP_EXACT_IN_SINGLE' && String(action.amountIn) === '0')
+            .length
+        : 0
+
+    it('keeps the remainder the plan already nominated instead of adding a second', () => {
+      const steps = [
+        buildV3ExactInStep({ amountIn: '1810000000000000000' }, [WETH, DAI]),
+        buildV3ExactInStep({ amountIn: '7160000000000000000' }, [WETH, DAI]),
+        { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '129350000000000000' } as SwapStep,
+        guideStarEthStep(),
+      ]
+      const rewritten = applyRouterBalanceInputToSteps(steps, WETH.address, WETH.address)
+
+      expect(openDeltaEthSwaps(rewritten[3])).to.equal(1)
+      expect(rewritten.slice(0, 2).map((step) => (step as V3SwapExactIn).amountIn)).to.deep.equal([
+        '1810000000000000000',
+        '7160000000000000000',
+      ])
+      // the fixed 0.09 slice keeps its amount; the pre-existing open delta stays open
+      const v4 = rewritten[3]
+      if (v4.type === 'V4_SWAP') {
+        const amounts = v4.v4Actions
+          .filter((action) => action.action === 'SWAP_EXACT_IN_SINGLE')
+          .map((action) => String((action as { amountIn: unknown }).amountIn))
+        expect(amounts).to.deep.equal(['90000000000000000', '0'])
+      }
+    })
+
+    it('refuses a step that already has two open-delta swaps on the input currency', () => {
+      const step = guideStarEthStep()
+      if (step.type === 'V4_SWAP') {
+        step.v4Actions[2] = { ...step.v4Actions[2], amountIn: '0' } as (typeof step.v4Actions)[number]
+      }
+      const steps = [
+        buildV3ExactInStep({ amountIn: '1810000000000000000' }, [WETH, DAI]),
+        { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '1' } as SwapStep,
+        step,
+      ]
+      expect(() => applyRouterBalanceInputToSteps(steps, WETH.address, WETH.address)).to.throw(
+        'ROUTER_BALANCE_INPUT_MULTIPLE_OPEN_DELTA_SWAPS'
+      )
+    })
+
     it('refuses a WETH leg after the unwrap', () => {
       const steps = [...unwrapThenNativePlan(), buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI])]
       expect(() => validateEncodeSwaps(buildSpec({ routerBalanceInput: {} }, wethRouting), steps)).to.throw(
