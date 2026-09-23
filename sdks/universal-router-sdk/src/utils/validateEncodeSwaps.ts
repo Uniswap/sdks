@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType, WETH9 } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import {
   MAX_UINT160,
@@ -167,6 +167,11 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       ? spec.routing.inputToken.wrapped.address
       : getCurrencyAddress(spec.routing.inputToken)
     const spendableSteps = nativeBalanceInput ? swapSteps.slice(1) : swapSteps
+    const unwrapIndex = swapSteps.findIndex((step) => step.type === 'UNWRAP_WETH')
+    const unwrapDrainsInput =
+      unwrapIndex >= 0 &&
+      !nativeBalanceInput &&
+      balanceInputTokenAddress.toLowerCase() === WETH9[spec.routing.inputToken.chainId]?.address.toLowerCase()
     const spenderIndexes = spendableSteps
       .map((step, index) => (stepSpendsToken(step, balanceInputTokenAddress) ? index : -1))
       .filter((index) => index >= 0)
@@ -185,6 +190,12 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
       invariant(
         !nativeBalanceInput || index === 0 || !stepSpendsToken(step, ETH_ADDRESS),
         'ROUTER_BALANCE_INPUT_NATIVE_LEG_UNSUPPORTED'
+      )
+      // With WETH delivered, the unwrap is the greedy claim, so an input-token spender
+      // after it would find an empty balance.
+      invariant(
+        !unwrapDrainsInput || index <= unwrapIndex || !stepSpendsToken(step, balanceInputTokenAddress),
+        'ROUTER_BALANCE_INPUT_WETH_LEG_AFTER_UNWRAP'
       )
       // The rewrite keeps the caller's v4 action order and turns the input settle into
       // SETTLE(CONTRACT_BALANCE) with the swap on the open delta. A swap that runs before

@@ -15,3 +15,5 @@ node_modules
 
 # npm pack output (preview tarballs are vendored in the consumer repo, never here)
 *.tgz
+
+.claude/worktrees/

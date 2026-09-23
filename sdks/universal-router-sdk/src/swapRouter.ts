@@ -18,7 +18,7 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType, WETH9 } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions, TokenTransferMode } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { SwapSpecification, SwapStep } from './types/encodeSwaps'
@@ -239,7 +239,11 @@ export abstract class SwapRouter {
     if (nativeBalanceInput) {
       stepsToEncode = applyNativeRouterBalanceInputToSteps(swapSteps, inputToken.wrapped.address)
     } else if (normalizedSpec.routerBalanceInput) {
-      stepsToEncode = applyRouterBalanceInputToSteps(swapSteps, getCurrencyAddress(inputToken))
+      stepsToEncode = applyRouterBalanceInputToSteps(
+        swapSteps,
+        getCurrencyAddress(inputToken),
+        WETH9[inputToken.chainId]?.address
+      )
     }
 
     stepsToEncode.forEach((step, index) => {
