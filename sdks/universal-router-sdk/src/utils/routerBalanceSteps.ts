@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant'
 import { BigNumber } from 'ethers'
-import { CONTRACT_BALANCE } from './constants'
+import { CONTRACT_BALANCE, ETH_ADDRESS } from './constants'
 import { SwapStep, V4Action } from '../types/encodeSwaps'
 
 function v4ActionSpendsToken(action: V4Action, tokenAddress: string): boolean {
@@ -193,6 +193,23 @@ function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[], tok
   return remainderIndex
 }
 
+// The unwrap converts the delivered pot to ETH, so the greedy claim moves to the leg
+// spending that ETH; the WETH legs keep their quoted amounts from router custody.
+function applyUnwrapBoundaryRemainder(swapSteps: SwapStep[], unwrapIndex: number, tokenAddress: string): SwapStep[] {
+  const nativeSpenders = swapSteps
+    .map((step, index) => (index > unwrapIndex && stepSpendsToken(step, ETH_ADDRESS) ? index : -1))
+    .filter((index) => index >= 0)
+  invariant(nativeSpenders.length > 0, 'ROUTER_BALANCE_INPUT_UNWRAP_WITHOUT_NATIVE_LEG')
+  invariant(nativeSpenders.length === 1, 'ROUTER_BALANCE_INPUT_UNWRAP_MULTIPLE_NATIVE_LEGS')
+
+  return swapSteps.map((step, index) => {
+    if (index === nativeSpenders[0]) {
+      return rewriteSpendingStep(step, ETH_ADDRESS)
+    }
+    return stepSpendsToken(step, tokenAddress) ? clearPayerIsUser(step) : step
+  })
+}
+
 /**
  * Rewrites a step plan to spend the router's entire input-token balance.
  *
@@ -206,8 +223,20 @@ function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[], tok
  * absorbs all delivery variance and the fill only reverts when delivery
  * cannot cover the fixed legs.
  */
-export function applyRouterBalanceInputToSteps(swapSteps: SwapStep[], inputTokenAddress: string): SwapStep[] {
+export function applyRouterBalanceInputToSteps(
+  swapSteps: SwapStep[],
+  inputTokenAddress: string,
+  wrappedNativeAddress?: string
+): SwapStep[] {
   const tokenAddress = inputTokenAddress.toLowerCase()
+
+  // UNWRAP_WETH takes the router's whole WETH balance, so with WETH delivered it is
+  // already the greedy claim and the legs before it stay fixed.
+  const unwrapIndex = swapSteps.findIndex((step) => step.type === 'UNWRAP_WETH')
+  if (unwrapIndex >= 0 && tokenAddress === wrappedNativeAddress?.toLowerCase()) {
+    return applyUnwrapBoundaryRemainder(swapSteps, unwrapIndex, tokenAddress)
+  }
+
   const spenderIndexes = swapSteps
     .map((step, index) => (stepSpendsToken(step, tokenAddress) ? index : -1))
     .filter((index) => index >= 0)
