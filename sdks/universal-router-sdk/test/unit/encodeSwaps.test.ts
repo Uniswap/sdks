@@ -30,6 +30,7 @@ import {
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
   ZERO_ADDRESS,
+  MAX_UINT256,
 } from '../../src/utils/constants'
 import { CommandType, RoutePlanner } from '../../src/utils/routerCommands'
 import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
@@ -2125,6 +2126,46 @@ describe('encodeSwaps', () => {
           .filter((action) => action.action === 'SWAP_EXACT_IN_SINGLE')
           .map((action) => String((action as { amountIn: unknown }).amountIn))
         expect(amounts).to.deep.equal(['90000000000000000', '0'])
+      }
+    })
+
+    // The remainder logic is currency-parameterised, so the same bug reached any input
+    // token whose v4 step nominated its own remainder, not just WETH.
+    it('keeps a nominated remainder on an ERC20 input too', () => {
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            { action: 'SETTLE', currency: USDC.address, amount: MAX_UINT256.toString() },
+            {
+              action: 'SWAP_EXACT_IN',
+              currencyIn: USDC.address,
+              path: [
+                { intermediateCurrency: DAI.address, fee: 100, tickSpacing: 1, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountIn: '5000000',
+              amountOutMinimum: '0',
+            },
+            {
+              action: 'SWAP_EXACT_IN',
+              currencyIn: USDC.address,
+              path: [
+                { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountIn: '0',
+              amountOutMinimum: '0',
+            },
+            { action: 'TAKE', currency: DAI.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+          ],
+        },
+      ]
+      const [rewritten] = applyRouterBalanceInputToSteps(steps, USDC.address, WETH.address)
+      expect(rewritten.type).to.equal('V4_SWAP')
+      if (rewritten.type === 'V4_SWAP') {
+        const amounts = rewritten.v4Actions
+          .filter((action) => action.action === 'SWAP_EXACT_IN')
+          .map((action) => String((action as { amountIn: unknown }).amountIn))
+        expect(amounts).to.deep.equal(['5000000', '0'])
       }
     })
 
