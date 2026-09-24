@@ -186,6 +186,18 @@ export class UniswapTrade implements Command {
       ) {
         throw new Error('routerBalanceInput split routes with a native input require every leg to wrap to WETH')
       }
+      // A WETH input whose route unwraps: UNWRAP_WETH takes the router's whole WETH
+      // balance, so it is the greedy claim and every leg must consume the resulting
+      // native currency. Checked across all legs rather than via inputRequiresUnwrap,
+      // which only inspects leg 0 and so depends on leg order.
+      if (!this.trade.inputAmount.currency.isNative && this.trade.swaps.length > 1) {
+        const nativeLegs = this.trade.swaps.filter(
+          (swap) => (swap.route as { pathInput?: Currency }).pathInput?.isNative
+        ).length
+        if (nativeLegs > 0 && nativeLegs < this.trade.swaps.length) {
+          throw new Error('routerBalanceInput with an unwrapped input requires every leg to consume native')
+        }
+      }
       if (options.inputTokenPermit) {
         throw new Error('routerBalanceInput does not use Permit2; remove inputTokenPermit')
       }
@@ -366,7 +378,9 @@ export class UniswapTrade implements Command {
         ])
       }
     } else if (this.inputRequiresUnwrap) {
-      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
+      // Balance input: the WETH is already in the router and msg.sender is the funder,
+      // not the swapper — pulling from them would spend the filler's own tokens.
+      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy && !this.options.routerBalanceInput) {
         // send wrapped token to router to unwrap via Permit2
         planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
           (this.trade.inputAmount.currency as Token).address,

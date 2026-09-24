@@ -2402,6 +2402,21 @@ describe('encodeSwaps', () => {
       expect(remainderLeg[4]).to.equal(false)
     })
 
+    it('moves the whole remainder leg, so its continuation hop still follows it', () => {
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        // remainder leg first: its spender, then the hop that consumes what it produced
+        buildV3ExactInStep({ amountIn: '900000' }, [USDC, WETH], [500]),
+        buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI], [3000]),
+        buildV3ExactInStep({ amountIn: '100000' }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const amountsIn = [0, 1, 2].map((i) =>
+        defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[i])[1].toString()
+      )
+      // fixed leg, then the remainder, then the remainder's hop — never the hop first
+      expect(amountsIn).to.deep.equal(['100000', CONTRACT_BALANCE.toString(), '1'])
+    })
+
     it('accepts a plan whose single spending step is not first', () => {
       const result = SwapRouter.encodeSwaps(balanceSpec(), [
         buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
