@@ -197,10 +197,6 @@ export function stepSpendAmount(step: SwapStep, tokenAddress: string): BigNumber
   }
 }
 
-function isSwapStep(step: SwapStep): boolean {
-  return step.type === 'V2_SWAP_EXACT_IN' || step.type === 'V3_SWAP_EXACT_IN' || step.type === 'V4_SWAP'
-}
-
 function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[], tokenAddress: string): number {
   let remainderIndex = spenderIndexes[0]
   let remainderAmount = BigNumber.from(-1)
@@ -250,6 +246,14 @@ export function applyRouterBalanceInputToSteps(
   inputTokenAddress: string,
   wrappedNativeAddress?: string
 ): SwapStep[] {
+  return rewriteRouterBalanceInputSteps(swapSteps, inputTokenAddress, wrappedNativeAddress)
+}
+
+function rewriteRouterBalanceInputSteps(
+  swapSteps: SwapStep[],
+  inputTokenAddress: string,
+  wrappedNativeAddress?: string
+): SwapStep[] {
   const tokenAddress = inputTokenAddress.toLowerCase()
 
   // UNWRAP_WETH takes the router's whole WETH balance, so with WETH delivered it is
@@ -287,16 +291,19 @@ export function applyRouterBalanceInputToSteps(
   // run up to the next spender moves with it.
   const nextSpenderIndex = spenderIndexes.find((index) => index > remainderIndex) ?? swapSteps.length
   const remainderEnd = nextSpenderIndex - 1
+  // A remainder that carries its own continuation hops cannot be placed by position:
+  // routers order steps either leg-by-leg or by token, and the two want opposite
+  // insertion points. Refuse rather than guess and emit a fill that reverts.
+  invariant(remainderEnd === remainderIndex, 'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE')
   const remainderRun = [remainder, ...swapSteps.slice(remainderIndex + 1, remainderEnd + 1)]
 
-  // Land after the last fixed leg's whole run, not just its spending step: its
-  // continuation hops chain through the router balance of an intermediate token,
-  // and the remainder's own hops would drain that balance out from under them.
-  // Trailing non-swap steps (an output-side unwrap) stay last.
-  let insertAfterIndex = lastSpenderIndex
-  while (insertAfterIndex + 1 < swapSteps.length && isSwapStep(swapSteps[insertAfterIndex + 1])) {
-    insertAfterIndex += 1
-  }
+  // Insert right after the last other spender. A position rule cannot serve both
+  // plan styles: routers order steps either leg-by-leg or by token (every first
+  // hop, then everything downstream), and "after the following run of swaps"
+  // pushes the remainder past its own consumers in the token-ordered case.
+  // assertStepDataflow below turns any plan this ordering cannot express into a
+  // typed refusal rather than calldata that reverts.
+  const insertAfterIndex = lastSpenderIndex
 
   const reordered: SwapStep[] = []
   swapSteps.forEach((step, index) => {
