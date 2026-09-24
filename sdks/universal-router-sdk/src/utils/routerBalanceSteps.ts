@@ -246,14 +246,6 @@ export function applyRouterBalanceInputToSteps(
   inputTokenAddress: string,
   wrappedNativeAddress?: string
 ): SwapStep[] {
-  return rewriteRouterBalanceInputSteps(swapSteps, inputTokenAddress, wrappedNativeAddress)
-}
-
-function rewriteRouterBalanceInputSteps(
-  swapSteps: SwapStep[],
-  inputTokenAddress: string,
-  wrappedNativeAddress?: string
-): SwapStep[] {
   const tokenAddress = inputTokenAddress.toLowerCase()
 
   // UNWRAP_WETH takes the router's whole WETH balance, so with WETH delivered it is
@@ -292,10 +284,7 @@ function rewriteRouterBalanceInputSteps(
   // then everything downstream), and the two orderings want opposite insertion
   // points. Refuse rather than guess and emit a fill that reverts.
   const nextSpenderIndex = spenderIndexes.find((index) => index > remainderIndex) ?? swapSteps.length
-  invariant(
-    nextSpenderIndex === remainderIndex + 1,
-    'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE'
-  )
+  invariant(nextSpenderIndex === remainderIndex + 1, 'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE')
 
   // So the remainder is a single step, and it moves to just after the last other
   // spender: late enough to absorb delivery variance, early enough that the
