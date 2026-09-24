@@ -197,6 +197,10 @@ export function stepSpendAmount(step: SwapStep, tokenAddress: string): BigNumber
   }
 }
 
+function isSwapStep(step: SwapStep): boolean {
+  return step.type === 'V2_SWAP_EXACT_IN' || step.type === 'V3_SWAP_EXACT_IN' || step.type === 'V4_SWAP'
+}
+
 function pickRemainderIndex(swapSteps: SwapStep[], spenderIndexes: number[], tokenAddress: string): number {
   let remainderIndex = spenderIndexes[0]
   let remainderAmount = BigNumber.from(-1)
@@ -285,6 +289,15 @@ export function applyRouterBalanceInputToSteps(
   const remainderEnd = nextSpenderIndex - 1
   const remainderRun = [remainder, ...swapSteps.slice(remainderIndex + 1, remainderEnd + 1)]
 
+  // Land after the last fixed leg's whole run, not just its spending step: its
+  // continuation hops chain through the router balance of an intermediate token,
+  // and the remainder's own hops would drain that balance out from under them.
+  // Trailing non-swap steps (an output-side unwrap) stay last.
+  let insertAfterIndex = lastSpenderIndex
+  while (insertAfterIndex + 1 < swapSteps.length && isSwapStep(swapSteps[insertAfterIndex + 1])) {
+    insertAfterIndex += 1
+  }
+
   const reordered: SwapStep[] = []
   swapSteps.forEach((step, index) => {
     if (index >= remainderIndex && index <= remainderEnd) {
@@ -292,8 +305,7 @@ export function applyRouterBalanceInputToSteps(
     }
     // fixed legs keep their quoted amounts but are funded from router custody too
     reordered.push(fixLeg(step, index))
-    // insert the remainder right after the last other spender
-    if (index === lastSpenderIndex) {
+    if (index === insertAfterIndex) {
       reordered.push(...remainderRun)
     }
   })

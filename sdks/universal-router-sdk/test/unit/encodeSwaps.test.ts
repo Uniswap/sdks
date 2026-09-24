@@ -2417,6 +2417,22 @@ describe('encodeSwaps', () => {
       expect(amountsIn).to.deep.equal(['100000', CONTRACT_BALANCE.toString(), '1'])
     })
 
+    it("lands the remainder after the fixed leg's own hop, not between them", () => {
+      // Both legs chain through WETH: if the remainder's hop runs before the fixed
+      // leg's hop, it drains the WETH the fixed leg just produced.
+      const result = SwapRouter.encodeSwaps(balanceSpec(), [
+        buildV3ExactInStep({ amountIn: '900000' }, [USDC, WETH], [500]),
+        buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI], [3000]),
+        buildV3ExactInStep({ amountIn: '100000' }, [USDC, WETH], [500]),
+        buildV3ExactInStep({ amountIn: '1' }, [WETH, DAI], [3000]),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const amountsIn = [0, 1, 2, 3].map((i) =>
+        defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[i])[1].toString()
+      )
+      expect(amountsIn).to.deep.equal(['100000', '1', CONTRACT_BALANCE.toString(), '1'])
+    })
+
     it('accepts a plan whose single spending step is not first', () => {
       const result = SwapRouter.encodeSwaps(balanceSpec(), [
         buildV3ExactInStep({ amountIn: '0' }, [DAI, WETH]),
