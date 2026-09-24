@@ -284,6 +284,8 @@ const BASE_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
   v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
   v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+  permissionedV4PositionManagerAddress: '0xC09255D86DB563cBc11C2fCf4a0C512e160111B4',
+  permissionedV4HooksAddress: '0x5750be78fEdfb2fA48FAa6C6623400Ba4538A8c0',
 }
 
 // Base Goerli v3 addresses
@@ -563,6 +565,8 @@ const INK_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  permissionedV4PositionManagerAddress: '0x003aa18c6E682dB80Cf4aa17261CcbFfd28690CE',
+  permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
