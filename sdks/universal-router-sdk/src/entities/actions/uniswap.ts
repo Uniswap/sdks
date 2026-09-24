@@ -200,6 +200,18 @@ export class UniswapTrade implements Command {
       ) {
         throw new Error('routerBalanceInput split routes with a native input require every leg to wrap to WETH')
       }
+      // A WETH input whose route unwraps: UNWRAP_WETH takes the router's whole WETH
+      // balance, so it is the greedy claim and every leg must consume the resulting
+      // native currency. Checked across all legs rather than via inputRequiresUnwrap,
+      // which only inspects leg 0 and so depends on leg order.
+      if (!this.trade.inputAmount.currency.isNative && this.trade.swaps.length > 1) {
+        const nativeLegs = this.trade.swaps.filter(
+          (swap) => (swap.route as { pathInput?: Currency }).pathInput?.isNative
+        ).length
+        if (nativeLegs > 0 && nativeLegs < this.trade.swaps.length) {
+          throw new Error('routerBalanceInput with an unwrapped input requires every leg to consume native')
+        }
+      }
       if (options.inputTokenPermit) {
         throw new Error('routerBalanceInput does not use Permit2; remove inputTokenPermit')
       }
@@ -380,7 +392,9 @@ export class UniswapTrade implements Command {
         ])
       }
     } else if (this.inputRequiresUnwrap) {
-      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
+      // Balance input: the WETH is already in the router and msg.sender is the funder,
+      // not the swapper — pulling from them would spend the filler's own tokens.
+      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy && !this.options.routerBalanceInput) {
         // send wrapped token to router to unwrap via Permit2
         planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
           (this.trade.inputAmount.currency as Token).address,
@@ -400,13 +414,20 @@ export class UniswapTrade implements Command {
     //      in that the reversion probability is lower
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
+    // v2SwapExactOutput only bounds amountIn and forwards whatever the pair actually produced, so a
+    // V2 exact-out leg paying the recipient directly has no output check. V3 (V3InvalidAmountOut)
+    // and V4 (exact TAKE) legs assert their own output; V2 legs need custody + a floored SWEEP.
+    const v2ExactOutputNeedsFloor =
+      this.trade.tradeType === TradeType.EXACT_OUTPUT &&
+      this.trade.routes.some((route) => route.pools.some((pool) => pool instanceof Pair))
     const routerMustCustody =
       performAggregatedSlippageCheck ||
       this.outputRequiresTransition ||
       hasFeeOption(this.options) ||
       // Balance-swap splits: the remainder leg's output varies with delivery,
       // so the minimum is enforced on the aggregate sweep, never per leg.
-      (!!this.options.routerBalanceInput && this.trade.swaps.length > 1)
+      (!!this.options.routerBalanceInput && this.trade.swaps.length > 1) ||
+      v2ExactOutputNeedsFloor
 
     // Balance-swap splits: the fixed legs run first with their quoted amounts
     // (per-leg options drop routerBalanceInput, so they encode normally from
@@ -511,9 +532,12 @@ export class UniswapTrade implements Command {
       // by this if-else clause.
       if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
-      } else if (this.outputRequiresWrap) {
-        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else {
+        // Custodied legs are encoded with amountOutMinimum 0, so this SWEEP is the trade's only
+        // output check. WRAP_ETH has no minimum, so wrap into the router and let the SWEEP floor it.
+        if (this.outputRequiresWrap) {
+          planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, CONTRACT_BALANCE])
+        }
         planner.addCommand(CommandType.SWEEP, [
           getCurrencyAddress(this.trade.outputAmount.currency),
           this.options.recipient,

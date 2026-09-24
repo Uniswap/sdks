@@ -128,6 +128,54 @@ describe('routerBalanceInput', () => {
       ).to.throw(/routerBalanceInput with a native input requires a route that wraps to WETH/)
     })
 
+    it('never pulls the input from msg.sender when a WETH input unwraps into a native v4 pool', () => {
+      // WETH in, first pool is native: the route unwraps. In balance mode the WETH is
+      // already in the router, so a Permit2 pull would spend the filler's own tokens.
+      const v4Trade = V4Trade.createUncheckedTrade({
+        route: new V4Route([makeV4Pool(ETHER, USDC)], WETH, USDC),
+        inputAmount: CurrencyAmount.fromRawAmount(WETH, '1000000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const unwrapTrade = new RouterTrade({
+        v2Routes: [],
+        v3Routes: [],
+        v4Routes: [{ routev4: v4Trade.route, inputAmount: v4Trade.inputAmount, outputAmount: v4Trade.outputAmount }],
+        mixedRoutes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const { calldata } = SwapRouter.swapCallParameters(unwrapTrade, balanceInputOptions())
+      const { commandTypes } = parseCommands(calldata)
+      expect(commandTypes).to.not.include(CommandType.PERMIT2_TRANSFER_FROM)
+      expect(commandTypes).to.include(CommandType.UNWRAP_WETH)
+    })
+
+    it('throws on an unwrapped input split across a leg that still expects WETH', () => {
+      // UNWRAP_WETH takes the router's whole WETH balance, so a WETH leg finds none.
+      const v4Trade = V4Trade.createUncheckedTrade({
+        route: new V4Route([makeV4Pool(ETHER, USDC)], WETH, USDC),
+        inputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000000'),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const splitTrade = new RouterTrade({
+        v2Routes: [],
+        v3Routes: [
+          {
+            routev3: new V3Route([makeV3Pool(WETH, USDC)], WETH, USDC),
+            inputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+            outputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000000'),
+          },
+        ],
+        v4Routes: [{ routev4: v4Trade.route, inputAmount: v4Trade.inputAmount, outputAmount: v4Trade.outputAmount }],
+        mixedRoutes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      expect(() => new UniswapTrade(splitTrade, balanceInputOptions())).to.throw(
+        /routerBalanceInput with an unwrapped input requires every leg to consume native/
+      )
+    })
+
     it('accepts a native input whose route wraps to WETH', () => {
       const nativeTrade = new RouterTrade({
         v2Routes: [],

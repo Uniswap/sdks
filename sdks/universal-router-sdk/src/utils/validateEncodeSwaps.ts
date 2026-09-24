@@ -211,6 +211,15 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         step.type !== 'V2_SWAP_EXACT_OUT' && step.type !== 'V3_SWAP_EXACT_OUT',
         'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
       )
+      // An exact-out action draws from the same settled balance but is invisible to the
+      // open-delta ordering, so the greedy leg can run first and starve it.
+      invariant(
+        step.type !== 'V4_SWAP' ||
+          !step.v4Actions.some(
+            (action) => action.action === 'SWAP_EXACT_OUT' || action.action === 'SWAP_EXACT_OUT_SINGLE'
+          ),
+        'ROUTER_BALANCE_INPUT_EXACT_INPUT_ONLY'
+      )
       // A wrap at hop 0 of an ERC20 plan means the plan expects native input. Wraps later
       // in the plan are routers wrapping intermediate ETH (a v4 leg paid out native and the
       // next leg wants WETH) and only touch what that leg produced.
