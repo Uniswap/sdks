@@ -270,18 +270,33 @@ export function applyRouterBalanceInputToSteps(
   const remainder = rewriteSpendingStep(swapSteps[remainderIndex], tokenAddress)
   const lastSpenderIndex = spenderIndexes[spenderIndexes.length - 1]
 
+  const fixLeg = (step: SwapStep, index: number): SwapStep =>
+    spenderIndexes.includes(index) ? clearPayerIsUser(step) : step
+
+  // Already the last spender: nothing to move, and moving it would drag the
+  // trailing output-side steps along with it.
+  if (remainderIndex === lastSpenderIndex) {
+    return swapSteps.map((step, index) => (index === remainderIndex ? remainder : fixLeg(step, index)))
+  }
+
+  // A remainder that carries its own continuation hops cannot be placed by
+  // position: routers order steps either leg-by-leg or by token (every first hop,
+  // then everything downstream), and the two orderings want opposite insertion
+  // points. Refuse rather than guess and emit a fill that reverts.
+  const nextSpenderIndex = spenderIndexes.find((index) => index > remainderIndex) ?? swapSteps.length
+  invariant(nextSpenderIndex === remainderIndex + 1, 'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE')
+
+  // So the remainder is a single step, and it moves to just after the last other
+  // spender: late enough to absorb delivery variance, early enough that the
+  // steps consuming what it produces still follow it.
   const reordered: SwapStep[] = []
   swapSteps.forEach((step, index) => {
     if (index === remainderIndex) {
       return
     }
     // fixed legs keep their quoted amounts but are funded from router custody too
-    reordered.push(spenderIndexes.includes(index) ? clearPayerIsUser(step) : step)
-    // insert the remainder right after the last other spender
-    if (
-      index === lastSpenderIndex ||
-      (lastSpenderIndex === remainderIndex && index === spenderIndexes[spenderIndexes.length - 2])
-    ) {
+    reordered.push(fixLeg(step, index))
+    if (index === lastSpenderIndex) {
       reordered.push(remainder)
     }
   })

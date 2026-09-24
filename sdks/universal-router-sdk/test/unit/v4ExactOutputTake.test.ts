@@ -143,7 +143,7 @@ describe('V4 exact output TAKE floors', () => {
     expect((sweep[2] as BigNumber).toString()).to.equal(BigNumber.from(ONE_USDC).mul(95).div(100).toString())
   })
 
-  it('exact output ETH-to-WETH output wrap transition floors TAKE before WRAP_ETH(CONTRACT_BALANCE)', () => {
+  it('exact output ETH-to-WETH output wrap transition floors TAKE, wraps into the router and SWEEPs at amountOut', () => {
     const v4Trade = V4Trade.createUncheckedTrade({
       route: new V4Route([ETH_USDC_V4], USDC, WETH),
       inputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
@@ -158,10 +158,16 @@ describe('V4 exact output TAKE floors', () => {
     const wrapIdx = commandTypes.indexOf(CommandType.WRAP_ETH)
     expect(wrapIdx).to.not.equal(-1)
     const wrap = defaultAbiCoder.decode(['address', 'uint256'], inputs[wrapIdx])
+    const sweepIdx = commandTypes.indexOf(CommandType.SWEEP)
+    expect(sweepIdx).to.be.greaterThan(wrapIdx)
+    const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[sweepIdx])
 
     expectTake(getV4Actions(methodParameters.calldata), ETH_ADDRESS, ROUTER_AS_RECIPIENT, ONE_ETH)
-    expect(wrap[0].toLowerCase()).to.equal(TEST_RECIPIENT_ADDRESS.toLowerCase())
+    expect(wrap[0].toLowerCase()).to.equal(ROUTER_AS_RECIPIENT.toLowerCase())
     expect((wrap[1] as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+    expect(sweep[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+    expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT_ADDRESS.toLowerCase())
+    expect((sweep[2] as BigNumber).toString()).to.equal(ONE_ETH)
   })
 
   it('exact input V4 encoding remains byte-identical to OPEN_DELTA TAKE encoding', () => {
