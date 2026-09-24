@@ -329,6 +329,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xd6145b2D3F379919E8CdEda7B97e37c4b2Ca9c40',
         creationBlock: 51446913,
       },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xbe2257d1aafbe6b73f67a9ac971c2f0b344bb3c5',
+        creationBlock: 51740773,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -644,8 +648,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 56186042,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x8BbCAEb326AD590521a921C9e457Ee09F336B48c',
-        creationBlock: 56261823,
+        address: '0x315e413a11ab0df498ef83873012430ca36638ae',
+        creationBlock: 56772481,
       },
     },
     // SwapProxy on Ink is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
