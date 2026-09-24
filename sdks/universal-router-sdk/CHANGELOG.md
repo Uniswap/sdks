@@ -1,5 +1,17 @@
 # @uniswap/universal-router-sdk
 
+## 5.13.1
+
+### Patch Changes
+
+- afd80aa: Add permissioned PositionManager and PermissionedHooks addresses for Base and Ink, and the UniversalRouter 2.2.0 deployments on Base and Ink
+- Updated dependencies [afd80aa]
+  - @uniswap/sdk-core@7.19.4
+  - @uniswap/router-sdk@2.11.6
+  - @uniswap/v2-sdk@4.21.5
+  - @uniswap/v3-sdk@3.31.5
+  - @uniswap/v4-sdk@2.4.1
+
 ## 5.13.0
 
 ### Minor Changes

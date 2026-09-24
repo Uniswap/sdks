@@ -1,5 +1,15 @@
 # @uniswap/router-sdk
 
+## 2.11.6
+
+### Patch Changes
+
+- Updated dependencies [afd80aa]
+  - @uniswap/sdk-core@7.19.4
+  - @uniswap/v2-sdk@4.21.5
+  - @uniswap/v3-sdk@3.31.5
+  - @uniswap/v4-sdk@2.4.1
+
 ## 2.11.5
 
 ### Patch Changes
