@@ -1,5 +1,14 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 1.16.4
+
+### Patch Changes
+
+- Updated dependencies [afd80aa]
+  - @uniswap/sdk-core@7.19.4
+  - @uniswap/v3-sdk@3.31.5
+  - @uniswap/v4-sdk@2.4.1
+
 ## 1.16.3
 
 ### Patch Changes

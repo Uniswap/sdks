@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.4
+
+### Patch Changes
+
+- afd80aa: Add permissioned PositionManager and PermissionedHooks addresses for Base and Ink, and the UniversalRouter 2.2.0 deployments on Base and Ink
+
 ## 7.19.3
 
 ### Patch Changes
