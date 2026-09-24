@@ -287,33 +287,28 @@ function rewriteRouterBalanceInputSteps(
     return swapSteps.map((step, index) => (index === remainderIndex ? remainder : fixLeg(step, index)))
   }
 
-  // The remainder's continuation hops consume what it produces, so the whole
-  // run up to the next spender moves with it.
+  // A remainder that carries its own continuation hops cannot be placed by
+  // position: routers order steps either leg-by-leg or by token (every first hop,
+  // then everything downstream), and the two orderings want opposite insertion
+  // points. Refuse rather than guess and emit a fill that reverts.
   const nextSpenderIndex = spenderIndexes.find((index) => index > remainderIndex) ?? swapSteps.length
-  const remainderEnd = nextSpenderIndex - 1
-  // A remainder that carries its own continuation hops cannot be placed by position:
-  // routers order steps either leg-by-leg or by token, and the two want opposite
-  // insertion points. Refuse rather than guess and emit a fill that reverts.
-  invariant(remainderEnd === remainderIndex, 'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE')
-  const remainderRun = [remainder, ...swapSteps.slice(remainderIndex + 1, remainderEnd + 1)]
+  invariant(
+    nextSpenderIndex === remainderIndex + 1,
+    'ROUTER_BALANCE_INPUT_REMAINDER_LEG_NOT_REORDERABLE'
+  )
 
-  // Insert right after the last other spender. A position rule cannot serve both
-  // plan styles: routers order steps either leg-by-leg or by token (every first
-  // hop, then everything downstream), and "after the following run of swaps"
-  // pushes the remainder past its own consumers in the token-ordered case.
-  // assertStepDataflow below turns any plan this ordering cannot express into a
-  // typed refusal rather than calldata that reverts.
-  const insertAfterIndex = lastSpenderIndex
-
+  // So the remainder is a single step, and it moves to just after the last other
+  // spender: late enough to absorb delivery variance, early enough that the
+  // steps consuming what it produces still follow it.
   const reordered: SwapStep[] = []
   swapSteps.forEach((step, index) => {
-    if (index >= remainderIndex && index <= remainderEnd) {
+    if (index === remainderIndex) {
       return
     }
     // fixed legs keep their quoted amounts but are funded from router custody too
     reordered.push(fixLeg(step, index))
-    if (index === insertAfterIndex) {
-      reordered.push(...remainderRun)
+    if (index === lastSpenderIndex) {
+      reordered.push(remainder)
     }
   })
   return reordered
