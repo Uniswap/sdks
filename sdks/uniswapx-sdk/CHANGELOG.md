@@ -1,5 +1,12 @@
 # @uniswap/uniswapx-sdk
 
+## 3.1.3
+
+### Patch Changes
+
+- Updated dependencies [afd80aa]
+  - @uniswap/sdk-core@7.19.4
+
 ## 3.1.2
 
 ### Patch Changes
