@@ -48,10 +48,14 @@ export type SwapSpecification = {
   /**
    * Fund the swap from the Universal Router's own balance of the input token: no Permit2
    * ingress is emitted, the first hop spends the CONTRACT_BALANCE sentinel, and an optional
-   * `minimumAmount` emits a BALANCE_CHECK_ERC20 up front (requires `chainId` to resolve the
-   * router address). Same semantics and guards as `SwapOptions.routerBalanceInput`: explicit
-   * `recipient`, ERC20 input, EXACT_INPUT, exactly one input-spending step (no splits);
-   * incompatible with `permit`, `nativeErc20Input`, `allowDirectTransfers`, and ApproveProxy.
+   * `minimumAmount` emits a BALANCE_CHECK_ERC20 (requires `chainId` to resolve the router
+   * address). A native input is funded by attaching msg.value to execute() (raw transfers
+   * to the router revert): the plan must lead with a WRAP_ETH, which is resized to wrap the
+   * whole balance, the floor is asserted post-wrap as WETH, ETH dust is always swept to the
+   * recipient, and the encoded value is 0. Same semantics and guards as
+   * `SwapOptions.routerBalanceInput`: explicit `recipient`, EXACT_INPUT, exactly one step
+   * spending the (wrapped) input token (no splits); incompatible with `permit`,
+   * `nativeErc20Input`, `allowDirectTransfers`, and ApproveProxy.
    */
   routerBalanceInput?: RouterBalanceInput
 }

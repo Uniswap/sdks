@@ -12,3 +12,8 @@ node_modules
 
 # spec workflow mcp from Uniswap
 .spec-workflow/
+
+# npm pack output (preview tarballs are vendored in the consumer repo, never here)
+*.tgz
+
+.claude/worktrees/
