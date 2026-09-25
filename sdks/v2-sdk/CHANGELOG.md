@@ -1,5 +1,12 @@
 # @uniswap/v2-sdk
 
+## 4.21.5
+
+### Patch Changes
+
+- Updated dependencies [afd80aa]
+  - @uniswap/sdk-core@7.19.4
+
 ## 4.21.4
 
 ### Patch Changes
