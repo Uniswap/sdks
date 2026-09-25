@@ -73,6 +73,12 @@ export type PriorityOrderResolutionOptions = {
 export type V3OrderResolutionOptions = {
   currentBlock: number;
   filler?: string;
+  /**
+   * The base fee of the block the order would be filled in. Required to resolve
+   * orders carrying a nonzero adjustmentPerGweiBaseFee, since the reactor
+   * adjusts the base amounts by the delta against the order's startingBaseFee.
+   */
+  blockBaseFee?: BigNumber;
 };
 
 export type DutchOutput = {
