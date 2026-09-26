@@ -240,7 +240,7 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   // Position Actions
   [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.V3Actions },
   [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.V3Actions },
-  [CommandType.V4_POSITION_MANAGER_CALL]: { parser: Parser.V4Actions },
+  [CommandType.V4_POSITION_MANAGER_CALL]: { parser: Parser.V3Actions },
 
   // 3rd Party Integrations
   [CommandType.ACROSS_V4_DEPOSIT_V3]: {
