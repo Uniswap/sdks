@@ -16,6 +16,7 @@ import {
   TickMath,
   FeeAmount,
   NonfungiblePositionManager,
+  NFTPermitOptions,
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
@@ -2921,6 +2922,189 @@ describe('Uniswap', () => {
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('INVALID_SPENDER')
+    })
+
+    // The cases below share the shape of 'encodes a migration to eth' and differ only in the permit spender
+    // and urVersion, so the fixtures stay comparable with '_MIGRATE_TO_ETH_WITH_PERMIT'.
+    function migrateToEthOptions(tokenId: number, permit?: NFTPermitOptions, urVersion?: UniversalRouterVersion) {
+      return Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: -200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+          ...(permit ? { permit } : {}),
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: ETHER,
+        },
+        ...(urVersion ? { urVersion } : {}),
+      })
+    }
+
+    async function signNftPermit(spender: string, tokenId: number, chainId: ChainId): Promise<NFTPermitOptions> {
+      const permit = { spender, tokenId, deadline: MAX_UINT160.toString(), nonce: 0 }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId],
+        chainId
+      )
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+      return { v: signature.v as 27 | 28, r: signature.r, s: signature.s, deadline: permit.deadline, spender }
+    }
+
+    it('encodes a permit migration for the router of urVersion (2.1.1)', async () => {
+      const tokenId = 377972
+      const spender = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, ChainId.MAINNET)
+      const permit = await signNftPermit(spender, tokenId, ChainId.MAINNET)
+
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(
+        migrateToEthOptions(tokenId, permit, UniversalRouterVersion.V2_1_1),
+        FORGE_V4_POSITION_MANAGER
+      )
+      registerFixture('_MIGRATE_TO_ETH_WITH_PERMIT_UR_V2_1_1', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      // the embedded NFPM.permit call names the 2.1.1 router, not the 2.0 one
+      expect(methodParameters.calldata.toLowerCase()).to.include(spender.slice(2).toLowerCase())
+      expect(methodParameters.calldata.toLowerCase()).to.not.include(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, ChainId.MAINNET).slice(2).toLowerCase()
+      )
+    })
+
+    it('accepts a checksummed permit spender', async () => {
+      const tokenId = 377972
+      const lowercaseSpender = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, ChainId.MAINNET)
+      const checksummedSpender = utils.getAddress(lowercaseSpender)
+      expect(checksummedSpender).to.not.eq(lowercaseSpender)
+
+      const withLowercase = SwapRouter.migrateV3ToV4CallParameters(
+        migrateToEthOptions(tokenId, await signNftPermit(lowercaseSpender, tokenId, ChainId.MAINNET)),
+        FORGE_V4_POSITION_MANAGER
+      )
+      const withChecksummed = SwapRouter.migrateV3ToV4CallParameters(
+        migrateToEthOptions(tokenId, await signNftPermit(checksummedSpender, tokenId, ChainId.MAINNET)),
+        FORGE_V4_POSITION_MANAGER
+      )
+      expect(withChecksummed.calldata).to.eq(withLowercase.calldata)
+    })
+
+    it('throws INVALID_SPENDER when the permit names a router other than the one for urVersion', async () => {
+      const tokenId = 377972
+      const permitFor20 = await signNftPermit(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, ChainId.MAINNET),
+        tokenId,
+        ChainId.MAINNET
+      )
+      const permitFor211 = await signNftPermit(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, ChainId.MAINNET),
+        tokenId,
+        ChainId.MAINNET
+      )
+
+      expect(() =>
+        SwapRouter.migrateV3ToV4CallParameters(
+          migrateToEthOptions(tokenId, permitFor20, UniversalRouterVersion.V2_1_1),
+          FORGE_V4_POSITION_MANAGER
+        )
+      ).to.throw('INVALID_SPENDER')
+      // no urVersion still means 2.0, so a 2.1.1 permit is rejected as before
+      expect(() =>
+        SwapRouter.migrateV3ToV4CallParameters(migrateToEthOptions(tokenId, permitFor211), FORGE_V4_POSITION_MANAGER)
+      ).to.throw('INVALID_SPENDER')
+    })
+
+    it('encodes a permit migration on a chain that registers only UR 2.1.1 when urVersion says so', async () => {
+      // Robinhood (4663) has V3, V4 and a 2.1.1 router in the SDK but no 2.0 router, so the previous
+      // hardcoded V2_0 lookup threw before the spender was even compared.
+      const chainId = ChainId.ROBINHOOD
+      const wethRobinhood = new Token(chainId, '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', 18, 'WETH')
+      const usdgRobinhood = new Token(chainId, '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168', 6, 'USDG')
+      const tickSpacing = 60
+      const liquidity = JSBI.BigInt(utils.parseEther('1000').toString())
+      const v3Pool = new V3Pool(wethRobinhood, usdgRobinhood, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), liquidity, 0)
+      const v4Pool = new V4Pool(
+        wethRobinhood,
+        usdgRobinhood,
+        FeeAmount.MEDIUM,
+        tickSpacing,
+        ZERO_ADDRESS,
+        encodeSqrtRatioX96(1, 1),
+        liquidity,
+        0
+      )
+      const v4PositionManager = CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress!
+      const tokenId = 532299
+      const spender = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, chainId)
+      const permit = await signNftPermit(spender, tokenId, chainId)
+      const options = (urVersion?: UniversalRouterVersion) =>
+        Object.assign({
+          inputPosition: new Position({
+            pool: v3Pool,
+            liquidity: 1000,
+            tickLower: -tickSpacing,
+            tickUpper: tickSpacing,
+          }),
+          outputPosition: new V4Position({
+            pool: v4Pool,
+            liquidity: 1000,
+            tickLower: -tickSpacing,
+            tickUpper: tickSpacing,
+          }),
+          v3RemoveLiquidityOptions: {
+            tokenId,
+            liquidityPercentage: new Percent(100, 100),
+            slippageTolerance: new Percent(5, 100),
+            deadline: MAX_UINT160,
+            burnToken: true,
+            collectOptions: {
+              expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(wethRobinhood, 0),
+              expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(usdgRobinhood, 0),
+              recipient: v4PositionManager,
+            },
+            permit,
+          },
+          v4AddLiquidityOptions: {
+            deadline: MAX_UINT160,
+            migrate: true,
+            slippageTolerance: new Percent(5, 100),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+          ...(urVersion ? { urVersion } : {}),
+        })
+
+      // default (2.0) keeps failing closed on this chain, with the SDK's own registry error
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(options(), v4PositionManager)).to.throw(
+        `Universal Router version ${UniversalRouterVersion.V2_0} not deployed on chain ${chainId}`
+      )
+
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(
+        options(UniversalRouterVersion.V2_1_1),
+        v4PositionManager
+      )
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      expect(methodParameters.calldata.toLowerCase()).to.include(spender.slice(2).toLowerCase())
     })
   })
 })

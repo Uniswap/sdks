@@ -74,6 +74,7 @@ export interface MigrateV3ToV4Options {
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
+  urVersion?: UniversalRouterVersion // Universal Router version that will execute the migrate; an embedded V3 NFT permit must name that router as spender (defaults to V2_0 for backward compatibility)
 }
 
 const DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS = 30 * 60
@@ -485,7 +486,8 @@ export abstract class SwapRouter {
    *   - v3RemoveLiquidityOptions.collectOptions.recipient must equal v4PositionManager
    *   - v3RemoveLiquidityOptions.liquidityPercentage must be 100%
    *   - input pool and output pool must have the same tokens
-   *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
+   *   - V3 NFT must be approved, or a valid v3RemoveLiquidityOptions.permit must be provided whose spender is the
+   *     Universal Router for `urVersion` (defaults to V2_0)
    */
   public static migrateV3ToV4CallParameters(
     options: MigrateV3ToV4Options,
@@ -541,12 +543,16 @@ export abstract class SwapRouter {
 
     // add position permit to the universal router planner
     if (options.v3RemoveLiquidityOptions.permit) {
-      // permit spender should be UR
+      // permit spender must be the router that executes this migrate. Resolving it from urVersion, rather than
+      // always 2.0, is what lets chains that only register a newer router (e.g. Robinhood, Arc) migrate with a permit.
       const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
-        UniversalRouterVersion.V2_0,
+        options.urVersion ?? UniversalRouterVersion.V2_0,
         options.inputPosition.pool.chainId as SupportedChainsType
       )
-      invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
+      invariant(
+        universalRouterAddress.toLowerCase() === options.v3RemoveLiquidityOptions.permit.spender.toLowerCase(),
+        'INVALID_SPENDER'
+      )
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
       // remove permit so that multicall doesnt add it again
