@@ -47,18 +47,18 @@ const BUILD_PARAMS = {
 describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-on Robinhood (4663) stack from the canonical dev-README deployment', () => {
     const addresses = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
-    expect(addresses?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
-    expect(addresses?.feeSplitter).toBe(getAddress('0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf'))
-    expect(addresses?.beneficiaryVault).toBe(getAddress('0xd35E9CA72F64C7F93BE30fad67524323396B36D7'))
-    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
+    expect(addresses?.strategy).toBe(getAddress('0x7c48DDe3B447381F4d986334679b3Afc7F2D35C2'))
+    expect(addresses?.feeSplitter).toBe(getAddress('0x9411fa7F956f64aa7981AA27cB3bC6eC0415449C'))
+    expect(addresses?.beneficiaryVault).toBe(getAddress('0x26d2F7AcB07707034406a0dC458351Bb63C02553'))
+    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0xf585b5D728A8fdE743027307BF5F3556E3B9C58D'))
     expect(addresses?.creatorFeesEnabled).toBe(true)
   })
 
   it('resolves the fees-off Robinhood stack to its own strategy + splitter, same singletons', () => {
     const on = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
-    expect(off?.feeSplitter).toBe(getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359'))
+    expect(off?.strategy).toBe(getAddress('0xC9566675b1Ea42861546f3c5B74Ace2c79c49572'))
+    expect(off?.feeSplitter).toBe(getAddress('0x882Ae5e2095435A62Fd1BBDEfcb637f5CeAFc0ee'))
     expect(off?.strategy).not.toBe(on!.strategy)
     expect(off?.feeSplitter).not.toBe(on!.feeSplitter)
     expect(off?.beneficiaryVault).toBe(on!.beneficiaryVault)
@@ -78,6 +78,21 @@ describe('getInstantLaunchAddresses', () => {
     expect(getInstantLaunchAddresses(999999, { creatorFeesEnabled: false })).toBeUndefined()
     expect(isInstantLaunchSupportedChain(CHAIN_ID)).toBe(true)
     expect(isInstantLaunchSupportedChain(SupportedChainId.MAINNET)).toBe(false)
+  })
+
+  it('resolves on Arc to the fees-off buyback-and-burn pair, with no fees-on stack', () => {
+    const launcher = getLauncherAddresses(SupportedChainId.ARC)!
+    const off = getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled: false })
+    expect(off?.strategy).toBe(getAddress('0x36F8c87047b212589eD66524Bb69cE62B1f00B2d'))
+    expect(off?.feeSplitter).toBe(getAddress('0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616'))
+    expect(off?.buybackAndBurnRecipient).toBe(getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C'))
+    expect(off?.beneficiaryVault).toBeUndefined()
+    expect(off?.compoundingClaimRecipient).toBeUndefined()
+    expect(off?.uerc20Factory).toBe(getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6'))
+    expect(off?.liquidityLauncher).toBe(launcher.liquidityLauncher)
+    expect(off?.creatorFeesEnabled).toBe(false)
+    expect(getInstantLaunchAddresses(SupportedChainId.ARC, { creatorFeesEnabled: true })).toBeUndefined()
+    expect(isInstantLaunchSupportedChain(SupportedChainId.ARC)).toBe(true)
   })
 })
 
@@ -231,10 +246,10 @@ describe('deployment registry selectors', () => {
   it('getInstantLaunchStrategy keys the variant by creatorFeesEnabled', () => {
     const on = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(on?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
+    expect(on?.strategy).toBe(getAddress('0x7c48DDe3B447381F4d986334679b3Afc7F2D35C2'))
     expect(on?.creatorFeeNativeBps).toBe(4000)
     expect(on?.creatorFeeTokenBps).toBe(0)
-    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
+    expect(off?.strategy).toBe(getAddress('0xC9566675b1Ea42861546f3c5B74Ace2c79c49572'))
     expect(off?.creatorFeeNativeBps).toBe(0)
   })
 

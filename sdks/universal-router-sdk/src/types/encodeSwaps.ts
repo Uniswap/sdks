@@ -1,7 +1,7 @@
 import { BigNumberish } from 'ethers'
 import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
 import { type PathKey, type PoolKey } from '@uniswap/v4-sdk'
-import { TokenTransferMode } from '../entities/actions/uniswap'
+import { RouterBalanceInput, TokenTransferMode } from '../entities/actions/uniswap'
 import { Permit2Permit } from '../utils/inputTokens'
 import { UniversalRouterVersion } from '../utils/constants'
 
@@ -13,6 +13,12 @@ export type Fee =
   | { kind: 'portion'; recipient: string; fee: Percent }
   | { kind: 'flat'; recipient: string; amount: BigNumberish }
 
+export type PortionFee = Extract<Fee, { kind: 'portion' }>
+export type FlatFee = Extract<Fee, { kind: 'flat' }>
+
+/** A bare `Fee` encodes as it always has; an array pays one recipient per entry (at most MAX_FEE_RECIPIENTS), each a fraction of GROSS output, all the same `kind`, and >1 portion needs urVersion >= 2.1.1. */
+export type FeeSpecification = Fee | Fee[]
+
 export type SwapSpecification = {
   tradeType: TradeType
   routing: {
@@ -23,7 +29,7 @@ export type SwapSpecification = {
   }
   slippageTolerance: Percent
   recipient?: string // defaults to SENDER_AS_RECIPIENT (0x01); ApproveProxy requires an explicit address
-  fee?: Fee
+  fee?: FeeSpecification
   tokenTransferMode?: TokenTransferMode
   permit?: Permit2Permit
   chainId?: number // required only for ApproveProxy
@@ -45,6 +51,19 @@ export type SwapSpecification = {
    * See `SwapRouter.encodeSwaps`.
    */
   allowDirectTransfers?: boolean
+  /**
+   * Fund the swap from the Universal Router's own balance of the input token: no Permit2
+   * ingress is emitted, the first hop spends the CONTRACT_BALANCE sentinel, and an optional
+   * `minimumAmount` emits a BALANCE_CHECK_ERC20 (requires `chainId` to resolve the router
+   * address). A native input is funded by attaching msg.value to execute() (raw transfers
+   * to the router revert): the plan must lead with a WRAP_ETH, which is resized to wrap the
+   * whole balance, the floor is asserted post-wrap as WETH, ETH dust is always swept to the
+   * recipient, and the encoded value is 0. Same semantics and guards as
+   * `SwapOptions.routerBalanceInput`: explicit `recipient`, EXACT_INPUT, exactly one step
+   * spending the (wrapped) input token (no splits); incompatible with `permit`,
+   * `nativeErc20Input`, `allowDirectTransfers`, and ApproveProxy.
+   */
+  routerBalanceInput?: RouterBalanceInput
 }
 
 // Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed

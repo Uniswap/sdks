@@ -66,7 +66,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.XLAYER]: 1,
   [ChainId.TEMPO]: 0.5,
   [ChainId.MEGAETH]: 1,
-  [ChainId.ARC]: 0.48,
+  [ChainId.ARC]: 0.5,
   [ChainId.ROBINHOOD]: 0.1,
   [ChainId.INK]: 1,
 }

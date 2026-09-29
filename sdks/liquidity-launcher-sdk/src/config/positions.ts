@@ -70,6 +70,9 @@ const FULL_RANGE_DEFINITION: PositionDefinition = {
  * `currency`/`token` (the raised currency and the launched token) determine v4 currency ordering.
  * When `currency` sorts as `currency0` the custom offsets are mirrored onto the reciprocal price
  * band (see the module header). Native ETH is `ZERO_ADDRESS`, which always sorts as `currency0`.
+ *
+ * Custom-range weights may sum to less than 100%. The returned definitions then cover only the
+ * allocated share; the migrator opens an implicit full-range position for the rest.
  */
 export function buildPositionDefinitions(
   strategy: PriceRangeKind,
@@ -125,10 +128,8 @@ export function buildPositionDefinitions(
   if (weightSum > MPS_TOTAL) {
     throw new LauncherSdkError('INVALID_PRICE_RANGE', 'Custom price range liquidity percentages exceed 100%')
   }
-  // Under-allocation is just as invalid: weights summing to less than MPS_TOTAL leave a slice of LP
-  // liquidity with no destination position. Valid inputs summing to 100% land exactly on MPS_TOTAL.
-  if (weightSum < MPS_TOTAL) {
-    throw new LauncherSdkError('INVALID_PRICE_RANGE', 'Custom price range liquidity percentages must sum to 100%')
-  }
+  // Under-allocation is allowed: PositionPlanner.resolve appends an implicit full-range position
+  // carrying whatever budget the definitions leave unspent, so a shortfall has a destination and
+  // needs no definition here. Only the overshoot above is rejected (the planner reverts on it).
   return definitions
 }

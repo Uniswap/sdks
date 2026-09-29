@@ -118,7 +118,7 @@ const MAINNET_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e',
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
   v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
-  permissionedV4PositionManagerAddress: '0x63Bd7e5D4EcfAA74d82AE1dE98F476C935a81973',
+  permissionedV4PositionManagerAddress: '0xD7BE746B6b29f6185A01013E944313E1704C971F',
   permissionedV4HooksAddress: '0x499a724Ab630549f14C995EC41a8E04fA3fd28c0',
 }
 const GOERLI_ADDRESSES: ChainAddresses = {
@@ -250,7 +250,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
-  permissionedV4PositionManagerAddress: '0xf99D553912084c99F6299291b75Fe9B7119Aa1A7',
+  permissionedV4PositionManagerAddress: '0x864C37908Aa5e10b100CaCEe1c62E3954d76f5E1',
   permissionedV4HooksAddress: '0x51247E2291d290d17C08813A175AC86465EdE8c0',
 }
 
@@ -284,6 +284,8 @@ const BASE_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
   v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
   v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+  permissionedV4PositionManagerAddress: '0xC09255D86DB563cBc11C2fCf4a0C512e160111B4',
+  permissionedV4HooksAddress: '0x5750be78fEdfb2fA48FAa6C6623400Ba4538A8c0',
 }
 
 // Base Goerli v3 addresses
@@ -563,6 +565,8 @@ const INK_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  permissionedV4PositionManagerAddress: '0x003aa18c6E682dB80Cf4aa17261CcbFfd28690CE',
+  permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {

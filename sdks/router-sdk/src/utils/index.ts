@@ -1,9 +1,15 @@
-import { Currency, Token } from '@uniswap/sdk-core'
+import { Currency } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { TPool } from './TPool'
+
+// `Pair.involvesToken` and `V3Pool.involvesToken` only accept a `Token`, so calling `involvesToken`
+// on the `TPool` union with a bare `Currency` (e.g. native ETH from `route.path`) fails to
+// typecheck. This checks the same token0/token1 membership but against any `Currency`.
+const poolInvolvesCurrency = (pool: TPool, currency: Currency): boolean =>
+  pool.token0.equals(currency) || pool.token1.equals(currency)
 
 /**
  * Utility function to return each consecutive section of Pools or Pairs in a MixedRoute
@@ -19,7 +25,10 @@ export const partitionMixedRouteByProtocol = (route: MixedRouteSDK<Currency, Cur
     if (
       (route.pools[left] instanceof V4Pool && !(route.pools[right] instanceof V4Pool)) ||
       (route.pools[left] instanceof V3Pool && !(route.pools[right] instanceof V3Pool)) ||
-      (route.pools[left] instanceof Pair && !(route.pools[right] instanceof Pair))
+      (route.pools[left] instanceof Pair && !(route.pools[right] instanceof Pair)) ||
+      // a native/wrapped boundary (e.g. a native-ETH v4 pool followed by a WETH v4 pool) needs a
+      // wrap/unwrap between sections, so it ends the section even within a single protocol
+      !poolInvolvesCurrency(route.pools[right], route.path[right])
     ) {
       acc.push(route.pools.slice(left, right))
       left = right
@@ -43,11 +52,13 @@ export const partitionMixedRouteByProtocol = (route: MixedRouteSDK<Currency, Cur
 export const getOutputOfPools = (pools: TPool[], firstInputToken: Currency): Currency => {
   const { inputToken: outputToken } = pools.reduce(
     ({ inputToken }, pool: TPool): { inputToken: Currency } => {
-      if (!pool.involvesToken(inputToken as Token)) throw new Error('PATH')
-      const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
-      return {
-        inputToken: outputToken,
-      }
+      // exact matches take priority so genuine ETH/WETH pools resolve to the correct side;
+      // the wrapped comparisons bridge native/wrapped boundaries the same way MixedRouteSDK does
+      if (pool.token0.equals(inputToken)) return { inputToken: pool.token1 }
+      if (pool.token1.equals(inputToken)) return { inputToken: pool.token0 }
+      if (pool.token0.wrapped.equals(inputToken.wrapped)) return { inputToken: pool.token1 }
+      if (pool.token1.wrapped.equals(inputToken.wrapped)) return { inputToken: pool.token0 }
+      throw new Error('PATH')
     },
     { inputToken: firstInputToken }
   )

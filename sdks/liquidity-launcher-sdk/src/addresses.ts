@@ -42,22 +42,26 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 // Deployed at the same CREATE2 address on every supported chain.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
-// Liquidity-launcher deploy on chain 4663 only. The #223/#227 redeploy changed the launcher's
-// bytecode so the original mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Scoped to
-// Robinhood because 4663 is the only chain it exists on; once this launcher is deployed on every
-// chain, this constant collapses back into LIQUIDITY_LAUNCHER.
+// The #223/#227 redeployed launcher: the redeploy changed the launcher's bytecode so the original
+// mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Deployed on Robinhood (4663, the
+// 2026-08-05 full redeploy) and Arc (5042); once it is deployed on every chain, this constant
+// collapses back into LIQUIDITY_LAUNCHER.
 //
 // 2026-08-05 full redeploy: the re-mined launcher, superseding the v3.1.1 interim launcher
 // `0x7A6C474b…` (which itself superseded the never-launched v3.1.0 dev launcher `0xe050309b…`).
 // Unlike the v3.1.0 removal, the v3.1.1 generation has indexed launches, so its strategy pair
 // stays registered in {@link INSTANT_LAUNCH_DEPLOYMENTS} below — only the "current" pointers move.
-const LIQUIDITY_LAUNCHER_ROBINHOOD = getAddress('0x0000FffFBE8efE702c8703aE3477FF5dE3d319C0')
-// UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER_ROBINHOOD as a constructor immutable.
+const LIQUIDITY_LAUNCHER_REDEPLOYED = getAddress('0x0000FffFBE8efE702c8703aE3477FF5dE3d319C0')
+// UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER_REDEPLOYED as a constructor immutable.
 // Deployed via CREATE2 at salt 0 through the canonical deployer (liquidity-launcher#227
-// `DeployUniversalRouterStrategy.s.sol`), so it is chain-independent too — but it is only deployed
-// on 4663 so far, hence the per-chain optional field. 2026-08-05 full redeploy; supersedes the
-// v3.1.1 `0x4962907c…` (and the v3.1.0 `0xB7fF4d94…` before it).
+// `DeployUniversalRouterStrategy.s.sol`) — but it is only deployed per-chain so far, hence the
+// per-chain optional field. 2026-08-05 full redeploy; supersedes the v3.1.1 `0x4962907c…` (and the
+// v3.1.0 `0xB7fF4d94…` before it). NOT redeployed in v3.3.0 — the existing deploy stays compatible,
+// so this address is unchanged by that release.
 const UNIVERSAL_ROUTER_STRATEGY_ROBINHOOD = getAddress('0x1242c9439d589cAE85E121B1f79f2aF51e91DCEE')
+// Arc deploy of the UniversalRouterStrategy (a different address than Robinhood's despite the same
+// launcher immutable — read back from the 5042 deploy; `launcher()` verified on-chain).
+const UNIVERSAL_ROUTER_STRATEGY_ARC = getAddress('0x0A122717bc36E3C7A7958128a5C789E0b070b3Ae')
 // Current CCA factory: the 2026-07-09 redeploy built against blocknumberish v1.1.0, which translates
 // block.number on every chain that needs it (e.g. Arbitrum One and Robinhood/4663 — the earlier
 // factory only handled Arbitrum, so on other translated chains it derived auction block ranges
@@ -71,13 +75,15 @@ const CCA_FACTORY = getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8')
 const CCA_FACTORY_LEGACY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
 const TOKEN_SPLITTER = getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd')
 // 2026-08-05 full-redeploy TokenSplitter, chain 4663 only — the rest of the chains keep the shared
-// TOKEN_SPLITTER above. Same collapse caveat as LIQUIDITY_LAUNCHER_ROBINHOOD.
+// TOKEN_SPLITTER above. Same collapse caveat as LIQUIDITY_LAUNCHER_REDEPLOYED.
 const TOKEN_SPLITTER_ROBINHOOD = getAddress('0x4F5E3FBb9745358A92Da5674305FAb8D2B8a73cE')
 
 // Token factories, split by token standard. The uERC20 factory shares a CREATE2 address across the
 // Ethereum-style chains that deploy it; the super-uERC20 factory shares one across the superchains.
 const UERC20_FACTORY = getAddress('0x000000e200088D55C39a11F609E5F667729ad49b')
 const USUPERC20_FACTORY = getAddress('0xeEeeEEE204Afb6BABb1287ffed52cCD6BA0b0fb2')
+// Arc's uERC20 factory is not at the shared CREATE2 address.
+const UERC20_FACTORY_ARC = getAddress('0xFf99D8f6C994607576eB652EDCf12E04a7EbfBf6')
 
 // Canonical Uniswap v4 PositionManager per chain (sdk-core CHAIN_TO_ADDRESSES_MAP[id].v4PositionManagerAddress).
 const POSITION_MANAGER_MAINNET = getAddress('0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e')
@@ -87,6 +93,7 @@ const POSITION_MANAGER_ARBITRUM = getAddress('0xd88F38F930b7952f2DB2432Cb002E7ab
 const POSITION_MANAGER_AVALANCHE = getAddress('0xB74b1F14d2754AcfcbBe1a221023a5cf50Ab8ACD')
 const POSITION_MANAGER_XLAYER = getAddress('0xcF1EAFC6928dC385A342E7C6491d371d2871458b')
 const POSITION_MANAGER_ROBINHOOD = getAddress('0x58daec3116aae6D93017bAAea7749052E8a04fA7')
+const POSITION_MANAGER_ARC = getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B')
 const POSITION_MANAGER_SEPOLIA = getAddress('0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4')
 const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80')
 
@@ -94,7 +101,7 @@ const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77
 export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   [SupportedChainId.MAINNET]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x49380c4EfaB1b491006aF7FabAB8B3459F0E6000'),
+    lbpStrategy: getAddress('0x2EEF0e2a9a652d755AccAD95a24541A98B5CA000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -104,7 +111,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.UNICHAIN]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'),
+    lbpStrategy: getAddress('0x48F55E7E8ac229aA4e2f3F2d44aa9284D86da000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -113,7 +120,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x34385dD739FE5464892BF0bA4CC42492804dA000'),
+    lbpStrategy: getAddress('0xf10124B01E9fa88b0a2eF3fA95a53B3310446000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -122,7 +129,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ARBITRUM_ONE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x8Af0775a70Cc94D71DFc0fE809435e833F2Fe000'),
+    lbpStrategy: getAddress('0xc80f3f4497CD9ae41bf8cB5C8809620182B6E000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -131,7 +138,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.AVALANCHE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000'),
+    lbpStrategy: getAddress('0x7575c9488AB7913e7749B9F5e02789355699E000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -140,7 +147,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.XLAYER]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000'),
+    lbpStrategy: getAddress('0xde758D7B3202b7f4f842E8313Fc04Bf19c6Be000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -148,8 +155,8 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     positionManager: POSITION_MANAGER_XLAYER,
   },
   [SupportedChainId.ROBINHOOD]: {
-    liquidityLauncher: LIQUIDITY_LAUNCHER_ROBINHOOD,
-    lbpStrategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
+    liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
+    lbpStrategy: getAddress('0xbf1aB81f7d534b2CC0Da76fcf4d541322bB0e000'),
     tokenSplitter: TOKEN_SPLITTER_ROBINHOOD,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -157,9 +164,21 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_ROBINHOOD,
   },
+  [SupportedChainId.ARC]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
+    lbpStrategy: getAddress('0x542BCDA1015485ef0B1cD11B835DC58DF5102000'),
+    // Arc keeps the shared TokenSplitter (verified deployed on 5042), unlike Robinhood's
+    // full-redeploy splitter. ccaFactory verified on-chain via LBPStrategy.initializerFactory().
+    tokenSplitter: TOKEN_SPLITTER,
+    ccaFactory: CCA_FACTORY,
+    permit2: PERMIT2,
+    universalRouterStrategy: UNIVERSAL_ROUTER_STRATEGY_ARC,
+    uerc20Factory: UERC20_FACTORY_ARC,
+    positionManager: POSITION_MANAGER_ARC,
+  },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x96641d91e223c766F45b19d09494F5925C3cE000'),
+    lbpStrategy: getAddress('0x95434E898Af471945Cab33D5064d2aC1A6Ba2000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -168,7 +187,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE_SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0xB06428b62c259eE982cE3D9BED47391dC9A5E000'),
+    lbpStrategy: getAddress('0x73ad52384798AdADfBe19fCfD28ff09D2CC82000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -269,7 +288,7 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // variant is its own strategy + FeeSplitter pair; the FeeSplitter's split table is likewise
 // immutable at construction.
 //
-// Five strategy generations are registered (append-only — indexed launches permanently reference
+// Six strategy generations are registered (append-only — indexed launches permanently reference
 // the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}):
 //  - c3f9506 pair (2026-07-29): OZ notes/L-04 round + the 1e20 compounding floor; still carries
 //    the OZ H01 fix flooring launch positions at tick -208,980. Has indexed launches, so it stays.
@@ -283,12 +302,16 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 //    This pair also carries a new fees-on FeeSplitter (`0x6CC1b74F…`) and a new
 //    UERC20BeneficiaryVault (`0xa5889CaF…`), unlike the earlier three generations which all reuse
 //    the c3f9506 splitters and vault.
-//  - 2026-08-05 full-redeploy pair (current): the whole 4663 stack was redeployed the same day —
+//  - 2026-08-05 full-redeploy pair: the whole 4663 stack was redeployed the same day —
 //    launcher (re-mined `0x0000FffF…`), strategies, both FeeSplitters, UERC20BeneficiaryVault,
 //    CompoundingClaimRecipient, TokenSplitter and UniversalRouterStrategy. NOT a pure re-pin,
 //    unlike v3.1.1: the strategy was recompiled with a new pool shape — TICK_SPACING 60 → 25,
 //    initialTick 198,060 → 198,050, MIN_LAUNCH_TICK -208,980 → -160,100 (all read back from the
 //    deployed contracts' getters, 2026-08-05).
+//  - v3.3.0 pair (contracts 1c59049, current): strategies redeployed on the same
+//    LIQUIDITY_LAUNCHER_REDEPLOYED, with new FeeSplitters, UERC20BeneficiaryVault and
+//    CompoundingClaimRecipient (periphery 7ea523c). Pool shape carried over from the 2026-08-05
+//    pair — the v3.3.0 deployment README records no tick change.
 //
 // The v3.1.0 dev pair (`0xF0C0a0f3…` / `0x3fe607E7…`) that shipped in 1.6.0 is **removed rather than
 // retained**: it was mis-pinned to the previous launcher, was never launched against, and therefore
@@ -296,7 +319,7 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // indexed launches is still registered below.
 //
 // Every generation up to and including v3.1.1 opens pools at initialTick 198,060 (spacing 60); the
-// 2026-08-05 full-redeploy pair opens at 198,050 (spacing 25). Pools are permanent, so BOTH pool
+// 2026-08-05 and v3.3.0 pairs open at 198,050 (spacing 25). Pools are permanent, so BOTH pool
 // shapes trade forever — see the per-entry `tickSpacing` / `initialTick` / `minLaunchTick` fields.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_C3F9506 = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
@@ -307,9 +330,12 @@ const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_3E05DA8 = getAddress('0x16b63f1
 // v3.1.1, re-pinned to the interim v3.1.1 launcher `0x7A6C474b…`.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_V311 = getAddress('0x3f556B542105D5EFBBefe7C766a4919C76B960Fb')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_V311 = getAddress('0x36bdB859518C89F764337cd5C24762d2Aa650f3C')
-// 2026-08-05 full redeploy, re-pinned to LIQUIDITY_LAUNCHER_ROBINHOOD.
+// 2026-08-05 full redeploy, re-pinned to LIQUIDITY_LAUNCHER_REDEPLOYED.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_20260805 = getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_20260805 = getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2')
+// v3.3.0 (contracts 1c59049), on the same LIQUIDITY_LAUNCHER_REDEPLOYED.
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_V330 = getAddress('0x7c48DDe3B447381F4d986334679b3Afc7F2D35C2')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_V330 = getAddress('0xC9566675b1Ea42861546f3c5B74Ace2c79c49572')
 // FeeSplitters. The fees-on side got a fresh splitter in v3.1.1 (it points at the v3.1.1 beneficiary
 // vault, likewise a new deploy at the time); the 2026-08-05 full redeploy replaces **both** sides —
 // the first time the fees-off splitter moves. Superseded splitters stay registered on their
@@ -321,14 +347,36 @@ const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_20260805 = getAddress('0xeFF
 // The c3f9506 fees-off splitter served every generation up to and including v3.1.1.
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD_C3F9506 = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD_20260805 = getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359')
-// UERC20BeneficiaryVault. The 2026-08-05 full redeploy deploys a new one; it is the vault the
-// current fees-on splitter forwards the creator share to, and the one a new launch registers its
-// beneficiary with. Supersedes the v3.1.1 vault `0xa5889CaF…` (and the c3f9506 vault `0x587D2fDD…`
-// before it), which remain the claim surfaces for beneficiaries registered by older generations.
-const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0xd35E9CA72F64C7F93BE30fad67524323396B36D7')
-// CompoundingClaimRecipient. 2026-08-05 full redeploy; supersedes `0x666DA634…`, which remains the
-// autocompound claim surface of the older generations' splitters.
-const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a')
+// v3.3.0 replaces both Robinhood splitters again, alongside the vault and compounding recipient
+// they forward to.
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_V330 = getAddress('0x9411fa7F956f64aa7981AA27cB3bC6eC0415449C')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD_V330 = getAddress('0x882Ae5e2095435A62Fd1BBDEfcb637f5CeAFc0ee')
+// UERC20BeneficiaryVault. v3.3.0 deploys a new one; it is the vault the current fees-on splitter
+// forwards the creator share to, and the one a new launch registers its beneficiary with.
+// Supersedes the 2026-08-05 vault `0xd35E9CA7…` (and `0xa5889CaF…` / `0x587D2fDD…` before it),
+// which remain the claim surfaces for beneficiaries registered by older generations.
+const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x26d2F7AcB07707034406a0dC458351Bb63C02553')
+// CompoundingClaimRecipient. v3.3.0; supersedes `0xf9526Dd3…`, which remains the autocompound claim
+// surface of the older generations' splitters.
+const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0xf585b5D728A8fdE743027307BF5F3556E3B9C58D')
+
+// Arc (5042) Instant Launch stack — fees-off only. Arc's native currency is 18-decimal USDC, so
+// initialTick is USDC-denominated (122,050 ≈ $5k FDV on 1e9 supply), not Robinhood's ETH-denominated
+// 198,050. There is no fees-on FeeSplitter / InstantLaunchStrategy / UERC20BeneficiaryVault on Arc
+// in this SDK; creator-fee Instant Launch and auction `positionRecipient` routing are Robinhood-only.
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901 = getAddress('0xff301aCB22816D210d75D71F31Ac13C771093EF3')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC = getAddress('0xCDDC6103dD64dd05Cf634166326a21Be06B3165A')
+// The 2026-09-01 Arc FeeSplitter forwarded to CompoundingClaimRecipient `0xBE5A26C5…`. That
+// recipient is not a current-generation singleton (Arc's v3.3.0 splitters buy back and burn
+// instead), so it is not registered on INSTANT_LAUNCH_CONTRACTS — only mentioned here as the
+// historical claim surface of the still-registered v3.2.0 splitter.
+// v3.3.0 buyback-and-burn fees-off (2026-09-15, current): same launcher and pool shape as 2026-09-01,
+// but a new FeeSplitter whose 100% fee share goes to the BuybackAndBurnRecipient instead of
+// compounding. Replaces the 2026-09-08 and 2026-09-14 v3.3.0 compounding pairs, which are dropped
+// from the registry: launches made through them no longer resolve here.
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_V330 = getAddress('0x36F8c87047b212589eD66524Bb69cE62B1f00B2d')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC_V330 = getAddress('0xE8113a9a9CddD6d13fe8A3E32eAA687e108C4616')
+const BUYBACK_AND_BURN_RECIPIENT_ARC = getAddress('0x5cEe9852d136833aE26c9E36a96fC02Cdfc9C40C')
 
 /** FeeSplitter splits are expressed in basis points summing to this denominator per currency side. */
 export const FEE_SPLIT_BPS_DENOMINATOR = 10_000
@@ -365,7 +413,7 @@ export interface InstantLaunchDeployment {
   creatorFeeTokenBps: number
   /**
    * The strategy's compile-time pool tick spacing (`TICK_SPACING`) — the spacing every pool this
-   * generation minted has forever. 25 on the 2026-08-05 full-redeploy pair, 60 on every earlier
+   * generation minted has forever. 25 from the 2026-08-05 full redeploy onward, 60 on every earlier
    * generation.
    */
   tickSpacing: number
@@ -373,8 +421,8 @@ export interface InstantLaunchDeployment {
   initialTick: number
   /**
    * The strategy's compile-time lower tick of every launch position (`MIN_LAUNCH_TICK`).
-   * -160,100 on the 2026-08-05 full-redeploy pair, -208,980 (the OZ H01 floor) on every earlier
-   * generation.
+   * -160,100 from the 2026-08-05 full redeploy onward, -208,980 (the OZ H01 floor) on every
+   * earlier generation.
    */
   minLaunchTick: number
   /** Human-readable deployment tag (not an on-chain value). */
@@ -392,14 +440,21 @@ export interface InstantLaunchChainContracts {
   /**
    * UERC20BeneficiaryVault — registers each fees-on launch's beneficiary as a transferable ERC721
    * and vaults the creator's share of split fees. Also lets the creator of a launcher-created
-   * uERC20 claim unregistered positions via the token's graffiti.
+   * uERC20 claim unregistered positions via the token's graffiti. Optional: omitted on chains with
+   * no fees-on FeeSplitter (Arc).
    */
-  beneficiaryVault: Address
+  beneficiaryVault?: Address
   /**
-   * CompoundingClaimRecipient — the protocol/autocompound split recipient of every FeeSplitter on
-   * the chain. Its `Claimed` events prove same-transaction liquidity compounding.
+   * CompoundingClaimRecipient — the protocol/autocompound split recipient of the chain's current
+   * FeeSplitters. Its `Claimed` events prove same-transaction liquidity compounding. Optional:
+   * omitted on chains whose current splitters do not compound (Arc — buyback-and-burn).
    */
-  compoundingClaimRecipient: Address
+  compoundingClaimRecipient?: Address
+  /**
+   * BuybackAndBurnRecipient — the non-creator split recipient of the buyback-and-burn FeeSplitters
+   * (Arc's current generation). Optional: only where such splitters are deployed.
+   */
+  buybackAndBurnRecipient?: Address
 }
 
 /**
@@ -526,7 +581,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     initialTick: 198050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch with creator fees (2026-08-05, full 4663 stack redeploy, current): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the new UERC20BeneficiaryVault, 60% native + 100% token to the new CompoundingClaimRecipient',
+      'Instant Launch with creator fees (2026-08-05, full 4663 stack redeploy): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the new UERC20BeneficiaryVault, 60% native + 100% token to the new CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
@@ -539,16 +594,72 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     initialTick: 198050,
     minLaunchTick: -160100,
     description:
-      'Instant Launch without creator fees (2026-08-05, full 4663 stack redeploy, current): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the new CompoundingClaimRecipient',
+      'Instant Launch without creator fees (2026-08-05, full 4663 stack redeploy): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the new CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_V330,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_V330,
+    creatorFeesEnabled: true,
+    creatorFeeNativeBps: 4000,
+    creatorFeeTokenBps: 0,
+    tickSpacing: 25,
+    initialTick: 198050,
+    minLaunchTick: -160100,
+    description:
+      'Instant Launch with creator fees (v3.3.0, current): unchanged 2026-08-05 pool shape on the same re-mined LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the v3.3.0 UERC20BeneficiaryVault, 60% native + 100% token to the v3.3.0 CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_V330,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD_V330,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    tickSpacing: 25,
+    initialTick: 198050,
+    minLaunchTick: -160100,
+    description:
+      'Instant Launch without creator fees (v3.3.0, current): unchanged 2026-08-05 pool shape on the same re-mined LiquidityLauncher; zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the v3.3.0 CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ARC,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_20260901,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    tickSpacing: 25,
+    initialTick: 122050,
+    minLaunchTick: -160100,
+    description:
+      'Instant Launch without creator fees (Arc/5042, 2026-09-01): native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100), pinned to the re-mined LiquidityLauncher; zero beneficiary vault; FeeSplitter forwarding 100% of both fee sides to the Arc CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ARC,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ARC_V330,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ARC_V330,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    tickSpacing: 25,
+    initialTick: 122050,
+    minLaunchTick: -160100,
+    description:
+      'Instant Launch without creator fees (Arc/5042 v3.3.0 buyback-and-burn, current): unchanged native-USDC pool shape (TICK_SPACING 25, initialTick 122,050, MIN_LAUNCH_TICK -160,100); zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the Arc BuybackAndBurnRecipient',
   },
 ]
 
 /** The per-chain Instant Launch singleton contracts, keyed by numeric chain id. */
 export const INSTANT_LAUNCH_CONTRACTS: Partial<Record<number, InstantLaunchChainContracts>> = {
   [SupportedChainId.ROBINHOOD]: {
-    liquidityLauncher: LIQUIDITY_LAUNCHER_ROBINHOOD,
+    liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
     beneficiaryVault: UERC20_BENEFICIARY_VAULT_ROBINHOOD,
     compoundingClaimRecipient: COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD,
+  },
+  [SupportedChainId.ARC]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
+    buybackAndBurnRecipient: BUYBACK_AND_BURN_RECIPIENT_ARC,
   },
 }
 

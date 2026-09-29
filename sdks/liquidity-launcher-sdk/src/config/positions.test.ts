@@ -69,3 +69,38 @@ describe('buildPositionDefinitions currency ordering', () => {
     expect(concentrated[0].offsetUpper).toBe(TickMath.MAX_TICK)
   })
 })
+
+describe('buildPositionDefinitions liquidity weights', () => {
+  it('accepts an under-allocated custom range set', () => {
+    // 45% concentrated; the remaining 55% of the LP budget lands in the implicit full-range
+    // position the migrator opens on-chain (PositionPlanner.resolve), which is not a definition
+    // here — so the returned weights sum to 45%, not MPS_TOTAL.
+    const defs = buildPositionDefinitions(
+      'CUSTOM_RANGE',
+      [
+        { minPercentFromClearing: -10, maxPercentFromClearing: 40, liquidityPercent: 30 },
+        { minPercentFromClearing: -20, maxPercentFromClearing: 25, liquidityPercent: 15 },
+      ],
+      TICK_SPACING,
+      CURRENCY_HIGH,
+      TOKEN_LOW,
+    )
+    expect(defs).toHaveLength(2)
+    expect(defs.reduce((sum, def) => sum + def.weight, 0)).toBe(MPS_TOTAL * 0.45)
+  })
+
+  it('still rejects a custom range set allocating more than 100%', () => {
+    expect(() =>
+      buildPositionDefinitions(
+        'CUSTOM_RANGE',
+        [
+          { minPercentFromClearing: -10, maxPercentFromClearing: 40, liquidityPercent: 60 },
+          { minPercentFromClearing: -20, maxPercentFromClearing: 25, liquidityPercent: 41 },
+        ],
+        TICK_SPACING,
+        CURRENCY_HIGH,
+        TOKEN_LOW,
+      ),
+    ).toThrow('Custom price range liquidity percentages exceed 100%')
+  })
+})
