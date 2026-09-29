@@ -193,11 +193,25 @@ export type OutputAllocation = {
 };
 
 /**
+ * Oracle feed template
+ *
+ * The feed identifier is derived from these fields, so they are hashed rather than
+ * referenced by a separate id.
+ */
+export type FeedTemplate = {
+  name: string; // Human-readable feed name
+  expression: string; // Feed price expression
+  parameters: string[]; // Positional parameters referenced by the expression
+  secrets: string[]; // Secrets referenced by the expression
+  retryCount: number; // Retry attempts on feed failure
+};
+
+/**
  * Oracle feed information
  */
 export type FeedInfo = {
-  feedId: string; // bytes32 feed identifier
-  feed_address: string; // Feed contract address
+  feedTemplate: FeedTemplate; // Template describing the feed
+  feedAddress: string; // Feed contract address
   feedType: string; // Feed type string
 };
 
