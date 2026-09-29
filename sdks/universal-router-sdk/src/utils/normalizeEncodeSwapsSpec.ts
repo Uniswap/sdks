@@ -1,6 +1,6 @@
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import { Fee, FlatFee, NormalizedSwapSpecification, PortionFee, SwapSpecification } from '../types/encodeSwaps'
-import { SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
+import { DEFAULT_UR_VERSION, SENDER_AS_RECIPIENT } from './constants'
 
 // Fills the five optional fields that `validateEncodeSwaps` and `computeEncodeSwapsAmounts` require.
 export function normalizeEncodeSwapsSpec(spec: SwapSpecification): NormalizedSwapSpecification {
@@ -8,7 +8,7 @@ export function normalizeEncodeSwapsSpec(spec: SwapSpecification): NormalizedSwa
     ...spec,
     recipient: spec.recipient ?? SENDER_AS_RECIPIENT,
     tokenTransferMode: spec.tokenTransferMode ?? TokenTransferMode.Permit2,
-    urVersion: spec.urVersion ?? UniversalRouterVersion.V2_0,
+    urVersion: spec.urVersion ?? DEFAULT_UR_VERSION,
     safeMode: spec.safeMode ?? false,
     allowDirectTransfers: spec.allowDirectTransfers ?? false,
   }

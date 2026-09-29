@@ -3106,5 +3106,14 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
       expect(methodParameters.calldata.toLowerCase()).to.include(spender.slice(2).toLowerCase())
     })
+
+    it('throws UR_VERSION_TOO_OLD for urVersion 1.2, whose router predates the position-manager commands', async () => {
+      expect(() =>
+        SwapRouter.migrateV3ToV4CallParameters(
+          migrateToEthOptions(377972, undefined, UniversalRouterVersion.V1_2),
+          FORGE_V4_POSITION_MANAGER
+        )
+      ).to.throw('UR_VERSION_TOO_OLD')
+    })
   })
 })
