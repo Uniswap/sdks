@@ -26,10 +26,12 @@ import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { directTransferSweepFloor, sumUserPaidMax } from './utils/directTransfers'
 import {
+  DEFAULT_UR_VERSION,
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
+  isAtLeastV2_0,
   isAtLeastV2_1_1,
 } from './utils/constants'
 import { getCurrencyAddress } from './utils/getCurrencyAddress'
@@ -74,6 +76,7 @@ export interface MigrateV3ToV4Options {
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
+  urVersion?: UniversalRouterVersion // router that executes the migrate; an embedded V3 NFT permit must name it as spender (defaults to V2_0)
 }
 
 const DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS = 30 * 60
@@ -485,7 +488,8 @@ export abstract class SwapRouter {
    *   - v3RemoveLiquidityOptions.collectOptions.recipient must equal v4PositionManager
    *   - v3RemoveLiquidityOptions.liquidityPercentage must be 100%
    *   - input pool and output pool must have the same tokens
-   *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
+   *   - V3 NFT must be approved, or a valid v3RemoveLiquidityOptions.permit must be provided whose spender is the
+   *     Universal Router for `urVersion` (defaults to V2_0)
    */
   public static migrateV3ToV4CallParameters(
     options: MigrateV3ToV4Options,
@@ -497,9 +501,13 @@ export abstract class SwapRouter {
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    const urVersion = options.urVersion ?? DEFAULT_UR_VERSION
+
     // owner of the v3 nft must be the receiver of the v4 nft
 
     // validate the parameters
+    // the position-manager commands this plan emits do not exist on the 1.2 router
+    invariant(isAtLeastV2_0(urVersion), 'UR_VERSION_TOO_OLD')
     if (v4Pool.currency0.isNative) {
       invariant(
         (v4Pool.currency0.wrapped.equals(v3Token0) && v4Pool.currency1.equals(v3Token1)) ||
@@ -541,12 +549,15 @@ export abstract class SwapRouter {
 
     // add position permit to the universal router planner
     if (options.v3RemoveLiquidityOptions.permit) {
-      // permit spender should be UR
+      // permit spender must be the router that executes this migrate
       const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
-        UniversalRouterVersion.V2_0,
+        urVersion,
         options.inputPosition.pool.chainId as SupportedChainsType
       )
-      invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
+      invariant(
+        universalRouterAddress.toLowerCase() === options.v3RemoveLiquidityOptions.permit.spender.toLowerCase(),
+        'INVALID_SPENDER'
+      )
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
       // remove permit so that multicall doesnt add it again
@@ -613,7 +624,7 @@ export abstract class SwapRouter {
       (trade.trade.inputAmount.currency as { address: string }).address,
       BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString()),
       options.chainId!,
-      options.urVersion ?? UniversalRouterVersion.V2_0,
+      options.urVersion ?? DEFAULT_UR_VERSION,
       options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined
     )
   }

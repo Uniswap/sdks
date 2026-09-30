@@ -1,7 +1,7 @@
 import { BigNumber } from 'ethers'
 
-// Members must stay declared oldest-to-newest: isAtLeastV2_1_1 derives its version ordering
-// from this declaration order.
+// Members must stay declared oldest-to-newest: the isAtLeast* helpers derive their version
+// ordering from this declaration order.
 export enum UniversalRouterVersion {
   V1_2 = '1.2',
   V2_0 = '2.0',
@@ -10,15 +10,28 @@ export enum UniversalRouterVersion {
   V2_2_0 = '2.2.0',
 }
 
+/** Version assumed when a caller does not pass `urVersion`; kept at V2_0 for backward compatibility. */
+export const DEFAULT_UR_VERSION = UniversalRouterVersion.V2_0
+
+// Enum order, not string comparison: '2.1.1-rc.1' would sort >= '2.1.1', and unknown values must be index -1.
+const VERSION_ORDER: readonly UniversalRouterVersion[] = Object.values(UniversalRouterVersion)
+
+function isAtLeast(version: UniversalRouterVersion | undefined, minimum: UniversalRouterVersion): boolean {
+  return !!version && VERSION_ORDER.indexOf(version) >= VERSION_ORDER.indexOf(minimum)
+}
+
 /**
  * Check if a UniversalRouterVersion is at least V2_1_1.
  * Duplicated from @uniswap/v4-sdk's isAtLeastV2_1_1 (which operates on URVersion)
  * to avoid coupling universal-router-sdk's version logic to v4-sdk.
  */
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
-  // Enum order, not string comparison: '2.1.1-rc.1' would sort >= '2.1.1', and unknown values must be index -1.
-  const order: readonly UniversalRouterVersion[] = Object.values(UniversalRouterVersion)
-  return !!version && order.indexOf(version) >= order.indexOf(UniversalRouterVersion.V2_1_1)
+  return isAtLeast(version, UniversalRouterVersion.V2_1_1)
+}
+
+/** Check if a UniversalRouterVersion is at least V2_0, the first router with the position-manager commands. */
+export function isAtLeastV2_0(version?: UniversalRouterVersion): boolean {
+  return isAtLeast(version, UniversalRouterVersion.V2_0)
 }
 
 export type RouterConfig = {

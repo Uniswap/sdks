@@ -37,6 +37,8 @@ contract DeployRouter is Test {
     address internal constant FEE_RECIPIENT = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address internal constant MAINNET_ROUTER = 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af;
+    // Universal Router 2.1.1 on mainnet; empty at the fork block, so the same mock code is etched there
+    address internal constant MAINNET_ROUTER_V2_1_1 = 0x4C82D1fBFe28C977cBB58D8C7FF8FCF9F70a2cCA;
 
     // This is not the address of the position manager on mainnet
     // It’s the address where Foundry deploys PositionManager during the test
@@ -51,6 +53,7 @@ contract DeployRouter is Test {
     uint256 ONE_DAI = 1 ether;
 
     IUniversalRouter public router;
+    IUniversalRouter public routerV2_1_1;
     IPermit2 public permit2 = IPermit2(MAINNET_PERMIT2);
     IPoolManager public poolManager;
     PositionManager public v4PositionManager;
@@ -78,6 +81,8 @@ contract DeployRouter is Test {
 
         vm.etch(MAINNET_ROUTER, address(mockrouter).code);
         router = IUniversalRouter(MAINNET_ROUTER);
+        vm.etch(MAINNET_ROUTER_V2_1_1, address(mockrouter).code);
+        routerV2_1_1 = IUniversalRouter(MAINNET_ROUTER_V2_1_1);
     }
 
     ////////////////////////////////////////////////////////////////

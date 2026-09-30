@@ -178,6 +178,55 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
+    // Same migration as test_migrate_toEth_withPermit, but the permit names the 2.1.1 router and the
+    // calldata is executed by that router: the spender the SDK accepts must be the router that runs it.
+    function test_migrate_toEth_withPermit_urV2_1_1() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_TO_ETH_WITH_PERMIT_UR_V2_1_1");
+
+        // add the position to v3 so we have something to migrate
+        assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
+        // USDC < WETH
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
+
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
+
+        assertEq(params.value, 0);
+        vm.prank(from);
+        (bool success,) = address(routerV2_1_1).call(params.data);
+        require(success, "call failed");
+
+        // all funds were swept out of contracts
+        assertEq(USDC.balanceOf(MAINNET_ROUTER_V2_1_1), 0);
+        assertEq(WETH.balanceOf(MAINNET_ROUTER_V2_1_1), 0);
+        assertEq(address(MAINNET_ROUTER_V2_1_1).balance, 0);
+        assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
+        assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, eth and usdc deposited
+        assertGt(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
+
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
+
+        // old position burned, new position minted
+        assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
+        assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
+    }
+
     function test_migrate_toErc20_withPermit() public {
         MethodParameters memory params = readFixture(json, "._MIGRATE_TO_ERC20_WITH_PERMIT");
 
