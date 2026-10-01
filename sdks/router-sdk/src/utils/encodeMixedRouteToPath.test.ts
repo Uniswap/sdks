@@ -13,6 +13,11 @@ describe('#encodeMixedRouteToPath', () => {
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2', 'token2')
 
   const weth = WETH9[1]
+  // sorts ABOVE weth's address (0xC02a...) -- unlike token0/1/2 above, which all sort below it.
+  // The pre-fix fallthrough-to-pool.token0 logic happened to be correct whenever the non-weth
+  // token sorted below weth, and wrong whenever it sorted above -- these fixtures exercise the
+  // side that was silently broken.
+  const tokenHigh = new Token(1, '0xdAC17F958D2ee523a2206206994597C13D831ec7', 6, 'high', 'tokenHigh')
 
   const pool_V3_0_1_medium = new V3Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
   const pool_V3_1_2_low = new V3Pool(token1, token2, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, [])
@@ -222,6 +227,42 @@ describe('#encodeMixedRouteToPath', () => {
       // 0x0000000000000000000000000000000000000000
       // // last path address - v4 pool, token0
       // 0x0000000000000000000000000000000000000001
+    })
+  })
+
+  describe('native/wrapped boundary fallthrough (regression)', () => {
+    // Before the fix, the v4 branch re-derived each hop's output token via
+    // `currencyIn.equals(pool.token0) ? pool.token1 : pool.token0`, which falls through to
+    // `pool.token0` whenever neither side matches by exact reference -- exactly what happens at
+    // a native/wrapped boundary where the constructor resolves the hop via wrapped-equality
+    // rather than `.equals()`. Whether the fallthrough happened to be correct depended entirely
+    // on whether the non-weth token sorted above or below weth's address -- these fixtures use
+    // `tokenHigh`, which sorts above, to exercise the side that was silently broken.
+    const pool_V4_token0_eth = new V4Pool(token0, ETHER, FeeAmount.MEDIUM, 30, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+    const pool_V3_weth_high = new V3Pool(weth, tokenHigh, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+    const pair_weth_high = new Pair(
+      CurrencyAmount.fromRawAmount(weth, '100'),
+      CurrencyAmount.fromRawAmount(tokenHigh, '100')
+    )
+
+    it('v4 branch: resolves the correct terminal token across a native/wrapped boundary, not pool.token0', () => {
+      // token0 -[V4]-> ETH -[V3, weth<->tokenHigh]-> tokenHigh
+      const route = new MixedRouteSDK([pool_V4_token0_eth, pool_V3_weth_high], token0, tokenHigh)
+      const encoded = encodeMixedRouteToPath(route)
+
+      // cross-source invariant: the encoded path's terminal address must be route.pathOutput's
+      expect(encoded.toLowerCase().endsWith(route.pathOutput.wrapped.address.slice(2).toLowerCase())).toBe(true)
+      expect(encoded.toLowerCase()).not.toContain(weth.address.slice(2).toLowerCase())
+    })
+
+    it('legacy (non-v4) branch: resolves the correct terminal token for a native ETH input, not pool.token0', () => {
+      // ETH -[V2, weth<->tokenHigh]-> tokenHigh, no v4 pools so this hits the legacy branch
+      const route = new MixedRouteSDK([pair_weth_high], ETHER, tokenHigh)
+      const encoded = encodeMixedRouteToPath(route)
+
+      expect(encoded.toLowerCase().endsWith(route.pathOutput.wrapped.address.slice(2).toLowerCase())).toBe(true)
+      // pre-fix, this route encoded a WETH -> WETH self-loop
+      expect(encoded.toLowerCase().split(weth.address.slice(2).toLowerCase()).length - 1).toBe(1)
     })
   })
 })

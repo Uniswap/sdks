@@ -32,10 +32,17 @@ export function encodeMixedRouteToPath(
   if (containsV4Pool) {
     path = [route.pathInput.isNative ? ADDRESS_ZERO : route.pathInput.address]
     types = ['address']
-    let currencyIn = route.pathInput
 
-    for (const pool of route.pools) {
-      const currencyOut = currencyIn.equals(pool.token0) ? pool.token1 : pool.token0
+    // route.path[i + 1] is always pool i's own currency object -- the MixedRouteSDK constructor
+    // already resolves native/wrapped boundaries (including cases where neither the input nor
+    // output currency instance is literally `.equals()` to either of the pool's own token
+    // objects), so reading it directly is reliable. Re-deriving the output token here via
+    // `currencyIn.equals(pool.token0) ? pool.token1 : pool.token0` silently falls through to
+    // `pool.token0` whenever neither side matches by exact reference, which can pick the wrong
+    // side of the pool at a native/wrapped boundary (see fix(router-sdk) ROUTE-886 / #706, which
+    // fixed the identical fallthrough pattern in `MixedRouteSDK.midPrice` and `getOutputOfPools`).
+    for (const [i, pool] of route.pools.entries()) {
+      const currencyOut = route.path[i + 1]
 
       if (pool instanceof V4Pool) {
         // a tickSpacing of 0 indicates a "fake" v4 pool where the quote actually requires a wrap or unwrap
@@ -65,23 +72,30 @@ export function encodeMixedRouteToPath(
       } else {
         throw new Error(`Unsupported pool type ${JSON.stringify(pool)}`)
       }
-
-      currencyIn = currencyOut
     }
   } else {
     // TODO: ROUTE-276 - delete this else block
     // We introduced this else block as a safety measure to prevent non-v4 mixed routes from potentially regressing
     // We'd like to gain more confidence in the new implementation before removing this block
+
+    // Same fix as the v4 branch above: read each hop's currency straight from route.path (which
+    // the MixedRouteSDK constructor already resolves correctly, including native/wrapped
+    // boundaries) instead of re-deriving it here via `pool.token0.equals(inputToken) ? ... :
+    // pool.token0`, which silently falls through to `pool.token0` whenever `inputToken` doesn't
+    // exactly match either side of the pool (e.g. `route.input` is native ETH but the pool's
+    // tokens are the wrapped form). This also fixes seeding from `route.input`, which may be
+    // native, instead of `route.pathInput` (route.path[0]), which is already resolved to the
+    // form the first pool actually holds.
     const result = route.pools.reduce(
       (
-        { inputToken, path, types }: { inputToken: Currency; path: (string | number)[]; types: string[] },
+        { path, types }: { path: (string | number)[]; types: string[] },
         pool: TPool,
         index
-      ): { inputToken: Currency; path: (string | number)[]; types: string[] } => {
-        const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
+      ): { path: (string | number)[]; types: string[] } => {
+        const inputToken = route.path[index]
+        const outputToken = route.path[index + 1]
         if (index === 0) {
           return {
-            inputToken: outputToken,
             types: ['address', 'uint24', 'address'],
             path: [
               inputToken.wrapped.address,
@@ -91,7 +105,6 @@ export function encodeMixedRouteToPath(
           }
         } else {
           return {
-            inputToken: outputToken,
             types: [...types, 'uint24', 'address'],
             path: [
               ...path,
@@ -101,7 +114,7 @@ export function encodeMixedRouteToPath(
           }
         }
       },
-      { inputToken: route.input, path: [], types: [] }
+      { path: [], types: [] }
     )
 
     path = result.path
