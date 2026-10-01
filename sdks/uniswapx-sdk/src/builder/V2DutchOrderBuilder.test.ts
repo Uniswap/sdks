@@ -209,7 +209,10 @@ describe("V2DutchOrderBuilder", () => {
         recipient: constants.AddressZero,
       })
       .inputOverride(INPUT_START_AMOUNT.mul(98).div(100))
-      .outputOverrides([OUTPUT_START_AMOUNT.mul(102).div(100)])
+      .outputOverrides([
+        OUTPUT_START_AMOUNT.mul(102).div(100),
+        OUTPUT_START_AMOUNT.mul(10).div(100),
+      ])
       .build();
 
     expect(order.info.cosignerData.decayStartTime).toEqual(deadline - 100);
