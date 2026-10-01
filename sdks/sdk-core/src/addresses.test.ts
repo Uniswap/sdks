@@ -77,5 +77,10 @@ describe('addresses', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.INK)
       expect(address).toEqual('0x177778f19e89dd1012bdbe603f144088a95c4b53')
     })
+
+    it('should return the correct address for abstract', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ABSTRACT)
+      expect(address).toEqual('0x2cB10Ac97F2C3dAEDEaB7b72DbaEb681891f51B8')
+    })
   })
 })
