@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { SignatureProvider } from './SignatureProvider'
 import { PermitTransferFrom, PermitBatchTransferFrom } from '../signatureTransfer'
 import { BigNumber } from '@ethersproject/bignumber'
@@ -83,7 +84,7 @@ describe('SignatureProvider', () => {
         deadline: BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour from now
       }
 
-      const isValid = await signatureProvider.isPermitValid(permit)
+      const isValid = await signatureProvider.isPermitValid(permit, owner)
       expect(typeof isValid).toBe('boolean')
     })
 
@@ -104,7 +105,7 @@ describe('SignatureProvider', () => {
         deadline: BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour from now
       }
 
-      const isValid = await signatureProvider.isPermitValid(permit)
+      const isValid = await signatureProvider.isPermitValid(permit, owner)
       expect(typeof isValid).toBe('boolean')
     })
 
@@ -119,7 +120,7 @@ describe('SignatureProvider', () => {
         deadline: BigNumber.from(Math.floor(Date.now() / 1000) - 3600), // 1 hour ago
       }
 
-      const isValid = await signatureProvider.isPermitValid(permit)
+      const isValid = await signatureProvider.isPermitValid(permit, owner)
       expect(isValid).toBe(false)
     })
   })
@@ -136,7 +137,7 @@ describe('SignatureProvider', () => {
         deadline: BigNumber.from(Math.floor(Date.now() / 1000) + 3600), // 1 hour from now
       }
 
-      const result = await signatureProvider.validatePermit(permit)
+      const result = await signatureProvider.validatePermit(permit, owner)
 
       expect(result).toHaveProperty('isUsed')
       expect(result).toHaveProperty('isExpired')
@@ -144,6 +145,29 @@ describe('SignatureProvider', () => {
       expect(typeof result.isUsed).toBe('boolean')
       expect(typeof result.isExpired).toBe('boolean')
       expect(typeof result.isValid).toBe('boolean')
+    })
+
+    it('should check the owner nonce bitmap, not the spender', async () => {
+      const nonce = BigNumber.from(123)
+      const permit: PermitTransferFrom = {
+        permitted: {
+          token,
+          amount: BigNumber.from(1000000),
+        },
+        spender,
+        nonce,
+        deadline: BigNumber.from(Math.floor(Date.now() / 1000) + 3600),
+      }
+
+      const nonceSpy = spyOn(signatureProvider, 'isNonceUsed').mockResolvedValue(true)
+      spyOn(signatureProvider, 'isExpired').mockResolvedValue(false)
+
+      const result = await signatureProvider.validatePermit(permit, owner)
+
+      expect(nonceSpy).toHaveBeenCalledWith(owner, nonce)
+      expect(nonceSpy).not.toHaveBeenCalledWith(spender, nonce)
+      expect(result.isUsed).toBe(true)
+      expect(result.isValid).toBe(false)
     })
   })
 
@@ -279,7 +303,7 @@ describe('SignatureProvider', () => {
       const isExpired = await signatureProvider.isExpired(deadline)
 
       // Validate permit
-      const isValid = await signatureProvider.isPermitValid(permit)
+      const isValid = await signatureProvider.isPermitValid(permit, owner)
 
       // All checks should be consistent
       expect(isValid).toBe(!isNonceUsed && !isExpired)
