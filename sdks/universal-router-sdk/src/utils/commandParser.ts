@@ -115,7 +115,7 @@ export class GenericCommandParser {
           return {
             commandName: CommandType[commandType],
             commandType,
-            params: inputs.map((input) => ({ name: 'command', value: input })),
+            params: [{ name: 'command', value: inputs[i] }],
           }
         } else {
           throw new Error(`Unsupported parser: ${commandDef}`)
