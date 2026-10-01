@@ -178,8 +178,8 @@ export class V3DutchOrderBuilder extends OrderBuilder {
       "exclusivityOverrideBps not set"
     );
     invariant(
-      info.cosignerData.outputOverrides.length > 0,
-      "outputOverrides not set"
+      info.cosignerData.outputOverrides.length === info.outputs.length,
+      "outputOverrides length must match outputs length"
     );
     invariant(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
