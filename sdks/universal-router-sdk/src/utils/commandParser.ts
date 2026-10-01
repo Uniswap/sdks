@@ -9,6 +9,7 @@ import {
   V2V3_SWAP_COMMANDS_V2_1_1,
   Subparser,
   Parser,
+  ALLOW_REVERT_FLAG,
 } from '../utils/routerCommands'
 import { UniversalRouterVersion, isAtLeastV2_1_1 } from '../utils/constants'
 
@@ -130,7 +131,8 @@ export class GenericCommandParser {
 
     for (let i = 2; i < commands.length; i += 2) {
       const byte = commands.substring(i, i + 2)
-      commandTypes.push(parseInt(byte, 16) as CommandType)
+      // strip the ALLOW_REVERT_FLAG bit before treating the byte as a CommandType enum value
+      commandTypes.push((parseInt(byte, 16) & ~ALLOW_REVERT_FLAG) as CommandType)
     }
 
     return commandTypes
