@@ -336,6 +336,60 @@ the correct `collateralDecimals` and a correctly-scaled price. **Keep one Aave p
 under one sub-account blends their reads and can break a later decrease/close. Morpho markets are
 isolated and unaffected.
 
+### Choosing a market
+
+When a pair has several eligible markets, `selectMarket` prices each one at the user's size and
+leverage and ranks them by **expected cost of carry** on the debt: the post-trade venue rate (the
+borrow moves utilization, and the whole position pays the new rate), net of any yield the collateral
+earns, plus the expected liquidation loss over the user's horizon (a first-passage probability from
+the pair's volatility, times the venue's liquidation penalty). At low leverage this is a rate
+ranking; at high leverage liquidation risk dominates. Set `volatilityWad: 0n` to rank on effective
+rate alone.
+
+```ts
+import { WAD, morphoLiquidationIncentiveFactor, parseLeverageX18, perSecondToApr, selectMarket } from '@uniswap/margin-sdk'
+
+const selection = selectMarket(
+  [
+    {
+      id: 'morpho-weth-usdc-86',
+      venue: 'MORPHO',
+      adapter: addresses.lendingAdapters.morphoBlue!,
+      market,
+      eligible: true, // passed the allowlist gates
+      riskRank: 2, // tiebreak inside the cost band: lower is safer
+      liquidationLtv: parseUnits('0.86', 18), // adapter.maxLtvWad
+      borrowLtvCap: parseUnits('0.86', 18), // Morpho borrows up to LLTV; Aave/Comet cap lower
+      liquidationPenalty: morphoLiquidationIncentiveFactor(parseUnits('0.86', 18)) - WAD,
+      oraclePriceDebtPerCollateralToken: parseUnits('3000', 6), // the venue oracle
+      totalSupply: parseUnits('20000000', 6),
+      totalBorrow: parseUnits('17000000', 6),
+      rateModel: { kind: 'morphoAdaptiveCurve', rateAtTargetApr: perSecondToApr(rateAtTarget) },
+    },
+    // ...the Aave v3 / v4 / Compound candidates for the same pair
+  ],
+  {
+    equity: parseUnits('1', 18),
+    leverageX18: parseLeverageX18(3),
+    collateralDecimals: 18,
+    quotePriceDebtPerCollateralToken: parseUnits('3015', 6), // maxDebtIn / collateralToBuy
+    horizonSeconds: 30n * 24n * 60n * 60n,
+    volatilityWad: parseUnits('0.8', 18), // annualized vol of the collateral/debt ratio
+  },
+)
+
+selection.recommended // cheapest expected cost; a lower riskRank within 25 bps wins the tie
+selection.frontier // the cheapest-to-safest alternatives worth showing
+selection.quotes[0].collateralDropToLiquidation // the buffer to display, e.g. 0.22e18
+selection.quotes[0].maxLtvAfter // pass as params.maxLtvAfter to enforce that buffer onchain
+```
+
+Every quote carries its feasibility `reasons` (borrow cap, liquidity, utilization ceiling, cap
+headroom, health-factor floor) and, once ranked, why it lost (`DOMINATED`, `HIGHER_EXPECTED_COST`,
+`LOST_RISK_TIEBREAK`), so a market selector can explain the default and still let the user override
+it. Rate curves (`borrowRateApr`) and the liquidation model (`liquidationProbability`) are exported
+on their own for custom scoring.
+
 ## Advanced: `execute` plans
 
 `execute(unlockData, deadline)` runs an arbitrary plan of v4 routing + margin actions atomically —
