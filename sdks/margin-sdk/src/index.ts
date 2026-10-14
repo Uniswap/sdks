@@ -25,6 +25,9 @@ export * from './account.js'
 export * from './math.js'
 export * from './accrual.js'
 
+// Market selection: venue rate curves, liquidation risk, and the expected-cost ranking
+export * from './rates.js'
+
 // Entry-point encoders, the execute-plan builder & Universal Router route builders
 export * from './encode.js'
 export * from './actions.js'
