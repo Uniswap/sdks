@@ -336,6 +336,31 @@ describe('selectMarket', () => {
       tieBandApr: pct('0.5'),
     })
     expect(wideBand.recommended?.candidate.id).toBe('safe')
+    // the tiebreak picked a market the risky one beats on both displayed axes: still offered, never dominated
+    expect(wideBand.recommended?.reasons).toEqual([])
+    expect(wideBand.frontier.map((q) => q.candidate.id)).toEqual(['risky', 'safe'])
+    expect(wideBand.quotes.find((q) => q.candidate.id === 'risky')?.reasons).toEqual(['LOST_RISK_TIEBREAK'])
+  })
+
+  test('the recommendation stays on the frontier when the liquidation term prefers a dominated market', () => {
+    const cheapRate: MarketCandidate = {
+      ...morpho86,
+      id: 'cheap-rate',
+      rateModel: { kind: 'constant', apr: pct('5') },
+    }
+    // Same buffer and a slightly higher rate, but half the debt is repaid at liquidation.
+    const lowPenalty: MarketCandidate = {
+      ...morpho86,
+      id: 'low-penalty',
+      rateModel: { kind: 'constant', apr: pct('5.1') },
+      closeFactor: pct('50'),
+    }
+    const s = selectMarket([cheapRate, lowPenalty], intent, { tieBandApr: 0n })
+    expect(s.recommended?.candidate.id).toBe('low-penalty')
+    expect(s.recommended?.reasons).toEqual([])
+    expect(s.cheapest?.candidate.id).toBe('cheap-rate')
+    expect(s.frontier.map((q) => q.candidate.id)).toEqual(['low-penalty', 'cheap-rate'])
+    expect(s.quotes[1].reasons).toEqual(['HIGHER_EXPECTED_COST'])
   })
 
   test('empty input', () => {

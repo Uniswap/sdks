@@ -173,7 +173,10 @@ export interface MarketQuote {
 export interface MarketSelection {
   /** Every candidate: feasible ones first, by ascending expected cost, then infeasible ones in input order. */
   quotes: MarketQuote[]
-  /** Feasible markets not beaten on both effective rate and health factor by another: the cheapest-to-safest tradeoff a UI shows. */
+  /**
+   * The cheapest-to-safest tradeoff a UI shows: feasible markets not beaten on both effective rate and
+   * health factor by another, plus the recommended market whenever the ranking prefers one that is.
+   */
   frontier: MarketQuote[]
   recommended?: MarketQuote
   cheapest?: MarketQuote
@@ -392,12 +395,10 @@ export function selectMarket(
   const feasible = quotes.filter((q) => q.feasible).sort(byExpectedCost)
   const infeasible = quotes.filter((q) => !q.feasible)
 
-  const frontier = feasible.filter((q) => !feasible.some((r) => dominates(r, q)))
-  for (const q of feasible) if (!frontier.includes(q)) q.reasons.push('DOMINATED')
-
   let recommended: MarketQuote | undefined
   let cheapest: MarketQuote | undefined
   let safest: MarketQuote | undefined
+  let inBand: MarketQuote[] = []
   if (feasible.length > 0) {
     cheapest = feasible.reduce((a, b) => (b.effectiveRateApr < a.effectiveRateApr ? b : a))
     safest = feasible.reduce((a, b) => (b.healthFactorAfter > a.healthFactorAfter ? b : a))
@@ -405,13 +406,21 @@ export function selectMarket(
     if (!safest.labels.includes('SAFEST')) safest.labels.push('SAFEST')
 
     const limit = feasible[0].expectedCostApr + opts.tieBandApr
-    const inBand = feasible.filter((q) => q.expectedCostApr <= limit)
+    inBand = feasible.filter((q) => q.expectedCostApr <= limit)
     recommended = inBand.reduce((a, b) => (b.candidate.riskRank < a.candidate.riskRank ? b : a))
     recommended.labels.unshift('RECOMMENDED')
-    for (const q of feasible) {
-      if (q === recommended) continue
-      q.reasons.push(inBand.includes(q) ? 'LOST_RISK_TIEBREAK' : 'HIGHER_EXPECTED_COST')
-    }
+  }
+
+  // The frontier is the Pareto set on the two displayed axes. The ranking can still prefer a market
+  // another beats on both of them, through the liquidation term or the risk tiebreak, so the
+  // recommendation is always offered and never reported as dominated.
+  const pareto = feasible.filter((q) => !feasible.some((r) => dominates(r, q)))
+  const frontier =
+    recommended !== undefined && !pareto.includes(recommended) ? [recommended, ...pareto].sort(byExpectedCost) : pareto
+  for (const q of feasible) {
+    if (q === recommended) continue
+    if (!frontier.includes(q)) q.reasons.push('DOMINATED')
+    q.reasons.push(inBand.includes(q) ? 'LOST_RISK_TIEBREAK' : 'HIGHER_EXPECTED_COST')
   }
 
   return { quotes: [...feasible, ...infeasible], frontier, recommended, cheapest, safest }
