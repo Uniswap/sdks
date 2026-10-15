@@ -1,6 +1,7 @@
 export { DEFAULT_LP_SLIPPAGE_TOLERANCE, DEFAULT_NATIVE_V4_SLIPPAGE_TOLERANCE } from './constants'
 export type { LpGasEstimateTransaction, Permit2AllowanceInput, TokenAllowanceInput } from './types'
-export { pickPreEstimateIndependentAmount } from './utils/pickPreEstimateIndependentAmount'
+export { getMinimalPreEstimateIndependentAmount } from './utils/getMinimalPreEstimateIndependentAmount'
+export type { MinimalPreEstimateIndependentAmountParams } from './utils/getMinimalPreEstimateIndependentAmount'
 export { getV2AddLiquidityGasEstimateTransactions } from './v2'
 export type { V2AddLiquidityGasEstimateParams } from './v2'
 export { getV3AddLiquidityGasEstimateTransactions } from './v3'

@@ -16,7 +16,7 @@ export interface V4AddLiquidityGasEstimateParams {
   tickUpper: number
   /**
    * The side of the pool the estimate is driven by, typically the output of
-   * {@link pickPreEstimateIndependentAmount}. The other side's amount is derived
+   * {@link getMinimalPreEstimateIndependentAmount}. The other side's amount is derived
    * from the pool price and the tick range.
    */
   independentAmount: CurrencyAmount<Currency>
@@ -59,7 +59,7 @@ export interface V4AddLiquidityGasEstimateParams {
 
 /**
  * Returns the ordered list of transactions a wallet must send to create or increase a
- * Uniswap v4 position, for use with `eth_estimateGas`: any required ERC-20 approvals
+ * Uniswap v4 position, for gas estimation: any required ERC-20 approvals
  * to Permit2 and Permit2 approvals to the v4 position manager, followed by the
  * mint/increase transaction itself.
  *

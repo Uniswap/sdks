@@ -3,9 +3,10 @@ import { BigintIsh } from '@uniswap/sdk-core'
 /**
  * A transaction to include in a gas-estimation batch.
  *
- * The SDK never talks to the chain: callers run `eth_estimateGas` over the returned
- * list (in order, from the position owner's address) with their own client and sum
- * the results to get the full cost of the flow.
+ * The SDK never talks to the chain: callers simulate the returned list in order, from the
+ * position owner's address, with their own client and sum the gas to get the full cost of the
+ * flow. The calls must share state (e.g. `eth_simulateV1`), since the position transaction
+ * reverts until the approvals before it have been applied.
  */
 export interface LpGasEstimateTransaction {
   to: string

@@ -36,7 +36,7 @@ export interface V2AddLiquidityGasEstimateParams {
   pair: Pair
   /**
    * The side of the pair the estimate is driven by, typically the output of
-   * {@link pickPreEstimateIndependentAmount}. The other side's amount is quoted from
+   * {@link getMinimalPreEstimateIndependentAmount}. The other side's amount is quoted from
    * the pair reserves. May be a native currency amount.
    */
   independentAmount: CurrencyAmount<Currency>
@@ -75,7 +75,7 @@ export interface V2AddLiquidityGasEstimateParams {
 
 /**
  * Returns the ordered list of transactions a wallet must send to add liquidity to a
- * Uniswap v2 pair, for use with `eth_estimateGas`: any required ERC-20 approvals to
+ * Uniswap v2 pair, for gas estimation: any required ERC-20 approvals to
  * the v2 router, followed by the addLiquidity/addLiquidityETH transaction itself.
  *
  * v2 has no position NFT, so the same call covers both creating and increasing a
