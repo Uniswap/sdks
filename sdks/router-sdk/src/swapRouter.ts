@@ -429,7 +429,16 @@ export abstract class SwapRouter {
     //   1. when there are >2 exact input trades. this is only a heuristic,
     //      as it's still more gas-expensive even in this case, but has benefits
     //      in that the reversion probability is lower
-    const performAggregatedSlippageCheck = sampleTrade.tradeType === TradeType.EXACT_INPUT && numberOfTrades > 2
+    //   2. NEVER for swap-and-add: in that path, individual swap recipients are
+    //      ADDRESS_ZERO (router custody) and there is no trailing `sweepToken` /
+    //      `unwrapWETH9` call that enforces the aggregated `minimumAmountOut`
+    //      against the router's balance. The only remaining downstream guard is
+    //      `mint`'s `amount0Min` / `amount1Min`, which `Position#mintAmountsWithSlippage`
+    //      may legitimately lower far below the swap-derived minimum when the
+    //      position price range is wide or near a boundary. Aggregating in that
+    //      case silently weakens the user's slippage tolerance - see #514.
+    const performAggregatedSlippageCheck =
+      sampleTrade.tradeType === TradeType.EXACT_INPUT && numberOfTrades > 2 && !isSwapAndAdd
     // flag for whether funds should be send first to the router
     //   1. when receiving ETH (which much be unwrapped from WETH)
     //   2. when a fee on the output is being taken
