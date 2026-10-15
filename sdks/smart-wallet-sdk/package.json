@@ -13,7 +13,10 @@
   "module": "./dist/esm/src/index.js",
   "types": "./dist/types/src/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts"
   ],
   "engines": {
     "node": ">=18"
