@@ -29,7 +29,8 @@
     "test": "run-s test:unit test:integration",
     "test:unit": "bun test src/",
     "test:integration": "cd integration && bun install && bun run test",
-    "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
+    "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json",
+    "regenerate:abis": "bun run scripts/regenerate-abis.ts"
   },
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
