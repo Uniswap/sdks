@@ -120,7 +120,17 @@ export abstract class SignatureTransfer {
     if (isPermitTransferFrom(permit)) {
       validateTokenPermissions(permit.permitted)
       const types = witness ? permitTransferFromWithWitnessType(witness) : PERMIT_TRANSFER_FROM_TYPES
-      const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
+      // Read required fields explicitly to retain inherited and non-enumerable properties.
+      const values = witness
+        ? {
+            ...permit,
+            permitted: permit.permitted,
+            spender: permit.spender,
+            nonce: permit.nonce,
+            deadline: permit.deadline,
+            witness: witness.witness,
+          }
+        : permit
       return {
         domain,
         types,
@@ -129,7 +139,17 @@ export abstract class SignatureTransfer {
     } else {
       permit.permitted.forEach(validateTokenPermissions)
       const types = witness ? permitBatchTransferFromWithWitnessType(witness) : PERMIT_BATCH_TRANSFER_FROM_TYPES
-      const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
+      // Read required fields explicitly to retain inherited and non-enumerable properties.
+      const values = witness
+        ? {
+            ...permit,
+            permitted: permit.permitted,
+            spender: permit.spender,
+            nonce: permit.nonce,
+            deadline: permit.deadline,
+            witness: witness.witness,
+          }
+        : permit
       return {
         domain,
         types,
