@@ -117,7 +117,7 @@ const MAINNET_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x000000000004444c5dc75cB358380D2e3dE08A90',
   v4PositionManagerAddress: '0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e',
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
-  v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
+  v4QuoterAddress: '0x99bd42b2b22e531f283b7f8a86dff631eb16a9d1',
   permissionedV4PositionManagerAddress: '0xD7BE746B6b29f6185A01013E944313E1704C971F',
   permissionedV4HooksAddress: '0x499a724Ab630549f14C995EC41a8E04fA3fd28c0',
 }
@@ -132,7 +132,7 @@ const OPTIMISM_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x9a13f98cb987694c9f086b1f5eb990eea8264ec3',
   v4PositionManagerAddress: '0x3c3ea4b57a46241e54610e5f022e5c45859a1017',
   v4StateView: '0xc18a3169788f4f75a170290584eca6395c75ecdb',
-  v4QuoterAddress: '0x1f3131a13296fb91c90870043742c3cdbff1a8d7',
+  v4QuoterAddress: '0xd673f731edfe5aaf1bda7fd43d13bbb5150b87ca',
 }
 
 const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
@@ -143,7 +143,7 @@ const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
 const POLYGON_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
@@ -245,11 +245,10 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
   mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
 
-  // TODO: update all below once v4 on sepolia redeployed
   v4PoolManagerAddress: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
   v4PositionManagerAddress: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
-  v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
+  v4QuoterAddress: '0x68afa8b853caa7a2d40b0f6aee5c4dbc147c8244',
   permissionedV4PositionManagerAddress: '0x864C37908Aa5e10b100CaCEe1c62E3954d76f5E1',
   permissionedV4HooksAddress: '0x51247E2291d290d17C08813A175AC86465EdE8c0',
 }
@@ -283,7 +282,7 @@ const BASE_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x498581ff718922c3f8e6a244956af099b2652b2b',
   v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
   v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
-  v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+  v4QuoterAddress: '0xe1a6c5803e3c44368b171bd680c7d32dfc92ca47',
   permissionedV4PositionManagerAddress: '0xC09255D86DB563cBc11C2fCf4a0C512e160111B4',
   permissionedV4HooksAddress: '0x5750be78fEdfb2fA48FAa6C6623400Ba4538A8c0',
 }
@@ -328,7 +327,7 @@ const ZORA_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x0575338e4c17006ae181b47900a84404247ca30f',
   v4PositionManagerAddress: '0xf66c7b99e2040f0d9b326b3b7c152e9663543d63',
   v4StateView: '0x385785af07d63b50d0a0ea57c4ff89d06adf7328',
-  v4QuoterAddress: '0x5edaccc0660e0a2c44b06e07ce8b915e625dc2c6',
+  v4QuoterAddress: '0x2a7aad35a2ebd95c1dc5ae323e866a737bf79523',
 }
 
 const ZORA_SEPOLIA_ADDRESSES: ChainAddresses = {
@@ -362,7 +361,7 @@ const BLAST_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x1631559198a9e474033433b2958dabc135ab6446',
   v4PositionManagerAddress: '0x4ad2f4cca2682cbb5b950d660dd458a1d3f1baad',
   v4StateView: '0x12a88ae16f46dce4e8b15368008ab3380885df30',
-  v4QuoterAddress: '0x6f71cdcb0d119ff72c6eb501abceb576fbf62bcf',
+  v4QuoterAddress: '0x684576b24f70b93c645f03f23c8ab4113f263d97',
 }
 
 const ZKSYNC_ADDRESSES: ChainAddresses = {
@@ -417,7 +416,7 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x1f98400000000000000000000000000000000004',
   v4PositionManagerAddress: '0x4529a01c7a0410167c5740c487a8de60232617bf',
   v4StateView: '0x86e8631a016f9068c3f085faf484ee3f5fdee8f2',
-  v4QuoterAddress: '0x333e3c607b141b18ff6de9f258db6e77fe7491e0',
+  v4QuoterAddress: '0xf885781cb68a0be66aa2ac7eda5fe72bde7da907',
 }
 
 const MONAD_TESTNET_ADDRESSES: ChainAddresses = {

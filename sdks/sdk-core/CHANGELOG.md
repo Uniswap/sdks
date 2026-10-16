@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.5
+
+### Patch Changes
+
+- Point `v4QuoterAddress` at the V4Quoter deployments that implement `msgSender()` on Ethereum, Optimism, Arbitrum, Base, Unichain, Blast, Zora and Sepolia. The ABI is unchanged; hooks that resolve the caller through `IMsgSender` (PermissionedHooks and third-party hooks) now work through the quoter.
+
 ## 7.19.4
 
 ### Patch Changes
