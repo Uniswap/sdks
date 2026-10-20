@@ -16,7 +16,10 @@
   "types": "./dist/types/src/index.d.ts",
   "bin": "./dist/cjs/src/cli/index.js",
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts"
   ],
   "engines": {
     "node": ">=18"
