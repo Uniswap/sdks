@@ -1,5 +1,13 @@
 # @uniswap/smart-wallet-sdk
 
+## 2.8.7
+
+### Patch Changes
+
+- b5c4f36: Publish TypeScript sources and declaration maps so shipped sourcemaps resolve and go-to-definition opens the real source.
+- Updated dependencies [b5c4f36]
+  - @uniswap/sdk-core@7.19.6
+
 ## 2.8.6
 
 ### Patch Changes

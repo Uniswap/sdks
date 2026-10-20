@@ -1,5 +1,14 @@
 # @uniswap/uniswapx-sdk
 
+## 3.1.5
+
+### Patch Changes
+
+- b5c4f36: Publish TypeScript sources and declaration maps so shipped sourcemaps resolve and go-to-definition opens the real source.
+- Updated dependencies [b5c4f36]
+  - @uniswap/sdk-core@7.19.6
+  - @uniswap/permit2-sdk@1.4.1
+
 ## 3.1.4
 
 ### Patch Changes
