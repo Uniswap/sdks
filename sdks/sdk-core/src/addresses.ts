@@ -113,11 +113,12 @@ const DEFAULT_ADDRESSES: ChainAddresses = {
 const MAINNET_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   mixedRouteQuoterV1Address: '0x84E44095eeBfEC7793Cd7d5b57B7e401D7f1cA2E',
+  mixedRouteQuoterV2Address: '0xd0372023c4938b9984efe75247461a4abb36974b',
 
   v4PoolManagerAddress: '0x000000000004444c5dc75cB358380D2e3dE08A90',
   v4PositionManagerAddress: '0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e',
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
-  v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
+  v4QuoterAddress: '0x99bd42b2b22e531f283b7f8a86dff631eb16a9d1',
   permissionedV4PositionManagerAddress: '0xD7BE746B6b29f6185A01013E944313E1704C971F',
   permissionedV4HooksAddress: '0x499a724Ab630549f14C995EC41a8E04fA3fd28c0',
 }
@@ -128,30 +129,33 @@ const GOERLI_ADDRESSES: ChainAddresses = {
 
 const OPTIMISM_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
+  mixedRouteQuoterV2Address: '0xbe2257d1aafbe6b73f67a9ac971c2f0b344bb3c5',
 
   v4PoolManagerAddress: '0x9a13f98cb987694c9f086b1f5eb990eea8264ec3',
   v4PositionManagerAddress: '0x3c3ea4b57a46241e54610e5f022e5c45859a1017',
   v4StateView: '0xc18a3169788f4f75a170290584eca6395c75ecdb',
-  v4QuoterAddress: '0x1f3131a13296fb91c90870043742c3cdbff1a8d7',
+  v4QuoterAddress: '0xd673f731edfe5aaf1bda7fd43d13bbb5150b87ca',
 }
 
 const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   multicallAddress: '0xadF885960B47eA2CD9B55E6DAc6B42b7Cb2806dB',
   tickLensAddress: '0xbfd8137f7d1516D3ea5cA83523914859ec47F573',
+  mixedRouteQuoterV2Address: '0x5c834b6cac4173bfe288c5722a38e04b9e366e30',
 
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
 const POLYGON_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
+  mixedRouteQuoterV2Address: '0xbe2257d1aafbe6b73f67a9ac971c2f0b344bb3c5',
 
   v4PoolManagerAddress: '0x67366782805870060151383f4bbff9dab53e5cd6',
   v4PositionManagerAddress: '0x1ec2ebf4f37e7363fdfe3551602425af0b3ceef9',
   v4StateView: '0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a',
-  v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
+  v4QuoterAddress: '0x31ab0dea31fc0ad5a54f03cd59c896ecd067447b',
 }
 
 // celo v3 and v4 addresses
@@ -178,11 +182,12 @@ const BNB_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x7b8A01B39D58278b5DE7e48c8449c9f4F5170613',
   tickLensAddress: '0xD9270014D396281579760619CCf4c3af0501A47C',
   swapRouter02Address: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
+  mixedRouteQuoterV2Address: '0xbe2257d1aafbe6b73f67a9ac971c2f0b344bb3c5',
 
   v4PoolManagerAddress: '0x28e2ea090877bf75740558f6bfb36a5ffee9e9df',
   v4PositionManagerAddress: '0x7a4a5c919ae2541aed11041a1aeee68f1287f95b',
   v4StateView: '0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4',
-  v4QuoterAddress: '0x9f75dd27d6664c475b90e105573e550ff69437b0',
+  v4QuoterAddress: '0x95c086d7fe28add842ee220fef225a777474d781',
 }
 
 // optimism goerli addresses
@@ -242,14 +247,12 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0x0b343475d44EC2b4b8243EBF81dc888BF0A14b36',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
 
-  // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
-  mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
+  mixedRouteQuoterV2Address: '0xd172b04456774b817f9433517fde6569bf973422',
 
-  // TODO: update all below once v4 on sepolia redeployed
   v4PoolManagerAddress: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
   v4PositionManagerAddress: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
-  v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
+  v4QuoterAddress: '0x68afa8b853caa7a2d40b0f6aee5c4dbc147c8244',
   permissionedV4PositionManagerAddress: '0x864C37908Aa5e10b100CaCEe1c62E3954d76f5E1',
   permissionedV4HooksAddress: '0x51247E2291d290d17C08813A175AC86465EdE8c0',
 }
@@ -263,11 +266,12 @@ const AVALANCHE_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x655C406EBFa14EE2006250925e54ec43AD184f8B',
   tickLensAddress: '0xEB9fFC8bf81b4fFd11fb6A63a6B0f098c6e21950',
   swapRouter02Address: '0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE',
+  mixedRouteQuoterV2Address: '0xabfb859e6c3324fe522bfbb19cb41345003ced65',
 
   v4PoolManagerAddress: '0x06380c0e0912312b5150364b9dc4542ba0dbbc85',
   v4PositionManagerAddress: '0xb74b1f14d2754acfcbbe1a221023a5cf50ab8acd',
   v4StateView: '0xc3c9e198c735a4b97e3e683f391ccbdd60b69286',
-  v4QuoterAddress: '0xbe40675bb704506a3c2ccfb762dcfd1e979845c2',
+  v4QuoterAddress: '0xf27e532878b622d6b916f524e8711880107d4ef0',
 }
 
 const BASE_ADDRESSES: ChainAddresses = {
@@ -279,11 +283,12 @@ const BASE_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
   mixedRouteQuoterV1Address: '0xe544efae946f0008ae9a8d64493efa7886b73776',
+  mixedRouteQuoterV2Address: '0x94a7d36e2ae728d6a2b2ee533b0a260385596d8b',
 
   v4PoolManagerAddress: '0x498581ff718922c3f8e6a244956af099b2652b2b',
   v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
   v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
-  v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+  v4QuoterAddress: '0xe1a6c5803e3c44368b171bd680c7d32dfc92ca47',
   permissionedV4PositionManagerAddress: '0xC09255D86DB563cBc11C2fCf4a0C512e160111B4',
   permissionedV4HooksAddress: '0x5750be78fEdfb2fA48FAa6C6623400Ba4538A8c0',
 }
@@ -324,11 +329,12 @@ const ZORA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xbC91e8DfA3fF18De43853372A3d7dfe585137D78',
   tickLensAddress: '0x209AAda09D74Ad3B8D0E92910Eaf85D2357e3044',
   swapRouter02Address: '0x7De04c96BE5159c3b5CeffC82aa176dc81281557',
+  mixedRouteQuoterV2Address: '0xabfb859e6c3324fe522bfbb19cb41345003ced65',
 
   v4PoolManagerAddress: '0x0575338e4c17006ae181b47900a84404247ca30f',
   v4PositionManagerAddress: '0xf66c7b99e2040f0d9b326b3b7c152e9663543d63',
   v4StateView: '0x385785af07d63b50d0a0ea57c4ff89d06adf7328',
-  v4QuoterAddress: '0x5edaccc0660e0a2c44b06e07ce8b915e625dc2c6',
+  v4QuoterAddress: '0x2a7aad35a2ebd95c1dc5ae323e866a737bf79523',
 }
 
 const ZORA_SEPOLIA_ADDRESSES: ChainAddresses = {
@@ -362,7 +368,7 @@ const BLAST_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x1631559198a9e474033433b2958dabc135ab6446',
   v4PositionManagerAddress: '0x4ad2f4cca2682cbb5b950d660dd458a1d3f1baad',
   v4StateView: '0x12a88ae16f46dce4e8b15368008ab3380885df30',
-  v4QuoterAddress: '0x6f71cdcb0d119ff72c6eb501abceb576fbf62bcf',
+  v4QuoterAddress: '0x684576b24f70b93c645f03f23c8ab4113f263d97',
 }
 
 const ZKSYNC_ADDRESSES: ChainAddresses = {
@@ -383,11 +389,12 @@ const WORLDCHAIN_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xec12a9F9a09f50550686363766Cc153D03c27b5e',
   tickLensAddress: '0xE61df0CaC9d85876aCE5E3037005D80943570623',
   swapRouter02Address: '0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6',
+  mixedRouteQuoterV2Address: '0x003aa18c6e682db80cf4aa17261ccbffd28690ce',
 
   v4PoolManagerAddress: '0xb1860d529182ac3bc1f51fa2abd56662b7d13f33',
   v4PositionManagerAddress: '0xc585e0f504613b5fbf874f21af14c65260fb41fa',
   v4StateView: '0x51d394718bc09297262e368c1a481217fdeb71eb',
-  v4QuoterAddress: '0x55d235b3ff2daf7c3ede0defc9521f1d6fe6c5c0',
+  v4QuoterAddress: '0xad02601f1be313c952ad198c0cbc3f87f9ee8e63',
 }
 
 const UNICHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
@@ -413,11 +420,12 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x943e6e07a7e8e791dafc44083e54041d743c46e9',
   tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
+  mixedRouteQuoterV2Address: '0x661e93cca42afacb172121ef892830ca3b70f08d',
 
   v4PoolManagerAddress: '0x1f98400000000000000000000000000000000004',
   v4PositionManagerAddress: '0x4529a01c7a0410167c5740c487a8de60232617bf',
   v4StateView: '0x86e8631a016f9068c3f085faf484ee3f5fdee8f2',
-  v4QuoterAddress: '0x333e3c607b141b18ff6de9f258db6e77fe7491e0',
+  v4QuoterAddress: '0xf885781cb68a0be66aa2ac7eda5fe72bde7da907',
 }
 
 const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
@@ -453,11 +461,12 @@ const SONEIUM_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x56c1205b0244332011c1e866f4ea5384eb6bfa2c',
   tickLensAddress: '0xcd08eefb928c86499e6235ac155906bb7c4dc41a',
   swapRouter02Address: '0x7e40db01736f88464e5f4e42394f3d5bbb6705b9',
+  mixedRouteQuoterV2Address: '0xabfb859e6c3324fe522bfbb19cb41345003ced65',
 
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
 
 const XLAYER_ADDRESSES: ChainAddresses = {
@@ -564,7 +573,7 @@ const INK_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
   permissionedV4PositionManagerAddress: '0x003aa18c6E682dB80Cf4aa17261CcbFfd28690CE',
   permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }

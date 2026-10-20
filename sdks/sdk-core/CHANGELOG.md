@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.5
+
+### Patch Changes
+
+- Point `v4QuoterAddress` at the V4Quoter deployments that implement `msgSender()` on Ethereum, Optimism, Arbitrum, Base, Unichain, Blast, Zora, Sepolia, Polygon, BNB, Avalanche, World Chain, Soneium and Ink, and `mixedRouteQuoterV2Address` at the MixedRouteQuoterV2 deployments that implement it on Ethereum, Optimism, Arbitrum, Base, Unichain, Zora, Polygon, BNB, Avalanche, World Chain, Soneium and Sepolia. The ABIs are unchanged; hooks that resolve the caller through `IMsgSender` (PermissionedHooks and third-party hooks) now work through both quoters.
+
 ## 7.19.4
 
 ### Patch Changes
