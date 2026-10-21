@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.19.6
+
+### Patch Changes
+
+- b5c4f36: Publish TypeScript sources and declaration maps so shipped sourcemaps resolve and go-to-definition opens the real source.
+
 ## 7.19.5
 
 ### Patch Changes
