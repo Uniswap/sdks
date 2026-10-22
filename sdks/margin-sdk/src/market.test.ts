@@ -3,6 +3,11 @@ import { type Address } from 'viem'
 
 import { MarginSdkError } from './errors.js'
 import {
+  EMPTY_MARKET_DATA,
+  decodeAaveV4MarketData,
+  decodeMorphoMarketData,
+  encodeAaveV4MarketData,
+  encodeMorphoMarketData,
   marketHasCurrencies,
   poolKeyMatchesMarket,
   sortsBefore,
@@ -90,6 +95,46 @@ describe('toPoolKey bounds', () => {
     expect(() => toPoolKey({ currencyA: '0xnope' as never, currencyB: USDC, fee: 3000, tickSpacing: 60 })).toThrow(
       MarginSdkError
     )
-    expect(() => validateMarket({ collateral: '0x12' as never, debt: USDC })).toThrow(MarginSdkError)
+    expect(() => validateMarket({ collateral: '0x12' as never, debt: USDC, data: '0x' })).toThrow(MarginSdkError)
+  })
+})
+
+describe('market.data encoders (venue-specific)', () => {
+  const ORACLE: Address = '0xdC6fd5831277c693b1054e19E94047cB37c77615'
+  const IRM: Address = '0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC'
+  const LLTV = 860_000_000_000_000_000n // 86%, WAD
+
+  test('Morpho market data round-trips (oracle, irm, lltv)', () => {
+    const data = encodeMorphoMarketData({ oracle: ORACLE, irm: IRM, lltv: LLTV })
+    expect(decodeMorphoMarketData(data)).toEqual({ oracle: ORACLE, irm: IRM, lltv: LLTV })
+  })
+
+  test('Morpho market data is exactly 96 bytes (MorphoLendingAdapter.MARKET_DATA_LENGTH)', () => {
+    const data = encodeMorphoMarketData({ oracle: ORACLE, irm: IRM, lltv: LLTV })
+    expect((data.length - 2) / 2).toBe(96)
+  })
+
+  test('Aave v4 market data round-trips (collateralReserveId, debtReserveId)', () => {
+    const data = encodeAaveV4MarketData({ collateralReserveId: 7n, debtReserveId: 0n })
+    expect(decodeAaveV4MarketData(data)).toEqual({ collateralReserveId: 7n, debtReserveId: 0n })
+  })
+
+  test('Aave v4 market data is exactly 64 bytes (AaveV4LendingAdapter.MARKET_DATA_LENGTH)', () => {
+    const data = encodeAaveV4MarketData({ collateralReserveId: 7n, debtReserveId: 0n })
+    expect((data.length - 2) / 2).toBe(64)
+  })
+
+  test('EMPTY_MARKET_DATA is zero-length (Aave v3 / Compound v3 requirement)', () => {
+    expect(EMPTY_MARKET_DATA).toBe('0x')
+    expect((EMPTY_MARKET_DATA.length - 2) / 2).toBe(0)
+  })
+
+  test('encodeMorphoMarketData rejects a malformed oracle/irm address', () => {
+    expect(() => encodeMorphoMarketData({ oracle: '0xnope' as never, irm: IRM, lltv: LLTV })).toThrow(MarginSdkError)
+    expect(() => encodeMorphoMarketData({ oracle: ORACLE, irm: '0xnope' as never, lltv: LLTV })).toThrow(MarginSdkError)
+  })
+
+  test('validateMarket rejects non-hex market data', () => {
+    expect(() => validateMarket({ collateral: WETH, debt: USDC, data: 'not-hex' as never })).toThrow(MarginSdkError)
   })
 })

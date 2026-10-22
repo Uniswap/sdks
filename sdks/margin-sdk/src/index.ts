@@ -21,6 +21,7 @@ export * from './abis.js'
 
 // Markets, account derivation, leverage & health math
 export * from './market.js'
+export * from './markets.js'
 export * from './account.js'
 export * from './math.js'
 export * from './accrual.js'

@@ -1,4 +1,13 @@
-import { type Address, type Hex, encodeAbiParameters, isAddress, isAddressEqual, isHex, zeroAddress } from 'viem'
+import {
+  type Address,
+  type Hex,
+  decodeAbiParameters,
+  encodeAbiParameters,
+  isAddress,
+  isAddressEqual,
+  isHex,
+  zeroAddress,
+} from 'viem'
 
 import { MarginSdkError } from './errors.js'
 import { type Market, type PoolKey } from './types.js'
@@ -99,10 +108,13 @@ export const EMPTY_MARKET_DATA: Hex = '0x'
 export function encodeMorphoMarketData(p: { oracle: Address; irm: Address; lltv: bigint }): Hex {
   validateAddress(p.oracle, 'oracle')
   validateAddress(p.irm, 'irm')
-  return encodeAbiParameters(
-    [{ type: 'address' }, { type: 'address' }, { type: 'uint256' }],
-    [p.oracle, p.irm, p.lltv]
-  )
+  return encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'uint256' }], [p.oracle, p.irm, p.lltv])
+}
+
+/** Decodes `market.data` encoded by {@link encodeMorphoMarketData}. */
+export function decodeMorphoMarketData(data: Hex): { oracle: Address; irm: Address; lltv: bigint } {
+  const [oracle, irm, lltv] = decodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'uint256' }], data)
+  return { oracle, irm, lltv }
 }
 
 /**
@@ -111,10 +123,13 @@ export function encodeMorphoMarketData(p: { oracle: Address; irm: Address; lltv:
  * and reverts `InvalidMarketData` otherwise.
  */
 export function encodeAaveV4MarketData(p: { collateralReserveId: bigint; debtReserveId: bigint }): Hex {
-  return encodeAbiParameters(
-    [{ type: 'uint256' }, { type: 'uint256' }],
-    [p.collateralReserveId, p.debtReserveId]
-  )
+  return encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [p.collateralReserveId, p.debtReserveId])
+}
+
+/** Decodes `market.data` encoded by {@link encodeAaveV4MarketData}. */
+export function decodeAaveV4MarketData(data: Hex): { collateralReserveId: bigint; debtReserveId: bigint } {
+  const [collateralReserveId, debtReserveId] = decodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], data)
+  return { collateralReserveId, debtReserveId }
 }
 
 /**
