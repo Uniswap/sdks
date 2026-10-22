@@ -18,15 +18,24 @@ import { type Address, type Hex } from 'viem'
  */
 
 /**
- * The lending-protocol-agnostic market descriptor: the `(collateral, debt)` token pair. Direction
- * is set entirely by the pairing — the position is long the collateral and short the debt. Margin
- * markets are ERC-20 only (use WETH, never the native-ETH zero address).
+ * The lending-protocol-agnostic market descriptor: the `(collateral, debt)` token pair plus
+ * venue-decoded `data` identifying the specific market within that venue. Direction is set
+ * entirely by the pairing — the position is long the collateral and short the debt. Margin
+ * markets are ERC-20 only (use WETH, never the native-ETH zero address). Market selection is
+ * permissionless: the adapter decodes and validates `data` itself, there is no onchain allowlist.
+ *
+ * `data` is venue-specific (see `market.ts` for the encoders):
+ * - Morpho Blue: `abi.encode(oracle, irm, lltv)`
+ * - Aave v4: `abi.encode(collateralReserveId, debtReserveId)` (both `uint16`)
+ * - Aave v3 / Compound v3: empty (`0x`) — the pool/Comet singleton fully determines the market
  */
 export interface Market {
   /** The ERC-20 token supplied as collateral in the lending market. */
   collateral: Address
   /** The ERC-20 token borrowed as debt in the lending market. */
   debt: Address
+  /** Venue-decoded market identifier; empty (`0x`) for a venue with no per-market encoding. */
+  data: Hex
 }
 
 /** A v4 pool descriptor (used by plan swap actions and the v4 route builder). `currency0 < currency1`. */

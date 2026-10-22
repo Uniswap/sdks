@@ -1,4 +1,4 @@
-import { type Address, isAddress, isAddressEqual, zeroAddress } from 'viem'
+import { type Address, type Hex, encodeAbiParameters, isAddress, isAddressEqual, isHex, zeroAddress } from 'viem'
 
 import { MarginSdkError } from './errors.js'
 import { type Market, type PoolKey } from './types.js'
@@ -79,6 +79,42 @@ export function validateMarket(market: Market): void {
   if (isAddressEqual(market.collateral, market.debt)) {
     throw new MarginSdkError('INVALID_MARKET', 'market collateral and debt must be distinct tokens')
   }
+  if (!isHex(market.data)) {
+    throw new MarginSdkError('INVALID_MARKET', 'market.data must be a hex byte string')
+  }
+}
+
+/**
+ * `market.data` for a venue with no per-market encoding (Aave v3, Compound v3): the pool/Comet
+ * singleton the adapter was constructed with fully determines the market, so `data` must be
+ * exactly empty — either adapter reverts `InvalidMarketData` on anything else.
+ */
+export const EMPTY_MARKET_DATA: Hex = '0x'
+
+/**
+ * Encodes `market.data` for a Morpho Blue market: `abi.encode(oracle, irm, lltv)`, the three
+ * `MarketParams` fields the Morpho adapter does not already know from the `(collateral, debt)`
+ * pair. `MorphoLendingAdapter` requires exactly 96 bytes and reverts `InvalidMarketData` otherwise.
+ */
+export function encodeMorphoMarketData(p: { oracle: Address; irm: Address; lltv: bigint }): Hex {
+  validateAddress(p.oracle, 'oracle')
+  validateAddress(p.irm, 'irm')
+  return encodeAbiParameters(
+    [{ type: 'address' }, { type: 'address' }, { type: 'uint256' }],
+    [p.oracle, p.irm, p.lltv]
+  )
+}
+
+/**
+ * Encodes `market.data` for an Aave v4 market: `abi.encode(collateralReserveId, debtReserveId)`
+ * (both `uint256`, the Spoke's reserve indices). `AaveV4LendingAdapter` requires exactly 64 bytes
+ * and reverts `InvalidMarketData` otherwise.
+ */
+export function encodeAaveV4MarketData(p: { collateralReserveId: bigint; debtReserveId: bigint }): Hex {
+  return encodeAbiParameters(
+    [{ type: 'uint256' }, { type: 'uint256' }],
+    [p.collateralReserveId, p.debtReserveId]
+  )
 }
 
 /**

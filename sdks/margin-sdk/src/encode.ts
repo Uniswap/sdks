@@ -38,8 +38,8 @@ export function validateDeadline(deadline: bigint): void {
  *
  * Always `simulateContract` before `writeContract` so reverts (`SlippageBoundRequired`,
  * `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`,
- * `AdapterNotAllowed`, `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface
- * with a decoded message. The SDK validates the same inputs offchain first.
+ * `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface with a decoded message.
+ * The SDK validates the same inputs offchain first.
  */
 
 /** A framework-agnostic contract write descriptor. */
@@ -91,7 +91,7 @@ function validateRoute(p: { universalRouter: Address; routeCommands: Hex; routeI
 
 type IncreaseArgs = {
   adapter: Address
-  market: { collateral: Address; debt: Address }
+  market: { collateral: Address; debt: Address; data: Hex }
   equity: bigint
   collateralToBuy: bigint
   maxDebtIn: bigint
@@ -177,7 +177,7 @@ export function increasePositionCall(p: {
 
 type DecreaseArgs = {
   adapter: Address
-  market: { collateral: Address; debt: Address }
+  market: { collateral: Address; debt: Address; data: Hex }
   debtToRepay: bigint
   maxCollateralIn: bigint
   universalRouter: Address
@@ -284,7 +284,7 @@ export function closePositionCall(p: {
 
 type AddCollateralArgs = {
   adapter: Address
-  market: { collateral: Address; debt: Address }
+  market: { collateral: Address; debt: Address; data: Hex }
   amount: bigint
   subId: bigint
   deadline: bigint
@@ -362,7 +362,7 @@ export interface AccountWithdrawCollateralParams {
 
 type AccountWithdrawCollateralArgs = readonly [
   adapter: Address,
-  market: { collateral: Address; debt: Address },
+  market: { collateral: Address; debt: Address; data: Hex },
   amount: bigint,
   to: Address
 ]
@@ -429,7 +429,7 @@ function normalizeAccountMarketAmount(
   params: AccountMarketAmountParams,
   label: string,
   allowFullSentinel = false
-): readonly [Address, { collateral: Address; debt: Address }, bigint] {
+): readonly [Address, { collateral: Address; debt: Address; data: Hex }, bigint] {
   validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
   if (params.amount <= 0n) {

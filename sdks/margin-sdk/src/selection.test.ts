@@ -13,7 +13,7 @@ const USDC_1M = parseUnits('1000000', 6)
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
-const MARKET = { collateral: WETH, debt: USDC }
+const MARKET = { collateral: WETH, debt: USDC, data: '0x' } as const
 const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
 const ORACLE_PRICE = parseUnits('3000', 6)
 

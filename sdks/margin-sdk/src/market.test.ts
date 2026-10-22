@@ -17,8 +17,8 @@ const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ZERO: Address = '0x0000000000000000000000000000000000000000'
 const OTHER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
 
-const LONG = { collateral: WETH, debt: USDC } // long ETH
-const SHORT = { collateral: USDC, debt: WETH } // short ETH
+const LONG = { collateral: WETH, debt: USDC, data: '0x' } as const // long ETH
+const SHORT = { collateral: USDC, debt: WETH, data: '0x' } as const // short ETH
 const POOL: PoolKey = { currency0: USDC, currency1: WETH, fee: 3000, tickSpacing: 60, hooks: ZERO }
 
 describe('toPoolKey', () => {

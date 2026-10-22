@@ -37,7 +37,6 @@ import {
   impliedLtv,
   increasePositionCall,
   isAccountDeployed,
-  getIsAdapterAllowed,
   getIsSupportedMarket,
   measureBorrowRatePerSecond,
   parseLeverageX18,
@@ -56,7 +55,6 @@ export async function run(ctx: Ctx): Promise<void> {
   section('01 · Long lifecycle on Morpho Blue (mirrors MarginRouterIntegration + E2E fork tests)')
 
   // -- 0. Preconditions read through SDK descriptors --------------------------------------------
-  assert(await getIsAdapterAllowed(ctx.publicClient, { marginRouter: router, adapter }), 'Morpho adapter allowlisted')
   assert(await getIsSupportedMarket(ctx.publicClient, { adapter, market }), 'WETH/USDC long market routable on Morpho')
 
   // -- 1. Offchain account derivation matches the router ----------------------------------------

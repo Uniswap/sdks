@@ -26,8 +26,10 @@ import {
 } from './lib/helpers'
 import {
   type LendingVenue,
+  EMPTY_MARKET_DATA,
   closePositionCall,
   collateralToBuyForLeverage,
+  encodeAaveV4MarketData,
   getIsSupportedMarket,
   getMarginAccountAddress,
   getPosition,
@@ -42,11 +44,25 @@ import {
 // sub-account (the docs' §3.2 rule the router does not enforce for you).
 const SUB_IDS: Partial<Record<LendingVenue, bigint>> = { aaveV3: 2n, aaveV4: 3n }
 
+// Aave v4 MAIN_SPOKE reserve ids (verified against ISpoke.getReserve onchain): WETH=0, USDC=7.
+const AAVE_V4_WETH_RESERVE_ID = 0n
+const AAVE_V4_USDC_RESERVE_ID = 7n
+
 async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
-  const { addresses, deployer, shortMarket: market } = ctx
+  const { addresses, deployer, shortMarket } = ctx
   const adapter = addresses.lendingAdapters[venue]!
   const router = addresses.marginRouter
   const subId = SUB_IDS[venue]!
+  // market.data is venue-specific: Aave v3 requires it empty, Aave v4 requires the
+  // (collateralReserveId, debtReserveId) pair — the pool/Comet address alone cannot disambiguate
+  // v4's per-reserve markets the way it does for v3.
+  const market = {
+    ...shortMarket,
+    data:
+      venue === 'aaveV4'
+        ? encodeAaveV4MarketData({ collateralReserveId: AAVE_V4_USDC_RESERVE_ID, debtReserveId: AAVE_V4_WETH_RESERVE_ID })
+        : EMPTY_MARKET_DATA,
+  }
 
   note(`— venue: ${venue} (adapter ${adapter}, subId ${subId}) —`)
   assert(

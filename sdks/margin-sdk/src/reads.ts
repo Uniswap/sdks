@@ -35,7 +35,7 @@ export async function readContract<T>(client: PublicClient, call: ContractCall):
 }
 
 // ---------------------------------------------------------------------------
-// Router: accounts, allowlist, governance
+// Router: accounts
 // ---------------------------------------------------------------------------
 
 /** `router.accountOf(owner, subId)` — the deterministic MarginAccount address (deployed or not). */
@@ -66,32 +66,14 @@ export async function isAccountDeployed(client: PublicClient, account: Address):
   return !!code && code !== '0x'
 }
 
-/** `router.isAdapterAllowed(adapter)` — whether the adapter can be used to add exposure. */
-export function isAdapterAllowedCall(p: {
-  marginRouter: Address
-  adapter: Address
-}): ContractCall<typeof MARGIN_ROUTER_ABI> {
-  return { address: p.marginRouter, abi: MARGIN_ROUTER_ABI, functionName: 'isAdapterAllowed', args: [p.adapter] }
-}
-
-/** Reads the adapter allowlist status (close/decrease never require it). */
-export async function getIsAdapterAllowed(
-  client: PublicClient,
-  p: { marginRouter: Address; adapter: Address }
-): Promise<boolean> {
-  return readContract<boolean>(client, isAdapterAllowedCall(p))
-}
-
-/** `router.governance()`. */
-export function governanceCall(marginRouter: Address): ContractCall<typeof MARGIN_ROUTER_ABI> {
-  return { address: marginRouter, abi: MARGIN_ROUTER_ABI, functionName: 'governance', args: [] }
-}
-
 // ---------------------------------------------------------------------------
 // Adapter: market support and position state
 // ---------------------------------------------------------------------------
 
-/** `adapter.isSupportedMarket(market)` — whether the (collateral, debt) pair is routable. */
+/**
+ * `adapter.isSupportedMarket(market)` — whether the market is routable: the adapter decodes and
+ * validates `market.data` itself (there is no onchain allowlist; market selection is permissionless).
+ */
 export function isSupportedMarketCall(p: {
   adapter: Address
   market: Market

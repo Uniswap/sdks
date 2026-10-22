@@ -9,8 +9,6 @@ import {
   accountOwnerCall,
   currentLtvCall,
   describePositionCall,
-  governanceCall,
-  isAdapterAllowedCall,
   isSupportedMarketCall,
   maxLtvCall,
   positionOfCall,
@@ -22,7 +20,7 @@ const ACCOUNT: Address = '0x64487fb85302b5A2f38EF91144155986D331D2Fe'
 const OWNER: Address = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
-const MARKET = { collateral: WETH, debt: USDC }
+const MARKET = { collateral: WETH, debt: USDC, data: '0x' } as const
 
 /**
  * The read layer is the backend's position/health-monitoring surface. Every descriptor must wire
@@ -42,13 +40,6 @@ describe('read descriptors', () => {
       address: ROUTER,
       args: [OWNER, 7n],
     },
-    {
-      name: 'isAdapterAllowed',
-      call: isAdapterAllowedCall({ marginRouter: ROUTER, adapter: ADAPTER }),
-      address: ROUTER,
-      args: [ADAPTER],
-    },
-    { name: 'governance', call: governanceCall(ROUTER), address: ROUTER, args: [] },
     {
       name: 'isSupportedMarket',
       call: isSupportedMarketCall({ adapter: ADAPTER, market: MARKET }),

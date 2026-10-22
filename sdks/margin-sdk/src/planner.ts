@@ -27,9 +27,9 @@ function validateRecipient(to: Address, action: string): void {
  *
  * `execute` does no entry validation — the plan carries exactly the guardrails it encodes:
  * 1. Open each account-scoped section with {@link setAccount} (enforced by `finalize`).
- * 2. Encode swap bounds (`amountInMaximum` / `amountOutMinimum`), {@link assertFill} after an
- *    exact-output swap, and {@link assertHealth} per touched (account, market) — after each
- *    account section, not once at the end.
+ * 2. Encode swap bounds (`amountInMaximum` / `amountOutMinimum`), {@link assertAccountBalance}
+ *    after an exact-output route, and {@link assertHealth} per touched (account, market) — after
+ *    each account section, not once at the end.
  * 3. Net the router to zero: terminate with {@link sweep} for every currency the plan may leave
  *    on the router. Residual balances are claimable by the next caller.
  * 4. Supply and borrow require an allowlisted adapter; withdraw, repay, and account-sweep do not.
@@ -127,14 +127,6 @@ export class MarginPlanner {
   }
 
   /**
-   * Asserts the router holds at least `minAmount` credit of `currency` — i.e. the preceding
-   * exact-output swap delivered the full requested amount (all-or-nothing on a thin pool).
-   */
-  assertFill(currency: Address, minAmount: bigint): this {
-    return this.add(MarginAction.ASSERT_FILL, [currency, minAmount])
-  }
-
-  /**
    * Routes a swap through `universalRouter` (sourcing liquidity across v2/v3/v4) behind a
    * flash-take of up to `maxIn` of `input`: the router funds the Universal Router via a scoped
    * Permit2 allowance of exactly `maxIn`, runs the caller-built `commands`/`inputs` (which MUST
@@ -158,8 +150,8 @@ export class MarginPlanner {
 
   /**
    * Asserts the active account's wallet balance of `currency` is at least `minAmount`, reverting
-   * `IncompleteFill` otherwise — the account-side counterpart of {@link assertFill}, used after
-   * {@link routeSwap} to catch an exact-output under-fill before the position is built on it.
+   * `IncompleteFill` otherwise — used after {@link routeSwap} to catch an exact-output under-fill
+   * before the position is built on it.
    */
   assertAccountBalance(currency: Address, minAmount: bigint): this {
     return this.add(MarginAction.ASSERT_ACCOUNT_BALANCE, [currency, minAmount])

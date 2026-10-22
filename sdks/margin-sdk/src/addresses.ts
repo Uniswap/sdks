@@ -33,10 +33,12 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 /**
  * All deployed margin stacks, keyed by numeric chain id. Mainnet addresses are the
- * `DeployMargin.s.sol` CREATE2 deployment of 2026-08-26 (blocks 25842465-25842483), the
- * post-audit suite carrying the full OpenZeppelin fix set, verified onchain: contract code,
- * the governance read, `isAdapterAllowed(...)` for every adapter, and the canonical market
- * registrations read back true.
+ * `DeployMargin.s.sol` CREATE2 deployment of 2026-10-22 (blocks 26244491-26244496, commit
+ * fd5dcdb435606dfc2a845ed3cfc6d68941ab84f1), the permissionless-market-key suite: the router has
+ * no governance or adapter allowlist, and market selection is a caller-supplied `Market` (adapter
+ * address plus venue-decoded `bytes data`) validated per call by the adapter itself. Verified
+ * onchain: contract code at every address below. This supersedes the 2026-08-26 post-audit suite,
+ * which predates this ABI and is no longer compatible with this SDK version.
  *
  * The Universal Router is deliberately NOT part of this record: it is a per-call parameter
  * (`IncreaseParams`/`DecreaseParams`/`ROUTE_SWAP`) so callers pick the deployment their route
@@ -44,13 +46,13 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
  */
 export const MARGIN_ADDRESSES: Partial<Record<number, MarginAddresses>> = {
   [SupportedChainId.MAINNET]: {
-    marginRouter: getAddress('0x0000000000F57fCd0d5a78a19907240F1169EDEC'),
-    marginAccountImplementation: getAddress('0xdDD0967e90bCBc2D1F026b3977bb4dE39133b109'),
+    marginRouter: getAddress('0x0000000000890d0ee01040c8855A0423e37c757B'),
+    marginAccountImplementation: getAddress('0xD9568a09F242fDDd01Be180359f67FbE31D4FaB7'),
     lendingAdapters: {
-      morphoBlue: getAddress('0x766C34DcFBA565a1b72ce83ECD96712376Ca1f3D'),
-      aaveV3: getAddress('0x7E1A543Bd8ed2F16D61DA4b6bC2eC5d240D098aC'),
-      aaveV4: getAddress('0xAb3C2661c810295Db32125942f04b92c61fAE2Eb'),
-      compoundV3: getAddress('0x77598B845d0200fc707bD32A8Ad6DCF85C995e0d'),
+      morphoBlue: getAddress('0x9770eB2e1e4e50126aC290F40340D4eB86c9ba91'),
+      aaveV3: getAddress('0xBcdd5ae0cf217439d0B84Bc2ABA5E5238200Ee75'),
+      aaveV4: getAddress('0x6ED39e59c72aa67488a72b4544C680369373d81B'),
+      compoundV3: getAddress('0x13352E9b6C57261Ce906a2984A15356547B40708'),
     },
     permit2: PERMIT2,
     poolManager: getAddress('0x000000000004444c5dc75cB358380D2e3dE08A90'),

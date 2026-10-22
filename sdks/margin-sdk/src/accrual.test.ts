@@ -16,7 +16,7 @@ const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
 const ACCOUNT: Address = '0x64487fb85302b5A2f38EF91144155986D331D2Fe'
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
-const MARKET = { collateral: WETH, debt: USDC }
+const MARKET = { collateral: WETH, debt: USDC, data: '0x' } as const
 
 /** ~5% APR as a WAD per-second rate: 0.05e18 / 31_536_000. */
 const FIVE_PCT_APR_PER_SECOND = parseUnits('0.05', 18) / 31_536_000n

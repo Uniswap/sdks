@@ -21,10 +21,18 @@ import {
   type MarginAddresses,
   type Market,
   type PoolKey,
+  EMPTY_MARKET_DATA,
   SupportedChainId,
+  encodeMorphoMarketData,
   getMarginAddresses,
   toPoolKey,
 } from '../../src'
+
+// The live Morpho Blue WETH/USDC 86% LLTV market `longMarket` targets (verified onchain against
+// `Morpho.market(id)`; mirrors v4-periphery `test/fork/MorphoLendingAdapter.fork.t.sol`).
+const MORPHO_WETH_USDC_86_ORACLE = '0xdC6fd5831277c693b1054e19E94047cB37c77615'
+const MORPHO_WETH_USDC_86_IRM = '0x870aC11D48B15DB9a138Cf899d20F13F79Ba00BC'
+const MORPHO_WETH_USDC_86_LLTV = 860_000_000_000_000_000n
 
 /**
  * Demo environment: an anvil fork of Ethereum mainnet with the margin deployer impersonated as
@@ -33,7 +41,7 @@ import {
  * v4-periphery fork tests exercise.
  */
 
-/** The margin deployment deployer/governance EOA — the impersonated sender for all demo flows. */
+/** The margin deployment's deployer EOA — the impersonated sender for all demo flows. */
 export const DEPLOYER: Address = '0x58e28b95a2ee57c4E90613AFce9e8CCEED3aB1E8'
 
 export const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
@@ -82,8 +90,17 @@ export function buildCtx(rpcUrl: string): Ctx {
     weth,
     usdc: USDC,
     poolKey: toPoolKey({ currencyA: weth, currencyB: USDC, fee: 500, tickSpacing: 10 }),
-    longMarket: { collateral: weth, debt: USDC },
-    shortMarket: { collateral: USDC, debt: weth },
+    longMarket: {
+      collateral: weth,
+      debt: USDC,
+      data: encodeMorphoMarketData({
+        oracle: MORPHO_WETH_USDC_86_ORACLE,
+        irm: MORPHO_WETH_USDC_86_IRM,
+        lltv: MORPHO_WETH_USDC_86_LLTV,
+      }),
+    },
+    // Aave v3 default (empty data); demo 03 overrides this per-venue for Aave v4.
+    shortMarket: { collateral: USDC, debt: weth, data: EMPTY_MARKET_DATA },
     universalRouter: zeroAddress,
   }
 }

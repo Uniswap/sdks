@@ -38,8 +38,7 @@ export enum MarginAction {
   ACCOUNT_SWEEP = 0x34,
   /** Assert the active account's LTV does not exceed a bound (`PositionUnhealthy` otherwise). */
   ASSERT_HEALTH = 0x35,
-  /** Assert an exact-output swap delivered the full amount (`IncompleteFill` otherwise). */
-  ASSERT_FILL = 0x36,
+  // 0x36 is vacant: the router dropped the redundant ASSERT_FILL opcode (`UnsupportedAction` now).
   /** Bind the active account (derived from the authenticated caller + subId, never calldata). */
   SET_ACCOUNT = 0x37,
   /** Move a token into the active account (Permit2 pull or router balance). Zero amount reverts. */
@@ -61,6 +60,7 @@ const MARKET = {
   components: [
     { name: 'collateral', type: 'address' },
     { name: 'debt', type: 'address' },
+    { name: 'data', type: 'bytes' },
   ],
 } as const
 
@@ -199,10 +199,6 @@ export const ACTION_ABI: Record<PlanAction, readonly AbiParameter[]> = {
     { name: 'adapter', type: 'address' },
     { name: 'market', ...MARKET },
     { name: 'maxLtv', type: 'uint256' },
-  ],
-  [MarginAction.ASSERT_FILL]: [
-    { name: 'currency', type: 'address' },
-    { name: 'minAmount', type: 'uint256' },
   ],
   [MarginAction.SET_ACCOUNT]: [{ name: 'subId', type: 'uint256' }],
   [MarginAction.PULL_TO_ACCOUNT]: [
