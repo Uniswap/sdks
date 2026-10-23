@@ -291,8 +291,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       "inputOverride larger than original input"
     );
     invariant(
-      this.info.cosignerData.outputOverrides.length > 0,
-      "outputOverrides not set"
+      this.info.cosignerData.outputOverrides.length === this.info.outputs.length,
+      "outputOverrides length must match outputs length"
     );
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
