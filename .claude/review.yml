@@ -13,10 +13,18 @@
 # selects the model (see resolve-model.ts priority order: CLI
 # override > frontmatter pin > config default > sonnet fallback).
 model:
-  default: claude-opus-4-8
+  default: claude-opus-5
 
 # Per-agent budget — soft cap. Same value as universe/backend so
 # investigations on cross-package SDK changes aren't budget-starved.
+# Whole-run ceiling, stated as intent only: review-cli 1.10.7 and 1.12.0
+# parse max_budget_usd but enforce only the per-agent budget below, so the
+# real ceiling is agent_budget_usd times every agent staffed. The triage
+# guidance staffs four or more reviewers on a change to financial math,
+# calldata encoding or permit handling; with triage
+# and synthesis that is six agents, or $60 at the per-agent cap, so this
+# number records intent rather than a limit anything enforces.
+max_budget_usd: 40.0
 agent_budget_usd: 10.0
 
 # Per-agent turn ceiling — set well above any reasonable investigation
