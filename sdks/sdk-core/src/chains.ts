@@ -69,6 +69,13 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.ARC]: 0.5,
   [ChainId.ROBINHOOD]: 0.1,
   [ChainId.INK]: 1,
+  // Testnets, measured over 1,000 blocks on 2026-10-23
+  [ChainId.SEPOLIA]: 12,
+  [ChainId.OPTIMISM_SEPOLIA]: 2,
+  [ChainId.ARBITRUM_SEPOLIA]: 0.25,
+  [ChainId.BASE_SEPOLIA]: 0.2,
+  [ChainId.ZORA_SEPOLIA]: 2,
+  [ChainId.UNICHAIN_SEPOLIA]: 1,
 }
 
 /**
