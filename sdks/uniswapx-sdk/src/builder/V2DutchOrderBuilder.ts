@@ -294,6 +294,11 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       this.info.cosignerData.outputOverrides.length > 0,
       "outputOverrides not set"
     );
+    invariant(
+      this.info.cosignerData.outputOverrides.length ===
+        this.info.outputs.length,
+      "outputOverrides length must match outputs length"
+    );
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
