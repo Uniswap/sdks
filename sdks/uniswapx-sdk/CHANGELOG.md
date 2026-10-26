@@ -1,5 +1,12 @@
 # @uniswap/uniswapx-sdk
 
+## 3.1.6
+
+### Patch Changes
+
+- Updated dependencies [0d47773]
+  - @uniswap/sdk-core@7.20.0
+
 ## 3.1.5
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/liquidity-launcher-sdk",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "⚒️ An SDK for launching tokens and auctions with the Uniswap Liquidity Launcher (CCA + LBP) stack",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
