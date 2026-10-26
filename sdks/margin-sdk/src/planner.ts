@@ -380,7 +380,7 @@ export function withdrawCollateralPlan(params: WithdrawCollateralPlanParams): He
   }
   if (params.maxLtvAfter <= 0n) {
     throw new MarginSdkError(
-      'SLIPPAGE_BOUND_REQUIRED',
+      'LTV_BOUND_REQUIRED',
       'maxLtvAfter is mandatory for a withdrawal: withdrawing collateral raises LTV, and ASSERT_HEALTH ' +
         'skips a zero bound, so the withdrawal would be unbounded against liquidation'
     )

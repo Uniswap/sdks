@@ -488,9 +488,10 @@ bun run demo
 
 All SDK validation throws `MarginSdkError` with a stable `code`
 (`INVALID_LEVERAGE`, `INVALID_AMOUNT`, `AMOUNT_OVERFLOW`, `SLIPPAGE_BOUND_REQUIRED`,
-`INEFFECTIVE_LTV_BOUND`, `UNIVERSAL_ROUTER_REQUIRED`, `MARKET_MISMATCH`, `INVALID_PLAN`, …) —
-catch with `isMarginSdkError` and forward. Onchain reverts (`SlippageBoundRequired`, `ZeroAmount`,
-`IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`, `AdapterNotAllowed`,
+`LTV_BOUND_REQUIRED`, `INEFFECTIVE_LTV_BOUND`, `UNIVERSAL_ROUTER_REQUIRED`, `MARKET_MISMATCH`,
+`INVALID_PLAN`, …) —
+catch with `isMarginSdkError` and forward. Onchain reverts (`SlippageBoundRequired`,
+`LtvBoundRequired`, `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`,
 `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`, …) are declared in
 `MARGIN_ROUTER_ABI`, so viem's `simulateContract` decodes them into readable messages — always
 simulate before writing.

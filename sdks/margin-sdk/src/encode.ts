@@ -37,8 +37,9 @@ export function validateDeadline(deadline: bigint): void {
  *    straight into viem `simulateContract`/`writeContract` or wagmi `useWriteContract`.
  *
  * Always `simulateContract` before `writeContract` so reverts (`SlippageBoundRequired`,
- * `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`,
- * `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface with a decoded message.
+ * `LtvBoundRequired`, `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`,
+ * `PositionUnhealthy`, `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface with
+ * a decoded message.
  * The SDK validates the same inputs offchain first.
  */
 
@@ -212,9 +213,10 @@ function normalizeDecrease(params: DecreaseParams): DecreaseArgs {
         'maxCollateralIn is the binding slippage cap and must be non-zero on a partial decrease'
       )
     }
+    // mirrors onchain `LtvBoundRequired`, distinct from the swap slippage bound above
     if ((params.maxLtvAfter ?? 0n) <= 0n) {
       throw new MarginSdkError(
-        'SLIPPAGE_BOUND_REQUIRED',
+        'LTV_BOUND_REQUIRED',
         'maxLtvAfter is mandatory on a partial decrease (it bounds the resulting position health)'
       )
     }

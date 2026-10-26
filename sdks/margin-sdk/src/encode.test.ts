@@ -177,16 +177,16 @@ describe('encodeDecreasePosition', () => {
     expect(encodeDecreasePosition(partial)).toBe(CAST_DECREASE_CALLDATA as `0x${string}`)
   })
 
-  test('partial decrease requires maxLtvAfter', () => {
-    expect(() => encodeDecreasePosition({ ...partial, maxLtvAfter: 0n })).toThrow(MarginSdkError)
+  test('partial decrease requires maxLtvAfter (LtvBoundRequired mirror)', () => {
+    expectCode(() => encodeDecreasePosition({ ...partial, maxLtvAfter: 0n }), 'LTV_BOUND_REQUIRED')
   })
 
   test('partial decrease rejects an unbindable maxLtvAfter', () => {
     expectCode(() => encodeDecreasePosition({ ...partial, maxLtvAfter: WAD }), 'INEFFECTIVE_LTV_BOUND')
   })
 
-  test('partial decrease requires maxCollateralIn', () => {
-    expect(() => encodeDecreasePosition({ ...partial, maxCollateralIn: 0n })).toThrow(MarginSdkError)
+  test('partial decrease requires maxCollateralIn (SlippageBoundRequired mirror)', () => {
+    expectCode(() => encodeDecreasePosition({ ...partial, maxCollateralIn: 0n }), 'SLIPPAGE_BOUND_REQUIRED')
   })
 
   test('partial decrease requires the Universal Router route', () => {

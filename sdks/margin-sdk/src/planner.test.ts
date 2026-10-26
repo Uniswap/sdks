@@ -260,7 +260,15 @@ describe('withdrawCollateralPlan', () => {
   })
 
   test('requires a non-zero maxLtvAfter (ASSERT_HEALTH skips a zero bound)', () => {
-    expect(() => withdrawCollateralPlan({ ...base, maxLtvAfter: 0n })).toThrow(/mandatory/)
+    let thrown: unknown
+    try {
+      withdrawCollateralPlan({ ...base, maxLtvAfter: 0n })
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(MarginSdkError)
+    expect((thrown as MarginSdkError).code).toBe('LTV_BOUND_REQUIRED')
+    expect((thrown as MarginSdkError).message).toMatch(/mandatory/)
   })
 
   test('rejects recipients the account would reject', () => {

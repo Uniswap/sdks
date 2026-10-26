@@ -132,7 +132,8 @@ export interface DecreaseParams {
   routeInputs?: Hex[]
   /**
    * The maximum LTV the position may have after a partial decrease (WAD, strictly below 1e18).
-   * Mandatory for a partial decrease; ignored on a full close.
+   * Mandatory for a partial decrease (a zero bound reverts `LtvBoundRequired`); ignored on a full
+   * close.
    */
   maxLtvAfter?: bigint
   /** Sub-account index identifying which MarginAccount to decrease or close. Default 0. */
