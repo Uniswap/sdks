@@ -10,6 +10,15 @@ describe('getAverageBlockTimeSecs', () => {
     expect(getAverageBlockTimeSecs(ChainId.INK)).toEqual(1)
   })
 
+  it('returns the registered block time for a testnet', () => {
+    expect(getAverageBlockTimeSecs(ChainId.SEPOLIA)).toEqual(12)
+    expect(getAverageBlockTimeSecs(ChainId.OPTIMISM_SEPOLIA)).toEqual(2)
+    expect(getAverageBlockTimeSecs(ChainId.ARBITRUM_SEPOLIA)).toEqual(0.25)
+    expect(getAverageBlockTimeSecs(ChainId.BASE_SEPOLIA)).toEqual(0.2)
+    expect(getAverageBlockTimeSecs(ChainId.ZORA_SEPOLIA)).toEqual(2)
+    expect(getAverageBlockTimeSecs(ChainId.UNICHAIN_SEPOLIA)).toEqual(1)
+  })
+
   it('throws on unregistered chainId', () => {
     expect(() => getAverageBlockTimeSecs(99999)).toThrow(/unsupported chainId 99999/)
   })
