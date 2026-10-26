@@ -1,11 +1,11 @@
 name: 'Install review-cli'
 description: 'Set up Bun and install @uniswap/review-cli from GitHub Packages into an isolated $RUNNER_TEMP directory.'
 
-# Shared by .github/workflows/claude-code-review.yml and
-# .github/workflows/review-feedback.yml. The two consumer workflows
-# pin their own `version` (typically via `vars.REVIEW_CLI_VERSION ||
-# '<fallback>'`) so the fallback can diverge per-workflow if one needs
-# to lag behind the other.
+# Used by .github/workflows/review-feedback.yml, which pins its own
+# `version` (typically via `vars.REVIEW_CLI_VERSION || '<fallback>'`).
+# The PR review workflow (.github/workflows/review.yml, copied from
+# review-cli's template) installs the cli inline instead, so it never
+# runs an action from a PR checkout.
 #
 # Mirrors the composite action of the same name in Uniswap/universe
 # and Uniswap/backend. Eventually we may migrate to the canonical
