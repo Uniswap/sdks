@@ -1,5 +1,12 @@
 # @uniswap/v2-sdk
 
+## 4.21.8
+
+### Patch Changes
+
+- Updated dependencies [0d47773]
+  - @uniswap/sdk-core@7.20.0
+
 ## 4.21.7
 
 ### Patch Changes

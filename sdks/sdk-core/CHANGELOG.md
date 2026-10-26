@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.20.0
+
+### Minor Changes
+
+- 0d47773: Register average block times for Sepolia, OP Sepolia, Arbitrum Sepolia, Base Sepolia, Zora Sepolia and Unichain Sepolia (measured on-chain), so `getAverageBlockTimeSecs` no longer throws for these listed testnets.
+
 ## 7.19.6
 
 ### Patch Changes

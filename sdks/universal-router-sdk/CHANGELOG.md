@@ -1,5 +1,16 @@
 # @uniswap/universal-router-sdk
 
+## 5.15.3
+
+### Patch Changes
+
+- Updated dependencies [0d47773]
+  - @uniswap/sdk-core@7.20.0
+  - @uniswap/router-sdk@2.11.9
+  - @uniswap/v2-sdk@4.21.8
+  - @uniswap/v3-sdk@3.31.8
+  - @uniswap/v4-sdk@2.4.4
+
 ## 5.15.2
 
 ### Patch Changes
