@@ -1,4 +1,8 @@
 import { BigNumber } from 'ethers'
+import { ChainId } from '@uniswap/sdk-core'
+
+// Native gas balance is also exposed through an ERC20 predeploy on these chains.
+export const NATIVE_ERC20_BALANCE_ALIAS_CHAINS: readonly number[] = [ChainId.ARC, ChainId.CELO, ChainId.CELO_ALFAJORES]
 
 // Members must stay declared oldest-to-newest: the isAtLeast* helpers derive their version
 // ordering from this declaration order.

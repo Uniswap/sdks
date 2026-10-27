@@ -1,7 +1,18 @@
 import { BigNumber } from 'ethers'
 import { TradeType } from '@uniswap/sdk-core'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
-import { CONTRACT_BALANCE, ETH_ADDRESS, SENDER_AS_RECIPIENT } from './constants'
+import {
+  CONTRACT_BALANCE,
+  ETH_ADDRESS,
+  NATIVE_ERC20_BALANCE_ALIAS_CHAINS,
+  ROUTER_AS_RECIPIENT,
+  SENDER_AS_RECIPIENT,
+  UNIVERSAL_ROUTER_ADDRESS,
+  WETH_ADDRESS,
+  ZERO_ADDRESS,
+} from './constants'
+import { getCurrencyAddress } from './getCurrencyAddress'
+import { toFeeList } from './normalizeEncodeSwapsSpec'
 
 export type UserPaidPull = {
   // token the step pulls from the user; undefined when not extractable (malformed path)
@@ -32,6 +43,149 @@ export function v3PathFirstToken(path: string): string | undefined {
 export function v3PathLastToken(path: string): string | undefined {
   if (getV3HopCount(path) === undefined) return undefined
   return '0x' + path.slice(-40)
+}
+
+function v3PathTokens(path: string): string[] | undefined {
+  if (typeof path !== 'string') return undefined
+  const hops = getV3HopCount(path)
+  if (hops === undefined || !/^0x[0-9a-fA-F]+$/.test(path)) return undefined
+  const tokens: string[] = []
+  for (let i = 0; i <= hops; i++) {
+    const start = 2 + i * 46
+    tokens.push(('0x' + path.slice(start, start + 40)).toLowerCase())
+  }
+  return tokens
+}
+
+/**
+ * Checks a validated spec and validated steps against their computed settlement sweep floor.
+ * The caller must ensure the router has no pre-existing output balance and tokens have no
+ * transfer side effects that credit the router; incidental output is not forwarded if omitted.
+ */
+export function isSettlementSweepRedundant(
+  spec: NormalizedSwapSpecification,
+  swapSteps: SwapStep[],
+  sweepFloor: BigNumber
+): boolean {
+  if (
+    spec.omitRedundantSettlementSweep !== true ||
+    spec.allowDirectTransfers !== true ||
+    spec.tradeType !== TradeType.EXACT_INPUT ||
+    toFeeList(spec.fee).length !== 0 ||
+    spec.routerBalanceInput !== undefined ||
+    !sweepFloor.isZero() ||
+    spec.nativeErc20Input ||
+    spec.routing.inputToken.wrapped.equals(spec.routing.outputToken.wrapped)
+  ) {
+    return false
+  }
+
+  const outputToken = spec.routing.outputToken
+  const chainId = outputToken.chainId
+  if (NATIVE_ERC20_BALANCE_ALIAS_CHAINS.includes(chainId)) return false
+  const settlementToken = getCurrencyAddress(outputToken).toLowerCase()
+  const recipient = spec.recipient.toLowerCase()
+  try {
+    if (UNIVERSAL_ROUTER_ADDRESS(spec.urVersion, chainId).toLowerCase() === recipient) return false
+  } catch {
+    return false
+  }
+
+  for (const step of swapSteps) {
+    if (!step || typeof step !== 'object') return false
+    if ('recipient' in step && typeof step.recipient !== 'string') return false
+    switch (step.type) {
+      case 'V2_SWAP_EXACT_IN':
+      case 'V2_SWAP_EXACT_OUT':
+        if (
+          !Array.isArray(step.path) ||
+          step.path.length < 2 ||
+          !step.path.every((token) => typeof token === 'string' && /^0x[0-9a-fA-F]{40}$/.test(token))
+        ) {
+          return false
+        }
+        if (
+          step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT &&
+          step.path[step.path.length - 1].toLowerCase() === settlementToken
+        ) {
+          return false
+        }
+        break
+      case 'V3_SWAP_EXACT_IN':
+      case 'V3_SWAP_EXACT_OUT': {
+        const tokens = v3PathTokens(step.path)
+        if (!tokens) return false
+        const outputIndex = step.type === 'V3_SWAP_EXACT_IN' ? tokens.length - 1 : 0
+        if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false
+        if (step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT && tokens[outputIndex] === settlementToken) {
+          return false
+        }
+        break
+      }
+      case 'WRAP_ETH':
+        try {
+          const wethAddress = WETH_ADDRESS(chainId)
+          if (!outputToken.isNative && wethAddress.toLowerCase() === settlementToken) return false
+        } catch {
+          return false
+        }
+        break
+      case 'UNWRAP_WETH':
+        if (outputToken.isNative && step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return false
+        break
+      case 'V4_SWAP':
+        if (!Array.isArray(step.v4Actions)) return false
+        for (const action of step.v4Actions) {
+          if (!action || typeof action !== 'object') return false
+          switch (action.action) {
+            case 'SWAP_EXACT_IN_SINGLE':
+            case 'SWAP_EXACT_OUT_SINGLE':
+              if (
+                typeof action.poolKey?.currency0 !== 'string' ||
+                typeof action.poolKey?.currency1 !== 'string' ||
+                typeof action.poolKey?.hooks !== 'string' ||
+                action.poolKey.hooks.toLowerCase() !== ZERO_ADDRESS
+              ) {
+                return false
+              }
+              break
+            case 'SWAP_EXACT_IN':
+            case 'SWAP_EXACT_OUT':
+              if (
+                !Array.isArray(action.path) ||
+                action.path.length === 0 ||
+                action.path.some(
+                  (hop) =>
+                    typeof hop?.intermediateCurrency !== 'string' ||
+                    typeof hop.hooks !== 'string' ||
+                    hop.hooks.toLowerCase() !== ZERO_ADDRESS
+                )
+              ) {
+                return false
+              }
+              break
+            case 'TAKE':
+            case 'TAKE_PORTION':
+              if (typeof action.currency !== 'string' || typeof action.recipient !== 'string') return false
+              if (action.currency.toLowerCase() === settlementToken && action.recipient.toLowerCase() !== recipient) {
+                return false
+              }
+              break
+            case 'SETTLE':
+            case 'SETTLE_ALL':
+            case 'TAKE_ALL':
+              if (typeof action.currency !== 'string') return false
+              break
+            default:
+              return false
+          }
+        }
+        break
+      default:
+        return false
+    }
+  }
+  return true
 }
 
 // SETTLE_ALL / TAKE_ALL are intrinsically direct (no flag on-chain) and are gated separately

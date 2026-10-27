@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 import { defaultAbiCoder } from 'ethers/lib/utils'
-import { CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { ChainId, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
@@ -13,11 +13,13 @@ import {
   V2SwapExactOut,
   V3SwapExactIn,
   V3SwapExactOut,
+  V4Action,
   V4Settle,
   V4Swap,
 } from '../../src/types/encodeSwaps'
 import {
   directTransferSweepFloor,
+  isSettlementSweepRedundant,
   stepUserPaidPulls,
   sumDirectOutputMin,
   v3PathFirstToken,
@@ -34,7 +36,9 @@ import {
   MAX_UINT160,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
+  UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
+  WETH_ADDRESS,
 } from '../../src/utils/constants'
 import {
   TEST_FEE_RECIPIENT_ADDRESS as FEE_RECIPIENT,
@@ -89,6 +93,7 @@ function buildSpec(
     urVersion: UniversalRouterVersion.V2_0,
     safeMode: false,
     allowDirectTransfers: false,
+    omitRedundantSettlementSweep: false,
   }
   return {
     ...base,
@@ -98,6 +103,7 @@ function buildSpec(
     urVersion: overrides.urVersion ?? base.urVersion,
     safeMode: overrides.safeMode ?? base.safeMode,
     allowDirectTransfers: overrides.allowDirectTransfers ?? base.allowDirectTransfers,
+    omitRedundantSettlementSweep: overrides.omitRedundantSettlementSweep ?? base.omitRedundantSettlementSweep,
     routing: { ...base.routing, ...routingOverrides },
   }
 }
@@ -1378,6 +1384,427 @@ describe('allowDirectTransfers', () => {
       expect(off.calldata.length).to.be.greaterThan(2000) // 8-step plan, ~5kB calldata
       expect(on.calldata).to.equal(off.calldata)
       expect(on.value).to.equal(off.value)
+    })
+  })
+})
+
+describe('omitRedundantSettlementSweep', () => {
+  const NET_MIN = BigNumber.from('475000000000000000')
+  const zero = BigNumber.from(0)
+  const enabled = () => buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true })
+  const directV3 = () =>
+    buildV3ExactInStep({ recipient: TEST_RECIPIENT, payerIsUser: true, amountOutMin: NET_MIN.toString() })
+  const check = (spec: NormalizedSwapSpecification, steps: SwapStep[], floor = zero) =>
+    isSettlementSweepRedundant(spec, steps, floor)
+  const v4Single = (hooks = ETH_ADDRESS): V4Swap => ({
+    type: 'V4_SWAP',
+    v4Actions: [
+      { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+      {
+        action: 'SWAP_EXACT_IN_SINGLE',
+        poolKey: { currency0: USDC.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks },
+        zeroForOne: true,
+        amountIn: '1000000',
+        amountOutMinimum: NET_MIN.toString(),
+        hookData: '0x',
+      },
+      { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '0' },
+    ],
+  })
+  const v4Multi = (hooks = ETH_ADDRESS): V4Swap => ({
+    type: 'V4_SWAP',
+    v4Actions: [
+      { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+      {
+        action: 'SWAP_EXACT_IN',
+        currencyIn: USDC.address,
+        path: [
+          { intermediateCurrency: DAI.address, fee: 500, tickSpacing: 10, hooks, hookData: '0x' },
+          { intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+        ],
+        amountIn: '1000000',
+        amountOutMinimum: NET_MIN.toString(),
+      },
+      { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '0' },
+    ],
+  })
+  const nativeSpec = () =>
+    buildSpec(
+      { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
+      {
+        outputToken: ETH,
+        quote: CurrencyAmount.fromRawAmount(ETH, '500000000000000000'),
+      }
+    )
+  const sweepInputs = (spec: NormalizedSwapSpecification, steps: SwapStep[]) => {
+    const { commandTypes, inputs } = parseCommands(SwapRouter.encodeSwaps(spec, steps).calldata)
+    return commandTypes.flatMap((command, index) =>
+      command === CommandType.SWEEP ? [defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[index])] : []
+    )
+  }
+
+  it('normalizes the opt-in flag to false by default', () => {
+    expect(normalizeEncodeSwapsSpec(enabled()).omitRedundantSettlementSweep).to.equal(true)
+    expect(
+      normalizeEncodeSwapsSpec({ ...enabled(), omitRedundantSettlementSweep: undefined }).omitRedundantSettlementSweep
+    ).to.equal(false)
+  })
+
+  describe('predicate', () => {
+    it('accepts direct V3 exact-in, V2 exact-in, unhooked V4 single and multi-hop plans', () => {
+      expect(check(enabled(), [directV3()])).to.equal(true)
+      expect(check(enabled(), [buildV2ExactInStep({ recipient: TEST_RECIPIENT, payerIsUser: true })])).to.equal(true)
+      expect(check(enabled(), [v4Single(), v4Multi()])).to.equal(true)
+    })
+
+    it('accepts TAKE_ALL when the recipient is the sender sentinel', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '1' }],
+      }
+      const spec = buildSpec({
+        allowDirectTransfers: true,
+        omitRedundantSettlementSweep: true,
+        recipient: SENDER_AS_RECIPIENT,
+      })
+      expect(check(spec, [step])).to.equal(true)
+    })
+
+    it('requires the opt-in flag and direct transfers', () => {
+      expect(check(buildSpec({ allowDirectTransfers: true }), [directV3()])).to.equal(false)
+      expect(check(buildSpec({ omitRedundantSettlementSweep: true }), [directV3()])).to.equal(false)
+    })
+
+    it('requires exact input', () => {
+      expect(
+        check(buildExactOutSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true }), [directV3()])
+      ).to.equal(false)
+    })
+
+    it('rejects portion and flat fees', () => {
+      expect(
+        check(
+          buildSpec({
+            allowDirectTransfers: true,
+            omitRedundantSettlementSweep: true,
+            fee: { kind: 'portion', recipient: FEE_RECIPIENT, fee: new Percent(1, 100) },
+          }),
+          [directV3()]
+        )
+      ).to.equal(false)
+      expect(
+        check(
+          buildSpec({
+            allowDirectTransfers: true,
+            omitRedundantSettlementSweep: true,
+            fee: { kind: 'flat', recipient: FEE_RECIPIENT, amount: 1 },
+          }),
+          [directV3()]
+        )
+      ).to.equal(false)
+    })
+
+    it('rejects router-balance input and a nonzero floor', () => {
+      expect(
+        check(buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, routerBalanceInput: {} }), [
+          directV3(),
+        ])
+      ).to.equal(false)
+      expect(check(enabled(), [directV3()], BigNumber.from(1))).to.equal(false)
+    })
+
+    it('rejects a hooked single pool and a hooked intermediate hop', () => {
+      expect(check(enabled(), [v4Single(TEST_RECIPIENT)])).to.equal(false)
+      expect(check(enabled(), [v4Multi(TEST_RECIPIENT)])).to.equal(false)
+    })
+
+    it('compares unhooked addresses without regard to casing and rejects missing hooks', () => {
+      expect(check(enabled(), [v4Single('0X' + '0'.repeat(40))])).to.equal(true)
+      expect(check(enabled(), [v4Single(TEST_RECIPIENT.toUpperCase().replace('0X', '0x'))])).to.equal(false)
+      const missingHooks = v4Single()
+      const swap = missingHooks.v4Actions[1] as Extract<V4Action, { action: 'SWAP_EXACT_IN_SINGLE' }>
+      swap.poolKey.hooks = undefined as unknown as string
+      expect(check(enabled(), [missingHooks])).to.equal(false)
+    })
+
+    it('rejects router-directed V2 and V3 output', () => {
+      expect(check(enabled(), [buildV2ExactInStep()])).to.equal(false)
+      expect(check(enabled(), [buildV2ExactOutStep()])).to.equal(false)
+      expect(check(enabled(), [buildV3ExactInStep()])).to.equal(false)
+      expect(check(enabled(), [buildV3ExactOutStep()])).to.equal(false)
+    })
+
+    it('rejects malformed V3 paths and output token in an intermediate position', () => {
+      expect(check(enabled(), [buildV3ExactInStep({ recipient: TEST_RECIPIENT, path: '0x1234' })])).to.equal(false)
+      expect(check(enabled(), [buildV3ExactOutStep({ recipient: TEST_RECIPIENT, path: '0x1234' })])).to.equal(false)
+      const loop = packV3Path([USDC.address, WETH.address, DAI.address, WETH.address], [500, 500, 500])
+      expect(check(enabled(), [buildV3ExactInStep({ recipient: TEST_RECIPIENT, path: loop })])).to.equal(false)
+      const reverse = packV3ExactOutPath([USDC.address, WETH.address, DAI.address, WETH.address], [500, 500, 500])
+      expect(check(enabled(), [buildV3ExactOutStep({ recipient: TEST_RECIPIENT, path: reverse })])).to.equal(false)
+    })
+
+    it('fails closed on unrecognized steps, actions, and malformed V2 paths', () => {
+      expect(check(enabled(), [{ type: 'UNKNOWN' } as unknown as SwapStep])).to.equal(false)
+      expect(
+        check(enabled(), [{ type: 'V4_SWAP', v4Actions: [{ action: 'UNKNOWN' } as unknown as V4Action] }])
+      ).to.equal(false)
+      expect(
+        check(enabled(), [buildV2ExactInStep({ recipient: TEST_RECIPIENT, path: [USDC.address, '0x1234'] })])
+      ).to.equal(false)
+    })
+
+    it('rejects V4 TAKE and TAKE_PORTION of the output into custody', () => {
+      const step = v4Single()
+      expect(
+        check(enabled(), [
+          {
+            ...step,
+            v4Actions: [
+              { action: 'TAKE', currency: WETH.address.toLowerCase(), recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+            ],
+          },
+        ])
+      ).to.equal(false)
+      expect(
+        check(enabled(), [
+          {
+            ...step,
+            v4Actions: [
+              { action: 'TAKE_PORTION', currency: WETH.address.toLowerCase(), recipient: ROUTER_AS_RECIPIENT, bips: 1 },
+            ],
+          },
+        ])
+      ).to.equal(false)
+      expect(
+        check(nativeSpec(), [
+          {
+            type: 'V4_SWAP',
+            v4Actions: [{ action: 'TAKE', currency: ETH_ADDRESS, recipient: ROUTER_AS_RECIPIENT, amount: 0 }],
+          },
+        ])
+      ).to.equal(false)
+      expect(
+        check(nativeSpec(), [
+          {
+            type: 'V4_SWAP',
+            v4Actions: [{ action: 'TAKE_PORTION', currency: ETH_ADDRESS, recipient: ROUTER_AS_RECIPIENT, bips: 1 }],
+          },
+        ])
+      ).to.equal(false)
+    })
+
+    it('rejects WRAP_ETH for WETH output and UNWRAP_WETH to router for native output', () => {
+      expect(check(enabled(), [{ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: 1 }])).to.equal(false)
+      expect(check(nativeSpec(), [{ type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: 0 }])).to.equal(
+        false
+      )
+    })
+
+    it('uses router WETH configuration on X Layer and fails closed when WETH is unavailable', () => {
+      const xWeth = new Token(ChainId.XLAYER, WETH_ADDRESS(ChainId.XLAYER), 18, 'WETH')
+      const xInput = new Token(ChainId.XLAYER, USDC.address, 6, 'USDC')
+      const xSpec = buildSpec(
+        { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
+        {
+          inputToken: xInput,
+          outputToken: xWeth,
+        }
+      )
+      expect(check(xSpec, [directV3()])).to.equal(true)
+      expect(check(xSpec, [{ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: 1 }])).to.equal(false)
+      const tempoInput = new Token(ChainId.TEMPO, USDC.address, 6, 'USDC')
+      const tempoOutput = new Token(ChainId.TEMPO, WETH.address, 18, 'OUT')
+      const tempoSpec = buildSpec(
+        { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
+        { inputToken: tempoInput, outputToken: tempoOutput }
+      )
+      expect(check(tempoSpec, [directV3()])).to.equal(true)
+      expect(check(tempoSpec, [{ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: 1 }])).to.equal(false)
+    })
+
+    it('rejects same-asset swaps, native-ERC20 input, and native balance aliases', () => {
+      expect(
+        check(buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true }, { inputToken: WETH }), [
+          directV3(),
+        ])
+      ).to.equal(false)
+      expect(
+        check(buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, nativeErc20Input: true }), [
+          directV3(),
+        ])
+      ).to.equal(false)
+      const arcInput = new Token(ChainId.ARC, USDC.address, 6, 'USDC')
+      const arcOutput = new Token(ChainId.ARC, WETH.address, 18, 'OUT')
+      expect(
+        check(
+          buildSpec(
+            {
+              allowDirectTransfers: true,
+              omitRedundantSettlementSweep: true,
+              urVersion: UniversalRouterVersion.V2_1_1,
+            },
+            { inputToken: arcInput, outputToken: arcOutput }
+          ),
+          [directV3()]
+        )
+      ).to.equal(false)
+      for (const celoChain of [ChainId.CELO, ChainId.CELO_ALFAJORES]) {
+        const celoInput = new Token(celoChain, USDC.address, 6, 'USDC')
+        const celoOutput = new Token(celoChain, WETH.address, 18, 'CELO')
+        expect(
+          check(
+            buildSpec(
+              { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
+              { inputToken: celoInput, outputToken: celoOutput }
+            ),
+            [directV3()]
+          )
+        ).to.equal(false)
+      }
+    })
+
+    it('rejects a router recipient and an unavailable router', () => {
+      expect(
+        check(
+          buildSpec({
+            allowDirectTransfers: true,
+            omitRedundantSettlementSweep: true,
+            recipient: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1).toLowerCase(),
+          }),
+          [directV3()]
+        )
+      ).to.equal(false)
+      expect(
+        check(
+          buildSpec({
+            allowDirectTransfers: true,
+            omitRedundantSettlementSweep: true,
+            urVersion: 'unknown' as UniversalRouterVersion,
+          }),
+          [directV3()]
+        )
+      ).to.equal(false)
+    })
+  })
+
+  describe('encodeSwaps', () => {
+    it('omits an ERC20 settlement sweep while preserving the safeMode ETH sweep', () => {
+      const steps = [directV3()]
+      expect(sweepInputs(enabled(), steps)).to.have.length(0)
+      const sweeps = sweepInputs(
+        buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, safeMode: true }),
+        steps
+      )
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][0].toLowerCase()).to.equal(ETH_ADDRESS)
+    })
+
+    it('omits a native settlement sweep while preserving the safeMode ETH sweep', () => {
+      const spec = nativeSpec()
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ amountOutMin: '0' }),
+        { type: 'UNWRAP_WETH', recipient: TEST_RECIPIENT, amountMin: NET_MIN.toString() },
+      ]
+      expect(sweepInputs(spec, steps)).to.have.length(0)
+      const sweeps = sweepInputs({ ...spec, safeMode: true }, steps)
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][0].toLowerCase()).to.equal(ETH_ADDRESS)
+    })
+
+    it('omits an unhooked V4 settlement sweep', () => {
+      expect(sweepInputs(enabled(), [v4Single()])).to.have.length(0)
+    })
+
+    it('omits settlement sweeps for direct V2 and unhooked V4 multi-hop output', () => {
+      const v2 = buildV2ExactInStep({ recipient: TEST_RECIPIENT, payerIsUser: true, amountOutMin: NET_MIN.toString() })
+      expect(sweepInputs(enabled(), [v2])).to.have.length(0)
+      expect(sweepInputs(enabled(), [v4Multi()])).to.have.length(0)
+    })
+
+    it('omits the sweep for a sender-recipient TAKE_ALL plan', () => {
+      const spec = buildSpec({
+        allowDirectTransfers: true,
+        omitRedundantSettlementSweep: true,
+        recipient: SENDER_AS_RECIPIENT,
+      })
+      const step = v4Single()
+      step.v4Actions[step.v4Actions.length - 1] = {
+        action: 'TAKE_ALL',
+        currency: WETH.address,
+        minAmount: NET_MIN.toString(),
+      }
+      expect(sweepInputs(spec, [step])).to.have.length(0)
+    })
+
+    it('preserves default calldata when the flag is absent or false', () => {
+      const spec = buildSpec({ allowDirectTransfers: true })
+      const steps = [directV3()]
+      expect(SwapRouter.encodeSwaps({ ...spec, omitRedundantSettlementSweep: false }, steps).calldata).to.equal(
+        SwapRouter.encodeSwaps({ ...spec, omitRedundantSettlementSweep: undefined }, steps).calldata
+      )
+    })
+
+    it('keeps a zero-floor sweep for a custody V3 output leg', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({
+          recipient: TEST_RECIPIENT,
+          payerIsUser: true,
+          amountIn: '500000',
+          amountOutMin: NET_MIN.toString(),
+        }),
+        buildV3ExactInStep({ amountIn: '500000', amountOutMin: '0' }),
+      ]
+      const sweeps = sweepInputs(enabled(), steps)
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps a zero-floor sweep for a V4 output TAKE into router custody', () => {
+      const custody: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' }],
+      }
+      const sweeps = sweepInputs(enabled(), [directV3(), custody])
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps a zero-floor sweep for a hooked V4 single pool', () => {
+      const sweeps = sweepInputs(enabled(), [v4Single(TEST_RECIPIENT)])
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps a zero-floor sweep for a hooked V4 intermediate hop', () => {
+      const sweeps = sweepInputs(enabled(), [v4Multi(TEST_RECIPIENT)])
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps a zero-floor sweep when WRAP_ETH can credit the WETH output balance', () => {
+      const steps: SwapStep[] = [directV3(), { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '0' }]
+      const sweeps = sweepInputs(enabled(), steps)
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps the settlement sweep when direct transfers are disabled', () => {
+      const sweeps = sweepInputs(buildSpec({ omitRedundantSettlementSweep: true }), [buildV3ExactInStep()])
+      expect(sweeps).to.have.length(1)
+      expect(sweeps[0][2].toString()).to.equal(NET_MIN.toString())
+    })
+
+    it('keeps a zero-floor settlement sweep for exact output', () => {
+      const spec = buildExactOutSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true })
+      const step = buildV3ExactOutStep({ recipient: TEST_RECIPIENT, payerIsUser: true })
+      const sweeps = sweepInputs(spec, [step])
+      expect(sweeps).to.have.length(2)
+      expect(sweeps[0][2].toString()).to.equal('0')
+    })
+
+    it('keeps the settlement sweep for a nonzero direct-transfer floor', () => {
+      const steps = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, payerIsUser: true, amountOutMin: '1' })]
+      expect(sweepInputs(enabled(), steps)).to.have.length(1)
     })
   })
 })

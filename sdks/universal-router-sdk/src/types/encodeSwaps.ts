@@ -52,6 +52,13 @@ export type SwapSpecification = {
    */
   allowDirectTransfers?: boolean
   /**
+   * Omit the settlement SWEEP when it can enforce nothing and the router never receives the
+   * output token (see `isSettlementSweepRedundant`). Default false. Only takes effect with
+   * `allowDirectTransfers`. Assumes the router holds no pre-existing output balance and tokens
+   * have no transfer side effects that credit the router. Incidental output balance is not forwarded.
+   */
+  omitRedundantSettlementSweep?: boolean
+  /**
    * Fund the swap from the Universal Router's own balance of the input token: no Permit2
    * ingress is emitted, the first hop spends the CONTRACT_BALANCE sentinel, and an optional
    * `minimumAmount` emits a BALANCE_CHECK_ERC20 (requires `chainId` to resolve the router
@@ -66,18 +73,19 @@ export type SwapSpecification = {
   routerBalanceInput?: RouterBalanceInput
 }
 
-// Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed
+// Output of `normalizeEncodeSwapsSpec`: the six fields below are guaranteed
 // non-undefined, encoding the precondition for `validateEncodeSwaps` and
 // `computeEncodeSwapsAmounts` at the type level.
 export type NormalizedSwapSpecification = Omit<
   SwapSpecification,
-  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers'
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers' | 'omitRedundantSettlementSweep'
 > & {
   recipient: string
   tokenTransferMode: TokenTransferMode
   urVersion: UniversalRouterVersion
   safeMode: boolean
   allowDirectTransfers: boolean
+  omitRedundantSettlementSweep: boolean
 }
 
 export type V2SwapExactIn = {
