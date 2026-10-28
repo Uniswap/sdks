@@ -102,14 +102,21 @@ jobs:
     # policy lookup (draft skip, association threshold, bot self-mention
     # guard, trigger-phrase parse); this `if:` just avoids paying the
     # runner-startup cost for events that obviously don't apply.
+    #
+    # Fork PRs are skipped here where the payload names the head repo.
+    # issue_comment and workflow_dispatch payloads don't, so the review
+    # job's "Refuse fork PRs" step is the authoritative check for those.
     if: |
-      (github.event_name == 'pull_request' && !github.event.pull_request.draft) ||
+      (github.event_name == 'pull_request'
+        && !github.event.pull_request.head.repo.fork
+        && !github.event.pull_request.draft) ||
       (github.event_name == 'issue_comment'
         && github.event.issue.pull_request != null
         && contains(github.event.comment.body, '@request-claude-review')
         && github.event.comment.user.type != 'Bot'
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'pull_request_review_comment'
+        && !github.event.pull_request.head.repo.fork
         && contains(github.event.comment.body, '@request-claude-review')
         && github.event.comment.user.type != 'Bot'
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
@@ -138,10 +145,14 @@ jobs:
       # so action.yml needs to be on disk. fetch-depth: 1 is enough
       # (no git history is consulted in triage). `persist-credentials:
       # false` because nothing in this job pushes or fetches from git.
+      # Pinned to the default branch: pull_request_review_comment would
+      # otherwise check out the PR merge ref and run the PR's copy of
+      # the action.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
           persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Install review-cli
         id: install-review-cli
@@ -262,20 +273,15 @@ jobs:
       # env IS, so this is the standard workaround.
       HAS_DATADOG_API_KEY: ${{ secrets.DD_API_KEY != '' }}
     steps:
-      # Pin the checkout to the PR head. Required for comment-trigger
-      # variants — `issue_comment` and `pull_request_review_comment`
-      # events default GITHUB_REF to the repo's default branch, so an
-      # un-pinned checkout would run the review against main and skip
-      # on "all hunks identical". The triage job already extracted
-      # pr_number from the event payload; reuse it here so the review
-      # runs against the PR's actual code regardless of which event
-      # triggered.
+      # Trusted checkout of the default branch, only so the local
+      # install_review_cli action below comes from main and not from the
+      # PR. The PR head is checked out further down, after the fork
+      # guard and after everything that installs tooling.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # Full history so review-cli can diff against the PR base.
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
-          ref: refs/pull/${{ needs.triage.outputs.pr_number }}/head
+          ref: ${{ github.event.repository.default_branch }}
 
       # NOTE: deliberately not running the monorepo's own bun install.
       # The install_review_cli action below sets up Bun pinned to
@@ -289,6 +295,44 @@ jobs:
         with:
           version: ${{ vars.REVIEW_CLI_VERSION || '1.6.0' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # pr_number reaches this job as a string output and ends up in the
+      # checkout ref below, so make sure it's just digits.
+      - name: Validate PR number
+        env:
+          PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          case "$PR_NUMBER" in
+            '' | *[!0-9]*)
+              echo "::error::Refusing to proceed: pr_number is not numeric."
+              exit 1
+              ;;
+          esac
+
+      # Authoritative fork guard, for every trigger. issue_comment and
+      # workflow_dispatch run the default-branch workflow with repository
+      # secrets even when the PR comes from a fork, and their payloads
+      # don't name the head repo, so the triage `if:` can't catch them.
+      # Without this, a member commenting @request-claude-review on a
+      # fork PR would run the fork's code in this job.
+      # A deleted fork has no head repo and is refused too.
+      - name: Refuse fork PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          HEAD_REPO=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER" --jq '.head.repo.full_name // ""')
+          if [ -z "$HEAD_REPO" ]; then
+            echo "::error::Could not resolve the head repository for PR #$PR_NUMBER (deleted fork, or unexpected API response). Refusing to proceed."
+            exit 1
+          fi
+          if [ "$HEAD_REPO" != "$GH_REPO" ]; then
+            echo "::error::Refusing to review a fork PR (head=$HEAD_REPO). Fork code must not run in a job holding repository secrets."
+            exit 1
+          fi
+          echo "same-repo PR confirmed (head=$HEAD_REPO)"
 
       # Fail fast if the OAuth token is missing — without it
       # agent-query-factory falls back to a mock, which is confusing.
@@ -350,6 +394,21 @@ jobs:
           echo "Installed claude at: $CLAUDE_BIN"
           echo "CLAUDE_CODE_EXECUTABLE_PATH=$CLAUDE_BIN" >> "$GITHUB_ENV"
           echo "$(dirname "$CLAUDE_BIN")" >> "$GITHUB_PATH"
+
+      # Now check out the PR head. Required for comment-trigger
+      # variants — `issue_comment` and `pull_request_review_comment`
+      # events default GITHUB_REF to the repo's default branch, so an
+      # un-pinned checkout would run the review against main and skip
+      # on "all hunks identical". This replaces the trusted tree above;
+      # review-cli and claude are already installed under $RUNNER_TEMP
+      # and $HOME, so nothing from the PR is executed as tooling.
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Full history so review-cli can diff against the PR base.
+          fetch-depth: 0
+          persist-credentials: false
+          ref: refs/pull/${{ needs.triage.outputs.pr_number }}/head
 
       # Pre — running sticky placeholder so the PR shows in-progress
       # state from t=0. Best-effort: if this fails Post creates the

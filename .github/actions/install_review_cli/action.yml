@@ -74,4 +74,8 @@ runs:
         cd "$install_dir"
         bun init -y > /dev/null
         bun add "@uniswap/review-cli@${REVIEW_CLI_VERSION}"
+        # The bunfig holds the token in cleartext and isn't needed once
+        # the package is resolved. Don't leave it on disk while the PR
+        # tree is being analyzed.
+        rm -f "$install_dir/bunfig.toml"
         echo "bin-path=$install_dir/node_modules/.bin" >> "$GITHUB_OUTPUT"
