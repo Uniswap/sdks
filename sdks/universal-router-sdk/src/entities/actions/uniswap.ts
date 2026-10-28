@@ -107,6 +107,17 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & 
    * `TokenTransferMode.ApproveProxy`.
    */
   routerBalanceInput?: RouterBalanceInput
+  /**
+   * Hook addresses whose pools need the swap input already in the PoolManager when the
+   * hook runs, e.g. ERC-4626 wrapper hooks that `take` the input inside `beforeSwap` to
+   * deposit it into a vault. A v4 route through any of these hooks is encoded as
+   * `SETTLE(amountIn)` then a swap on the open delta, the order mixed-route v4 sections
+   * already use, instead of settling after the swap. The swap spends what actually arrived,
+   * so an input token whose transfers round down cannot leave an unsettled delta.
+   * Exact-input only: an exact-output route through one of these hooks is refused.
+   * Matching is case-insensitive.
+   */
+  settleBeforeSwapHooks?: string[]
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
@@ -702,13 +713,20 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   const perHopSlippage = minHopPriceX36?.map((s) => BigNumber.from(s)) ?? []
 
+  const settleBeforeSwap = routeHasSettleBeforeSwapHook(pools, options.settleBeforeSwapHooks)
+  invariant(!settleBeforeSwap || tradeType === TradeType.EXACT_INPUT, 'SETTLE_BEFORE_SWAP_HOOK_EXACT_INPUT_ONLY')
+
   const v4Planner = new V4Planner()
-  if (options.routerBalanceInput) {
+  if (options.routerBalanceInput || settleBeforeSwap) {
     // V4Planner.addTrade would bake the quoted amountIn into the swap action, so build the
-    // pair explicitly instead: SETTLE the router's whole balance, then swap the resulting
-    // open delta. Same shape the mixed-route encoder uses for its v4 sections.
+    // pair explicitly instead: SETTLE the input first, then swap the resulting open delta.
+    // Same shape the mixed-route encoder uses for its v4 sections.
     const pathInput = trade.route.pathInput
-    v4Planner.addSettle(pathInput, false, CONTRACT_BALANCE)
+    if (options.routerBalanceInput) {
+      v4Planner.addSettle(pathInput, false, CONTRACT_BALANCE)
+    } else {
+      v4Planner.addSettle(pathInput, payerIsUser, BigNumber.from(inputAmount.quotient.toString()))
+    }
     v4Planner.addAction(
       Actions.SWAP_EXACT_IN,
       [
@@ -764,6 +782,12 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     takeAmount
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
+}
+
+function routeHasSettleBeforeSwapHook(pools: V4Pool[], settleBeforeSwapHooks: string[] | undefined): boolean {
+  if (!settleBeforeSwapHooks?.length) return false
+  const hooks = new Set(settleBeforeSwapHooks.map((hook) => hook.toLowerCase()))
+  return pools.some((pool) => hooks.has(pool.hooks.toLowerCase()))
 }
 
 // encode a mixed route swap, i.e. including both v2 and v3 pools
