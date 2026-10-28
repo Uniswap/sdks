@@ -69,7 +69,7 @@ describe('Universal Router Constants', () => {
         '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1'
       )
       expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 4663)).to.equal(
-        '0x8876789976decbfcbbbe364623c63652db8c0904'
+        '0x06afBA43fd06227fA663b0dAeCF536F6eaA6BF99'
       )
     })
 
@@ -128,7 +128,7 @@ describe('Universal Router Constants', () => {
 
     it('should return the correct V2_1_1 creation block for arc and robinhood', () => {
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 5042)).to.equal(1950059)
-      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 4663)).to.equal(18127)
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 4663)).to.equal(3347899)
     })
 
     it('should throw for Ink (57073) V2_1_1 creation block, which is not deployed there', () => {
