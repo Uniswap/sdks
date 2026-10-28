@@ -24,7 +24,7 @@ import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
-import { directTransferSweepFloor, sumUserPaidMax } from './utils/directTransfers'
+import { directTransferSweepFloor, isSettlementSweepRedundant, sumUserPaidMax } from './utils/directTransfers'
 import {
   DEFAULT_UR_VERSION,
   ETH_ADDRESS,
@@ -182,6 +182,10 @@ export abstract class SwapRouter {
    * Amount convention: on `EXACT_INPUT`, `spec.routing.quote` is the GROSS output (before fees).
    * The fee cascade is deducted from it when sizing the sweep floor; passing a net
    * (post-fee) quote double-counts the fees and floors the sweep below the real minimum.
+   * With `omitRedundantSettlementSweep`, a zero-floor settlement sweep is omitted only for
+   * direct-transfer plans that leave no output in router custody. This assumes the router holds
+   * no pre-existing output balance and tokens have no transfer side effects that credit it;
+   * incidental output balance is not forwarded when the sweep is omitted.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
@@ -292,17 +296,20 @@ export abstract class SwapRouter {
 
     // Assumes routers already normalized final gross output into `routing.outputToken`.
     // Direct-output minimums (contract-enforced, delivered straight to the recipient)
-    // reduce the floor; the sweep always remains to forward any custody balance.
+    // reduce the floor. With `omitRedundantSettlementSweep`, a zero-floor sweep is omitted when no
+    // step can leave output in router custody; otherwise it remains to forward any custody balance.
     const sweepFloor = normalizedSpec.allowDirectTransfers
       ? directTransferSweepFloor(normalizedSpec, netMinOrExactAmountOut, swapSteps, getCurrencyAddress(outputToken))
       : netMinOrExactAmountOut
 
-    planner.addCommand(
-      CommandType.SWEEP,
-      [getCurrencyAddress(outputToken), normalizedSpec.recipient, sweepFloor],
-      false,
-      normalizedSpec.urVersion
-    )
+    if (!isSettlementSweepRedundant(normalizedSpec, swapSteps, sweepFloor)) {
+      planner.addCommand(
+        CommandType.SWEEP,
+        [getCurrencyAddress(outputToken), normalizedSpec.recipient, sweepFloor],
+        false,
+        normalizedSpec.urVersion
+      )
+    }
 
     // Assumes routers already normalized unused input into `routing.inputToken`.
     // Exact-output uses max input, so any unused slippage padding is refunded to the recipient.
