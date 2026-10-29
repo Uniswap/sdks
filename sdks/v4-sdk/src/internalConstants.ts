@@ -1,9 +1,9 @@
 import JSBI from 'jsbi'
-import { constants } from 'ethers'
+import { AddressZero, Zero } from '@ethersproject/constants'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 
 // constants used internally but not expected to be used externally
-export const ADDRESS_ZERO = constants.AddressZero
+export const ADDRESS_ZERO = AddressZero
 export const NEGATIVE_ONE = JSBI.BigInt(-1)
 export const ZERO = JSBI.BigInt(0)
 export const ONE = JSBI.BigInt(1)
@@ -25,7 +25,7 @@ export const TICK_SPACING_SIXTY = 60
 export const MIN_SLIPPAGE_DECREASE = 0
 
 // used when unwrapping weth in positon manager
-export const OPEN_DELTA = constants.Zero
+export const OPEN_DELTA = Zero
 
 // default prices
 export const SQRT_PRICE_1_1 = encodeSqrtRatioX96(1, 1)

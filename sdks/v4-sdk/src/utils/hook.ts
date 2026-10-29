@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { isAddress } from 'ethers/lib/utils'
+import { isAddress } from '@ethersproject/address'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export type HookPermissions = { [key in HookOptions]: boolean }
