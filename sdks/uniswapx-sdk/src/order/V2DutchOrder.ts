@@ -535,7 +535,7 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
    *  @returns The address which co-signed the order
    */
   recoverCosigner(): string {
-    return ethers.utils.verifyMessage(
+    return ethers.utils.recoverAddress(
       this.cosignatureHash(this.info.cosignerData),
       this.info.cosignature
     );
