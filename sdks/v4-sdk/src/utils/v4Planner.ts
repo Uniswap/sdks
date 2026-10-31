@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant'
-import { defaultAbiCoder } from 'ethers/lib/utils'
-import { BigNumber } from 'ethers'
+import { defaultAbiCoder } from '@ethersproject/abi'
+import { BigNumber } from '@ethersproject/bignumber'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
 import { ADDRESS_ZERO, EMPTY_BYTES } from '../internalConstants'
