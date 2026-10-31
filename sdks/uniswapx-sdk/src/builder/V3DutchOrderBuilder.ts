@@ -183,6 +183,11 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     );
     invariant(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      info.cosignerData.outputOverrides.length === this.info.outputs!.length,
+      "outputOverrides length must match outputs length"
+    );
+    invariant(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       info.cosignerData.inputOverride.lte(this.info.input!.startAmount),
       "inputOverride larger than original input"
     );

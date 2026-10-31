@@ -538,6 +538,56 @@ describe("V3DutchOrderBuilder", () => {
           ).toThrow("Invariant failed: inputOverride larger than original input");
     });
 
+    it("Throw if outputOverrides length does not match outputs", () => {
+        const deadline = Math.floor(Date.now() / 1000) + 1000;
+        expect(() =>
+            builder
+            .cosigner(constants.AddressZero)
+            .cosignature("0x")
+            .deadline(deadline)
+            .decayStartBlock(212121)
+            .swapper(constants.AddressZero)
+            .nonce(BigNumber.from(100))
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [],
+                    relativeAmounts: [],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [17],
+                    relativeAmounts: [BigInt(17)],
+                },
+                recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(17),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+            // Only one override for two outputs — must reject (issue #728).
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .build()
+        ).toThrow("Invariant failed: outputOverrides length must match outputs length");
+    });
+
     it("Throw if outputOverride smaller than output", () => {
         const deadline = Math.floor(Date.now() / 1000) + 1000;
         expect(() =>
