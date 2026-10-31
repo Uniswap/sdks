@@ -641,8 +641,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
     routerConfigs: {
       [UniversalRouterVersion.V2_1_1]: {
-        address: '0x8876789976decbfcbbbe364623c63652db8c0904',
-        creationBlock: 18127,
+        // Production Across SpokePool redeploy (Uniswap/contracts deployments/json/4663.json).
+        // Prior 0x8876…0904 is labeled orphaned there (placeholder SpokePool).
+        address: '0x06afBA43fd06227fA663b0dAeCF536F6eaA6BF99',
+        creationBlock: 3347899,
       },
       [UniversalRouterVersion.V2_1_2]: {
         address: '0x204FAca1764B154221e35c0d20aBb3c525710498',
