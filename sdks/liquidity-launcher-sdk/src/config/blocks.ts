@@ -12,13 +12,27 @@ import { LauncherSdkError } from '../errors'
  * passed in so this module stays pure and unit-testable.
  */
 
+/** Whether the SDK knows `chainId`'s block time (a schedule or a fixed-cadence entry). */
+export function hasKnownBlockTime(chainId: number): boolean {
+  return BLOCK_TIME_SCHEDULE_BY_CHAIN[chainId] !== undefined || BLOCK_TIME_SECONDS_BY_CHAIN[chainId] !== undefined
+}
+
+function fixedSchedule(seconds: number): readonly BlockTimeSegment[] {
+  return [{ fromBlock: 0n, fromTimestamp: 0n, blockTimeMs: Math.round(seconds * 1000) }]
+}
+
+/** The chain's block-time schedule; throws `INVALID_TIME` for a chain the SDK has no block time for. */
 function getBlockTimeSchedule(chainId: number): readonly BlockTimeSegment[] {
   const schedule = BLOCK_TIME_SCHEDULE_BY_CHAIN[chainId]
   if (schedule) {
     return schedule
   }
-  const seconds = BLOCK_TIME_SECONDS_BY_CHAIN[chainId] ?? DEFAULT_BLOCK_TIME_SECONDS
-  return [{ fromBlock: 0n, fromTimestamp: 0n, blockTimeMs: Math.round(seconds * 1000) }]
+  const seconds = BLOCK_TIME_SECONDS_BY_CHAIN[chainId]
+  if (seconds === undefined) {
+    // No silent DEFAULT_BLOCK_TIME_SECONDS here: a wrong cadence writes wrong blocks on-chain.
+    throw new LauncherSdkError('INVALID_TIME', `No block time known for chain ${chainId}`)
+  }
+  return fixedSchedule(seconds)
 }
 
 function gcd(a: bigint, b: bigint): bigint {
@@ -60,7 +74,10 @@ function scaledBlocksBetween(schedule: readonly BlockTimeSegment[], fromMs: bigi
   return scaled
 }
 
-/** Rounded block count produced between two unix timestamps (seconds) on `chainId`. */
+/**
+ * Rounded block count produced between two unix timestamps (seconds) on `chainId`. Throws
+ * `INVALID_TIME` for a chain with no known block time.
+ */
 export function blocksBetweenTimestamps(chainId: number, fromUnix: bigint, toUnix: bigint): bigint {
   const schedule = getBlockTimeSchedule(chainId)
   const den = scheduleDenominator(schedule)
@@ -68,14 +85,17 @@ export function blocksBetweenTimestamps(chainId: number, fromUnix: bigint, toUni
 }
 
 /**
- * Block time (seconds) on a chain at `atUnix` (default: now), falling back to
- * {@link DEFAULT_BLOCK_TIME_SECONDS}. A single number cannot describe a window that crosses a
- * cadence change — prefer {@link timeToBlockOnChain} / `deriveBlocks({ chainId })` for time → block
- * and {@link blocksToSeconds} for block → time.
+ * Block time (seconds) in effect on a chain at `atUnix` (default: **now**), falling back to
+ * {@link DEFAULT_BLOCK_TIME_SECONDS} for a chain the SDK has no entry for.
+ *
+ * The result depends on the wall clock: on Base after Denim it returns `0.2`, so multiplying it by
+ * a span of older (2s) blocks under-reads that span 10x. A single number cannot describe a span
+ * that crosses a cadence change — use {@link blocksToSeconds} to convert historical block spans to
+ * seconds, and {@link timeToBlockOnChain} / `deriveBlocks({ chainId })` for time → block.
  */
 export function getBlockTimeSeconds(chainId: number, atUnix: bigint | number = Math.floor(Date.now() / 1000)): number {
   const at = typeof atUnix === 'bigint' ? atUnix : BigInt(Math.floor(atUnix))
-  const schedule = getBlockTimeSchedule(chainId)
+  const schedule = hasKnownBlockTime(chainId) ? getBlockTimeSchedule(chainId) : fixedSchedule(DEFAULT_BLOCK_TIME_SECONDS)
   let active = schedule[0]!
   for (const segment of schedule) {
     if (segment.fromTimestamp <= at) {
@@ -87,7 +107,8 @@ export function getBlockTimeSeconds(chainId: number, atUnix: bigint | number = M
 
 /**
  * Real seconds elapsed from block `fromBlock` to block `toBlock` on `chainId`, following the chain's
- * block-time schedule (negative when `toBlock < fromBlock`).
+ * block-time schedule (negative when `toBlock < fromBlock`). Throws `INVALID_TIME` for a chain
+ * with no known block time.
  */
 export function blocksToSeconds(chainId: number, fromBlock: bigint, toBlock: bigint): number {
   if (toBlock < fromBlock) {
@@ -123,7 +144,8 @@ export function timeToBlock(
 
 /**
  * Converts a future unix timestamp to a block number on `chainId`, following the chain's
- * block-time schedule across any cadence change between `nowUnix` and `targetUnix`.
+ * block-time schedule across any cadence change between `nowUnix` and `targetUnix`. Throws
+ * `INVALID_TIME` for a chain with no known block time.
  */
 export function timeToBlockOnChain(chainId: number, targetUnix: bigint, currentBlock: bigint, nowUnix: bigint): bigint {
   return assertNotPast(currentBlock + blocksBetweenTimestamps(chainId, nowUnix, targetUnix), currentBlock)
@@ -146,11 +168,12 @@ interface DeriveBlocksBaseInput {
 }
 
 /**
- * Pass `chainId` to follow the chain's block-time schedule (required for windows that cross a
- * cadence change, e.g. Base Denim); when set it takes precedence over `blockTimeSeconds`.
+ * Pass exactly one of `chainId` (follows the chain's block-time schedule; required for windows that
+ * cross a cadence change, e.g. Base Denim) or a fixed `blockTimeSeconds`. Passing both throws, so a
+ * half-migrated caller is caught rather than one value silently winning.
  */
 export type DeriveBlocksInput = DeriveBlocksBaseInput &
-  ({ blockTimeSeconds: number; chainId?: number } | { chainId: number; blockTimeSeconds?: number })
+  ({ blockTimeSeconds: number; chainId?: undefined } | { chainId: number; blockTimeSeconds?: undefined })
 
 export interface DerivedBlocks {
   startBlock: bigint
@@ -164,6 +187,9 @@ export function deriveBlocks(input: DeriveBlocksInput): DerivedBlocks {
   const { startTimeUnix, endTimeUnix, currentBlock, nowUnix, chainId, blockTimeSeconds } = input
   if (endTimeUnix <= startTimeUnix) {
     throw new LauncherSdkError('INVALID_AUCTION_WINDOW', 'Auction end time must be after start time')
+  }
+  if (chainId !== undefined && blockTimeSeconds !== undefined) {
+    throw new LauncherSdkError('INVALID_TIME', 'Pass either chainId or blockTimeSeconds, not both')
   }
   const toBlock = (targetUnix: bigint): bigint => {
     if (chainId !== undefined) {

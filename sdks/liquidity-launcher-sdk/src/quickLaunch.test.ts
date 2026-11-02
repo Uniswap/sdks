@@ -6,6 +6,7 @@ import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import { resolveNewPoolTickSpacing } from './config/fees'
 import { fdvUsdToPricePerToken } from './config/price'
+import { LauncherSdkError } from './errors'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
@@ -130,6 +131,12 @@ describe('isQuickLaunch — near-misses do NOT match', () => {
   it('degenerate window (endBlock <= startBlock)', () => {
     expect(isQuickLaunch(presetAuction({ endBlock: START }))).toBe(false)
   })
+
+  it('classifies an unknown chain at the 12s default rather than throwing', () => {
+    // 300 blocks at 12s = 1h: the pre-schedule classifier behavior is kept for read-side predicates.
+    expect(isQuickLaunch(presetAuction({ chainId: 999_999, endBlock: START + 300n }))).toBe(true)
+    expect(isPermanentTimelock({ chainId: 999_999, endBlock: 0n, unlockBlock: 1n })).toBe(false)
+  })
 })
 
 describe('getQuickLaunchDurationBlocks', () => {
@@ -152,6 +159,10 @@ describe('getQuickLaunchDurationBlocks', () => {
 
   it('splits a window that opens 30min before Base Denim: 900 + 9,000 blocks', () => {
     expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE, 1_793_899_801n)).toBe(9_900n)
+  })
+
+  it('throws for a chain with no known block time instead of assuming 12s', () => {
+    expect(() => getQuickLaunchDurationBlocks(999_999, 1_794_000_000n)).toThrow(LauncherSdkError)
   })
 })
 

@@ -104,7 +104,9 @@ import {
 } from '@uniswap/liquidity-launcher-sdk'
 
 // `chainId` follows the chain's block-time schedule, including cadence changes such as Base Denim
-// (2s -> 200ms blocks). A fixed `blockTimeSeconds` is still accepted for chains without one.
+// (2s -> 200ms blocks), and throws for a chain with no known block time. Pass either `chainId` or
+// a fixed `blockTimeSeconds`, not both. For block -> time on past blocks use `blocksToSeconds`,
+// not `getBlockTimeSeconds` (that returns the cadence in effect now).
 const { startBlock, endBlock, claimBlock, migrationBlock } = deriveBlocks({
   startTimeUnix, endTimeUnix, currentBlock, nowUnix, chainId,
 })

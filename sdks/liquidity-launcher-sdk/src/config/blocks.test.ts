@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 
 import { SupportedChainId } from '../chains'
-import { BLOCK_TIME_SCHEDULE_BY_CHAIN, DEFAULT_BLOCK_TIME_SECONDS } from '../constants'
+import { BLOCK_TIME_SCHEDULE_BY_CHAIN, BLOCK_TIME_SECONDS_BY_CHAIN, DEFAULT_BLOCK_TIME_SECONDS } from '../constants'
 import { LauncherSdkError } from '../errors'
 
 import {
@@ -10,6 +10,7 @@ import {
   deriveBlocks,
   type DeriveBlocksInput,
   getBlockTimeSeconds,
+  hasKnownBlockTime,
   timeToBlock,
   timeToBlockOnChain,
 } from './blocks'
@@ -176,6 +177,38 @@ describe('timeToBlockOnChain', () => {
   })
 })
 
+describe('unknown chains on the chainId path', () => {
+  const UNKNOWN = 999_999
+
+  it('every SupportedChainId has a block-time schedule or a fixed-cadence entry', () => {
+    const chainIds = Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')
+    expect(chainIds.length).toBeGreaterThan(0)
+    for (const chainId of chainIds) {
+      const known = BLOCK_TIME_SCHEDULE_BY_CHAIN[chainId] !== undefined || BLOCK_TIME_SECONDS_BY_CHAIN[chainId] !== undefined
+      expect({ chainId, known }).toEqual({ chainId, known: true })
+      expect(hasKnownBlockTime(chainId)).toBe(true)
+      expect(() => blocksBetweenTimestamps(chainId, 0n, 3_600n)).not.toThrow()
+    }
+  })
+
+  it('throws INVALID_TIME rather than silently using the 12s default', () => {
+    expect(hasKnownBlockTime(UNKNOWN)).toBe(false)
+    const expectInvalidTime = (fn: () => unknown) => {
+      try {
+        fn()
+      } catch (error) {
+        expect(error).toBeInstanceOf(LauncherSdkError)
+        expect((error as LauncherSdkError).code).toBe('INVALID_TIME')
+        return
+      }
+      throw new Error('expected INVALID_TIME')
+    }
+    expectInvalidTime(() => blocksBetweenTimestamps(UNKNOWN, 0n, 3_600n))
+    expectInvalidTime(() => blocksToSeconds(UNKNOWN, 0n, 300n))
+    expectInvalidTime(() => timeToBlockOnChain(UNKNOWN, 3_600n, 0n, 0n))
+  })
+})
+
 describe('blocksToSeconds', () => {
   it('converts blocks before, after and across Base Denim', () => {
     expect(blocksToSeconds(SupportedChainId.BASE, BASE_DENIM_BLOCK - 1_800n, BASE_DENIM_BLOCK)).toBe(3_600)
@@ -218,17 +251,22 @@ describe('deriveBlocks — chain-aware', () => {
     expect(blocks.migrationBlock).toBe(blocks.endBlock + 1n)
   })
 
-  it('prefers the chain schedule over a stale blockTimeSeconds', () => {
+  it('rejects a half-migrated caller that passes both chainId and blockTimeSeconds', () => {
     const now = BASE_DENIM_UNIX + 10n
-    const blocks = deriveBlocks({
+    const input = {
       startTimeUnix: now + 60n,
       endTimeUnix: now + 3_660n,
       currentBlock: CURRENT_BLOCK,
       nowUnix: now,
       chainId: SupportedChainId.BASE,
       blockTimeSeconds: 2,
-    })
-    expect(blocks.endBlock - blocks.startBlock).toBe(18_000n)
+    } as unknown as DeriveBlocksInput
+    expect(() => deriveBlocks(input)).toThrow(/either chainId or blockTimeSeconds/)
+  })
+
+  it('rejects a chain with no known block time instead of assuming the 12s default', () => {
+    const input = { startTimeUnix: 1_003_600n, endTimeUnix: 1_054_000n, currentBlock: 5_000_000n, nowUnix: 1_000_000n }
+    expect(() => deriveBlocks({ ...input, chainId: 999_999 })).toThrow(LauncherSdkError)
   })
 
   it('matches the fixed-cadence path on chains without a schedule', () => {

@@ -1,11 +1,12 @@
 import { type Address } from 'viem'
 
-import { blocksBetweenTimestamps, blocksToSeconds } from './config/blocks'
+import { blocksBetweenTimestamps, blocksToSeconds, hasKnownBlockTime } from './config/blocks'
 import { resolveNewPoolTickSpacing } from './config/fees'
 import type { PriceRangeKind } from './config/positions'
 import { fdvUsdToPricePerToken } from './config/price'
 import {
   DEFAULT_AUCTION_STEPS,
+  DEFAULT_BLOCK_TIME_SECONDS,
   DEFAULT_CONVEXITY_ALPHA,
   DEFAULT_FINAL_BLOCK_PCT,
   NEW_TOKEN_DECIMALS,
@@ -315,6 +316,17 @@ export function getQuickLaunchDurationBlocks(
   return blocksBetweenTimestamps(chainId, startUnix, startUnix + BigInt(QUICK_LAUNCH_DURATION_SECONDS))
 }
 
+/**
+ * Block span → seconds for the read-side classifiers. Unlike {@link blocksToSeconds} (which throws
+ * for an unknown chain), this keeps the classifiers' pre-schedule behavior of reading an unknown
+ * chain at {@link DEFAULT_BLOCK_TIME_SECONDS}, so a predicate over indexed data never throws.
+ */
+function classifierBlocksToSeconds(chainId: number, fromBlock: bigint, toBlock: bigint): number {
+  return hasKnownBlockTime(chainId)
+    ? blocksToSeconds(chainId, fromBlock, toBlock)
+    : Number(toBlock - fromBlock) * DEFAULT_BLOCK_TIME_SECONDS
+}
+
 // ---------------------------------------------------------------------------
 // CreateAuction request derivation (FDV -> price-per-token)
 // ---------------------------------------------------------------------------
@@ -385,7 +397,7 @@ export function isPermanentTimelock(params: PermanentTimelockParams): boolean {
     return Number(params.unlockTimeSeconds) - Number(params.endTimeSeconds) >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
   }
   // Block form: chain-aware horizon via the chain's block-time schedule.
-  const horizonSeconds = blocksToSeconds(params.chainId, params.endBlock, params.unlockBlock)
+  const horizonSeconds = classifierBlocksToSeconds(params.chainId, params.endBlock, params.unlockBlock)
   return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
 }
 
@@ -539,7 +551,7 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
   if (params.endBlock <= params.startBlock) {
     return false
   }
-  const durationSeconds = blocksToSeconds(params.chainId, params.startBlock, params.endBlock)
+  const durationSeconds = classifierBlocksToSeconds(params.chainId, params.startBlock, params.endBlock)
   const durationMatches = allowedDurationsSeconds.some(
     (target) => Math.abs(durationSeconds - target) <= target * durationToleranceRatio
   )
