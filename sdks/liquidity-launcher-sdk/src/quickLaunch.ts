@@ -1,6 +1,6 @@
 import { type Address } from 'viem'
 
-import { getBlockTimeSeconds } from './config/blocks'
+import { blocksBetweenTimestamps, blocksToSeconds } from './config/blocks'
 import { resolveNewPoolTickSpacing } from './config/fees'
 import type { PriceRangeKind } from './config/positions'
 import { fdvUsdToPricePerToken } from './config/price'
@@ -304,9 +304,15 @@ export const QUICK_LAUNCH_PRESET: QuickLaunchPreset = {
   },
 }
 
-/** The {@link QUICK_LAUNCH_DURATION_SECONDS} window as a block count on `chainId` (uses the chain's block time). */
-export function getQuickLaunchDurationBlocks(chainId: number): bigint {
-  return BigInt(Math.round(QUICK_LAUNCH_DURATION_SECONDS / getBlockTimeSeconds(chainId)))
+/**
+ * The {@link QUICK_LAUNCH_DURATION_SECONDS} window as a block count on `chainId`, for a window
+ * opening at `startUnix` (default: now) — the chain's block-time schedule can change mid-window.
+ */
+export function getQuickLaunchDurationBlocks(
+  chainId: number,
+  startUnix: bigint = BigInt(Math.floor(Date.now() / 1000))
+): bigint {
+  return blocksBetweenTimestamps(chainId, startUnix, startUnix + BigInt(QUICK_LAUNCH_DURATION_SECONDS))
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +348,7 @@ export function getQuickLaunchGraduationPricePerToken(nativeUsdPrice: number): s
  *
  * 1. **Block form** (`{chainId, endBlock, unlockBlock}`) — the canonical, chain-aware check used by
  *    classifiers over indexed data: the block horizon past the auction end, converted to real
- *    seconds via the chain block time, must reach
+ *    seconds via the chain's block-time schedule, must reach
  *    {@link PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS}. Legacy max-uint sentinel unlock blocks pass
  *    naturally (their horizon is astronomically large).
  * 2. **Timestamp form** (`{endTimeSeconds, unlockTimeSeconds}`) — the same horizon rule over real
@@ -378,8 +384,8 @@ export function isPermanentTimelock(params: PermanentTimelockParams): boolean {
   if ('endTimeSeconds' in params) {
     return Number(params.unlockTimeSeconds) - Number(params.endTimeSeconds) >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
   }
-  // Block form: chain-aware horizon via the chain block time.
-  const horizonSeconds = Number(params.unlockBlock - params.endBlock) * getBlockTimeSeconds(params.chainId)
+  // Block form: chain-aware horizon via the chain's block-time schedule.
+  const horizonSeconds = blocksToSeconds(params.chainId, params.endBlock, params.unlockBlock)
   return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
 }
 
@@ -533,8 +539,7 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
   if (params.endBlock <= params.startBlock) {
     return false
   }
-  const blockDelta = params.endBlock - params.startBlock
-  const durationSeconds = Number(blockDelta) * getBlockTimeSeconds(params.chainId)
+  const durationSeconds = blocksToSeconds(params.chainId, params.startBlock, params.endBlock)
   const durationMatches = allowedDurationsSeconds.some(
     (target) => Math.abs(durationSeconds - target) <= target * durationToleranceRatio
   )
@@ -579,7 +584,11 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
   // within tolerance of SOME allowed preset value. USD-denominated on purpose: the matcher never
   // sees a native amount, so the gate is chain-agnostic (a legit $5k launch passes on any chain; a
   // raw-native threshold would wrongly demote every non-ETH chain).
-  if (params.graduationFdvUsd !== undefined && params.graduationFdvUsd !== null && Number.isFinite(params.graduationFdvUsd)) {
+  if (
+    params.graduationFdvUsd !== undefined &&
+    params.graduationFdvUsd !== null &&
+    Number.isFinite(params.graduationFdvUsd)
+  ) {
     const fdv = params.graduationFdvUsd
     const graduationMatches = allowedGraduationFdvUsd.some(
       (allowed) => Math.abs(fdv - allowed) <= allowed * graduationFdvToleranceRatio

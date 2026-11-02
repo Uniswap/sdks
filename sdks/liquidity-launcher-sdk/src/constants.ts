@@ -94,11 +94,43 @@ export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   1301: 1, // unichain sepolia
   4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence (blocknumberish-aware contracts redeployed 2026-07-09)
   5042: 0.5, // arc
-  8453: 2, // base
+  8453: 2, // base — pre-Denim only; BLOCK_TIME_SCHEDULE_BY_CHAIN takes precedence
   42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche
-  84532: 2, // base sepolia
+  84532: 2, // base sepolia — pre-Denim only; BLOCK_TIME_SCHEDULE_BY_CHAIN takes precedence
   11155111: 12, // sepolia
+}
+
+/**
+ * A run of blocks produced at a fixed cadence: block `fromBlock` has unix timestamp
+ * `fromTimestamp`, and every later block in the run follows `blockTimeMs` after its parent.
+ */
+export interface BlockTimeSegment {
+  readonly fromBlock: bigint
+  readonly fromTimestamp: bigint
+  readonly blockTimeMs: number
+}
+
+/**
+ * Block-time schedules for chains whose cadence changed at a hard fork, ordered by `fromBlock`.
+ * Takes precedence over {@link BLOCK_TIME_SECONDS_BY_CHAIN}.
+ *
+ * Base's Denim upgrade moves block production from 2s to exactly 200ms. The first Denim block is
+ * the first legacy 2s slot at or after the configured activation time, so its number and timestamp
+ * follow from the genesis anchor: `block = ceil((activation - genesisTime) / 2)`,
+ * `timestamp = genesisTime + 2 * block`.
+ */
+export const BLOCK_TIME_SCHEDULE_BY_CHAIN: Record<number, readonly BlockTimeSegment[]> = {
+  // base: genesis 1686789347, Denim activation 1793901600
+  8453: [
+    { fromBlock: 0n, fromTimestamp: 1_686_789_347n, blockTimeMs: 2_000 },
+    { fromBlock: 53_556_127n, fromTimestamp: 1_793_901_601n, blockTimeMs: 200 },
+  ],
+  // base sepolia: genesis 1695768288, Denim activation 1792605600
+  84532: [
+    { fromBlock: 0n, fromTimestamp: 1_695_768_288n, blockTimeMs: 2_000 },
+    { fromBlock: 48_418_656n, fromTimestamp: 1_792_605_600n, blockTimeMs: 200 },
+  ],
 }
 
 /** Re-exported so callers building pool params don't need a direct v4-sdk import. */

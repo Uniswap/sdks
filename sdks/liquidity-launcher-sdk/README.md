@@ -103,8 +103,10 @@ import {
   deriveConvexAuctionSteps,
 } from '@uniswap/liquidity-launcher-sdk'
 
+// `chainId` follows the chain's block-time schedule, including cadence changes such as Base Denim
+// (2s -> 200ms blocks). A fixed `blockTimeSeconds` is still accepted for chains without one.
 const { startBlock, endBlock, claimBlock, migrationBlock } = deriveBlocks({
-  startTimeUnix, endTimeUnix, currentBlock, nowUnix, blockTimeSeconds: 1,
+  startTimeUnix, endTimeUnix, currentBlock, nowUnix, chainId,
 })
 const { floorPriceX96, tickSpacing } = deriveAuctionPricing(floorPriceToX96('0.0001', 18, 18))
 const steps = deriveConvexAuctionSteps(startBlock, endBlock)
