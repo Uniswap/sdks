@@ -6,6 +6,7 @@ import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import { resolveNewPoolTickSpacing } from './config/fees'
 import { fdvUsdToPricePerToken } from './config/price'
+import { LauncherSdkError } from './errors'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
@@ -34,10 +35,15 @@ import {
   type QuickLaunchMatchParams,
 } from './quickLaunch'
 
-const CHAIN = SupportedChainId.BASE // 2s blocks
+const CHAIN = SupportedChainId.BASE // 2s blocks before Denim
 const START = 1_000_000n
+// Base block 1,000,000's timestamp — well before Denim.
+const START_UNIX = 1_688_789_347n
 // The preset (1h) window as a block count on Base.
-const END = START + getQuickLaunchDurationBlocks(CHAIN)
+const END = START + getQuickLaunchDurationBlocks(CHAIN, START_UNIX)
+// Base Denim: block 53,556,127 (timestamp 1,793,901,601) is the first 200ms block.
+const BASE_DENIM_BLOCK = 53_556_127n
+const BASE_DENIM_UNIX = 1_793_901_601n
 
 // An auction built straight from the preset.
 function presetAuction(overrides: Partial<QuickLaunchMatchParams> = {}): QuickLaunchMatchParams {
@@ -95,12 +101,12 @@ describe('isQuickLaunch — near-misses do NOT match', () => {
   })
 
   it('wrong duration (30m — half the preset window)', () => {
-    const halfWindow = getQuickLaunchDurationBlocks(CHAIN) / 2n
+    const halfWindow = getQuickLaunchDurationBlocks(CHAIN, START_UNIX) / 2n
     expect(isQuickLaunch(presetAuction({ endBlock: START + halfWindow }))).toBe(false)
   })
 
   it('wrong duration (2h — between the 1h preset and the legacy 4h window)', () => {
-    const twoHourWindow = getQuickLaunchDurationBlocks(CHAIN) * 2n
+    const twoHourWindow = getQuickLaunchDurationBlocks(CHAIN, START_UNIX) * 2n
     expect(isQuickLaunch(presetAuction({ endBlock: START + twoHourWindow }))).toBe(false)
   })
 
@@ -125,6 +131,12 @@ describe('isQuickLaunch — near-misses do NOT match', () => {
   it('degenerate window (endBlock <= startBlock)', () => {
     expect(isQuickLaunch(presetAuction({ endBlock: START }))).toBe(false)
   })
+
+  it('classifies an unknown chain at the 12s default rather than throwing', () => {
+    // 300 blocks at 12s = 1h: the pre-schedule classifier behavior is kept for read-side predicates.
+    expect(isQuickLaunch(presetAuction({ chainId: 999_999, endBlock: START + 300n }))).toBe(true)
+    expect(isPermanentTimelock({ chainId: 999_999, endBlock: 0n, unlockBlock: 1n })).toBe(false)
+  })
 })
 
 describe('getQuickLaunchDurationBlocks', () => {
@@ -137,8 +149,20 @@ describe('getQuickLaunchDurationBlocks', () => {
     expect(getQuickLaunchDurationBlocks(SupportedChainId.MAINNET)).toBe(300n)
   })
 
-  it('is 1,800 blocks on a 2s/block chain (Base)', () => {
-    expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE)).toBe(1_800n)
+  it('is 1,800 blocks on Base before Denim (2s/block)', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE, 1_793_000_000n)).toBe(1_800n)
+  })
+
+  it('is 18,000 blocks on Base after Denim (200ms/block)', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE, 1_794_000_000n)).toBe(18_000n)
+  })
+
+  it('splits a window that opens 30min before Base Denim: 900 + 9,000 blocks', () => {
+    expect(getQuickLaunchDurationBlocks(SupportedChainId.BASE, 1_793_899_801n)).toBe(9_900n)
+  })
+
+  it('throws for a chain with no known block time instead of assuming 12s', () => {
+    expect(() => getQuickLaunchDurationBlocks(999_999, 1_794_000_000n)).toThrow(LauncherSdkError)
   })
 })
 
@@ -240,33 +264,32 @@ describe('isQuickLaunch — lock refinement null/undefined semantics', () => {
   })
 
   it('still fails the base fingerprint even when both refinements pass', () => {
-    expect(
-      isQuickLaunch(presetAuction({ currency: getAddress('0x15d0e0c55a3e7Ee67152ad7E89AcF164253Ff68D') }))
-    ).toBe(false)
+    expect(isQuickLaunch(presetAuction({ currency: getAddress('0x15d0e0c55a3e7Ee67152ad7E89AcF164253Ff68D') }))).toBe(
+      false
+    )
   })
 })
 
 describe('isPermanentTimelock', () => {
-  const endBlock = END
+  // A post-Denim Base auction, so the whole horizon runs at one cadence.
+  const endBlock = BASE_DENIM_BLOCK + 1_000_000n
   // The block delta that makes a timelock permanent on this chain. Derived from the block-time
   // table and the threshold, not hardcoded, so a change to either keeps these tests honest.
-  const permanentUnlockBlock =
-    endBlock + BigInt(Math.ceil(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / getBlockTimeSeconds(CHAIN)))
+  const blockTimeSeconds = getBlockTimeSeconds(CHAIN, BASE_DENIM_UNIX)
+  const permanentUnlockBlock = endBlock + BigInt(Math.ceil(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / blockTimeSeconds))
   const nearlyPermanentUnlockBlock =
-    endBlock + BigInt(Math.floor(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / getBlockTimeSeconds(CHAIN)) - 1)
+    endBlock + BigInt(Math.floor(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / blockTimeSeconds) - 1)
 
   it('encodes a 1000-year horizon', () => {
     expect(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS).toBe(1000 * 365 * 86_400)
   })
 
   it('accepts an unlock block at or past the permanence horizon', () => {
-    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: permanentUnlockBlock }))
-      .toBe(true)
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: permanentUnlockBlock })).toBe(true)
   })
 
   it('rejects an unlock block one block short of the horizon', () => {
-    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: nearlyPermanentUnlockBlock }))
-      .toBe(false)
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: nearlyPermanentUnlockBlock })).toBe(false)
   })
 
   it('rejects a lock that unlocks right after the auction ends', () => {
@@ -389,12 +412,8 @@ describe('isPermanentTimelock — burn is structurally permanent', () => {
   })
 
   it('does not treat other modes as structurally permanent', () => {
-    expect(isPermanentTimelock({ lockMode: 'buybackBurn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(
-      false
-    )
-    expect(isPermanentTimelock({ lockMode: 'timelock', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(
-      false
-    )
+    expect(isPermanentTimelock({ lockMode: 'buybackBurn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(false)
+    expect(isPermanentTimelock({ lockMode: 'timelock', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(false)
   })
 })
 
@@ -402,7 +421,6 @@ describe('isPermanentTimelock — creatorFees is structurally permanent', () => 
   it('accepts a creatorFees position at unlock block 0 (block form), as splitter rows carry', () => {
     expect(isPermanentTimelock({ lockMode: 'creatorFees', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(true)
   })
-
 
   it('exposes the structural set: burn and creatorFees only', () => {
     expect([...STRUCTURALLY_PERMANENT_LOCK_MODES].sort()).toEqual(['burn', 'creatorFees'])
@@ -647,27 +665,23 @@ describe('isQuickLaunch — graduation-FDV gate', () => {
   })
 
   it('is an ADDITIONAL gate: a good FDV cannot rescue a broken structural fingerprint', () => {
-    expect(
-      isQuickLaunch(presetAuction({ totalSupplyRaw: 500_000_000n * 10n ** 18n, graduationFdvUsd: 10_000 }))
-    ).toBe(false)
+    expect(isQuickLaunch(presetAuction({ totalSupplyRaw: 500_000_000n * 10n ** 18n, graduationFdvUsd: 10_000 }))).toBe(
+      false
+    )
   })
 
   it('honors an overridden allowed set (same mechanism as allowedDurationsSeconds)', () => {
     // $50k is not in the default set, so it fails by default...
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 50_000 }))).toBe(false)
     // ...but passes when the caller widens the allowed set explicitly.
-    expect(
-      isQuickLaunch(presetAuction({ graduationFdvUsd: 50_000 }), { allowedGraduationFdvUsd: [50_000] })
-    ).toBe(true)
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 50_000 }), { allowedGraduationFdvUsd: [50_000] })).toBe(true)
   })
 
   it('honors an overridden tolerance ratio', () => {
     // 20_000 is 100% over 10_000 — far outside the default ±25%...
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 20_000 }))).toBe(false)
     // ...but within a widened ±100% tolerance.
-    expect(
-      isQuickLaunch(presetAuction({ graduationFdvUsd: 20_000 }), { graduationFdvToleranceRatio: 1.0 })
-    ).toBe(true)
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 20_000 }), { graduationFdvToleranceRatio: 1.0 })).toBe(true)
   })
 })
 
@@ -735,5 +749,39 @@ describe('isQuickLaunch — real prod cohort (graduation FDVs as of 2026-08-04, 
       (allowed) => Math.abs(3_747_000_000 - allowed) / allowed <= QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO
     )
     expect(rthWithin).toBe(false)
+  })
+})
+
+describe('Base Denim: block → time follows the block-time schedule', () => {
+  // Literal block counts (1h at each cadence), not derived from the schedule.
+  it('matches a 1h auction entirely after Denim (18,000 blocks at 200ms)', () => {
+    const start = BASE_DENIM_BLOCK + 500_000n
+    expect(isQuickLaunch(presetAuction({ startBlock: start, endBlock: start + 18_000n }))).toBe(true)
+    // The pre-Denim block count is now only 6 minutes of real time.
+    expect(isQuickLaunch(presetAuction({ startBlock: start, endBlock: start + 1_800n }))).toBe(false)
+  })
+
+  it('matches a 1h auction straddling activation (30min at 2s + 30min at 200ms)', () => {
+    const start = BASE_DENIM_BLOCK - 900n
+    expect(isQuickLaunch(presetAuction({ startBlock: start, endBlock: BASE_DENIM_BLOCK + 9_000n }))).toBe(true)
+  })
+
+  it('keeps matching a pre-Denim 1h auction judged after activation', () => {
+    expect(isQuickLaunch(presetAuction({ startBlock: START, endBlock: START + 1_800n }))).toBe(true)
+  })
+
+  it('keeps a pre-Denim permanent lock request permanent (~10k real years once blocks run 10x faster)', () => {
+    const endBlock = BASE_DENIM_BLOCK - 1_000n
+    const unlockBlock = endBlock + PERMANENT_TIMELOCK_REQUEST_SECONDS / 2n // converted at 2s/block
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock })).toBe(true)
+  })
+
+  it('judges a finite lock by the real time it spans across activation', () => {
+    // 1000 blocks before activation (2,000s) + 157,679,990,000 blocks after (31,535,998,000s) is
+    // exactly 1000 years.
+    const endBlock = BASE_DENIM_BLOCK - 1_000n
+    const unlockBlock = BASE_DENIM_BLOCK + 157_679_990_000n
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock })).toBe(true)
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: unlockBlock - 1n })).toBe(false)
   })
 })
