@@ -70,6 +70,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.ARC]: 0.5,
   [ChainId.ROBINHOOD]: 0.1,
   [ChainId.INK]: 1,
+  [ChainId.ELYSIUM]: 0.1, // 100ms canonical blocks per Kinetiq's docs
   // Testnets
   [ChainId.SEPOLIA]: 12,
   [ChainId.OPTIMISM_SEPOLIA]: 2,
