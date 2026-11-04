@@ -1,5 +1,16 @@
 # @uniswap/universal-router-sdk
 
+## 5.16.1
+
+### Patch Changes
+
+- Updated dependencies [baa5fad]
+  - @uniswap/sdk-core@7.20.1
+  - @uniswap/router-sdk@2.11.10
+  - @uniswap/v2-sdk@4.21.9
+  - @uniswap/v3-sdk@3.31.9
+  - @uniswap/v4-sdk@2.4.5
+
 ## 5.16.0
 
 ### Minor Changes
