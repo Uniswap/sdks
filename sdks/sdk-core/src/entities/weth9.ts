@@ -38,4 +38,6 @@ export const WETH9: { [chainId: number]: Token } = {
   4326: new Token(4326, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
   4663: new Token(4663, '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', 18, 'WETH', 'Wrapped Ether'),
   57073: new Token(57073, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
+  // Elysium's gas token is HYPE, so its wrapped native is WHYPE
+  99901: new Token(99901, '0xbA876237B0F021A6c6D852d6c26E107997cC5E81', 18, 'WHYPE', 'Wrapped HYPE'),
 }

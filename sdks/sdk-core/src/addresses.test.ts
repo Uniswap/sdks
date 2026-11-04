@@ -1,5 +1,6 @@
-import { SWAP_ROUTER_02_ADDRESSES } from './addresses'
+import { SWAP_ROUTER_02_ADDRESSES, V2_FACTORY_ADDRESSES, V3_CORE_FACTORY_ADDRESSES } from './addresses'
 import { ChainId } from './chains'
+import { WETH9 } from './entities/weth9'
 
 describe('addresses', () => {
   describe('swap router 02 addresses', () => {
@@ -76,6 +77,18 @@ describe('addresses', () => {
     it('should return the correct address for ink', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.INK)
       expect(address).toEqual('0x177778f19e89dd1012bdbe603f144088a95c4b53')
+    })
+  })
+
+  describe('elysium', () => {
+    it('should return the v2 and v3 factory addresses', () => {
+      expect(V2_FACTORY_ADDRESSES[ChainId.ELYSIUM]).toEqual('0xBbBcC62853a5fA27b93d6Bab3E6F7ce841E25Df2')
+      expect(V3_CORE_FACTORY_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f')
+    })
+
+    it('should wrap HYPE as WHYPE', () => {
+      expect(WETH9[ChainId.ELYSIUM].address).toEqual('0xbA876237B0F021A6c6D852d6c26E107997cC5E81')
+      expect(WETH9[ChainId.ELYSIUM].symbol).toEqual('WHYPE')
     })
   })
 })

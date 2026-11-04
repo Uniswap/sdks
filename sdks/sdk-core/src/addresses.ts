@@ -71,6 +71,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.ARC]: '0x89e5db8b5aa49aa85ac63f691524311aeb649eba',
   [ChainId.ROBINHOOD]: '0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f',
   [ChainId.INK]: '0xfe57a6ba1951f69ae2ed4abe23e0f095df500c04',
+  [ChainId.ELYSIUM]: '0xBbBcC62853a5fA27b93d6Bab3E6F7ce841E25Df2',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -578,6 +579,18 @@ const INK_ADDRESSES: ChainAddresses = {
   permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
+// TODO(SWAP-3759): fill multicallAddress, quoterAddress (QuoterV2), tickLensAddress, swapRouter02Address,
+// mixedRouteQuoterV2Address, v4StateView and v4QuoterAddress from Uniswap/contracts
+// deployments/json/99901.json once it is published. The two required fields are left out on purpose so
+// this does not compile until they are real.
+const ELYSIUM_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f',
+  nonfungiblePositionManagerAddress: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
+
+  v4PoolManagerAddress: '0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1',
+  v4PositionManagerAddress: '0x1d1C51b9d07fD27d36412A2b66CC23D19Eb3E518',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -615,6 +628,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ARC]: ARC_ADDRESSES,
   [ChainId.ROBINHOOD]: ROBINHOOD_ADDRESSES,
   [ChainId.INK]: INK_ADDRESSES,
+  [ChainId.ELYSIUM]: ELYSIUM_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
