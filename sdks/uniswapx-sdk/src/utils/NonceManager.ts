@@ -17,6 +17,7 @@ export class NonceManager {
   private permit2: Permit2;
   private currentWord: Map<string, BigNumber>;
   private currentBitmap: Map<string, BigNumber>;
+  private pendingReservations = new Map<string, Promise<void>>();
 
   constructor(
     private provider: BaseProvider,
@@ -41,17 +42,37 @@ export class NonceManager {
   /**
    * Finds the next unused nonce and returns it
    * Marks the nonce as used so it won't be returned again from this instance
+   * Concurrent calls for the same owner are serialized, including bitmap reads.
    * NOTE: if any nonce usages are in-flight and created outside of this instance,
    * this function will not know about them and will return duplicates
    */
   async useNonce(address: string): Promise<BigNumber> {
-    const { word, bitmap } = await this.getNextOpenWord(address);
-    const bitPos = getFirstUnsetBit(bitmap);
+    address = ethers.utils.isAddress(address)
+      ? ethers.utils.getAddress(address)
+      : address;
+    const previous = this.pendingReservations.get(address) || Promise.resolve();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.pendingReservations.set(address, pending);
 
-    this.currentWord.set(address, word);
-    this.currentBitmap.set(address, setBit(bitmap, bitPos));
+    // Reserve only after the previous caller has updated the cached bitmap.
+    await previous;
+    try {
+      const { word, bitmap } = await this.getNextOpenWord(address);
+      const bitPos = getFirstUnsetBit(bitmap);
 
-    return buildNonce(word, bitPos);
+      this.currentWord.set(address, word);
+      this.currentBitmap.set(address, setBit(bitmap, bitPos));
+
+      return buildNonce(word, bitPos);
+    } finally {
+      release();
+      if (this.pendingReservations.get(address) === pending) {
+        this.pendingReservations.delete(address);
+      }
+    }
   }
 
   async isUsed(address: string, nonce: BigNumber): Promise<boolean> {
