@@ -48,7 +48,7 @@ const NATIVE_SUB_ID = 8n
 /** Opens a fresh 2x long under `subId` and returns the account address. */
 async function open2xLong(ctx: Ctx, subId: bigint, equity: bigint): Promise<`0x${string}`> {
   const { addresses, deployer, longMarket: market } = ctx
-  const adapter = addresses.lendingAdapters.morphoBlue!
+  const adapter = addresses.lendingAdapters.morphoBlue![0]
   const account = getMarginAccountAddress(1, deployer, subId)
   const collateralToBuy = collateralToBuyForLeverage(equity, parseLeverageX18(2))
   const { capped: maxDebtIn } = await quoteSwapInput(ctx, market, market.debt, collateralToBuy, 50)
@@ -79,7 +79,7 @@ async function open2xLong(ctx: Ctx, subId: bigint, equity: bigint): Promise<`0x$
 
 export async function run(ctx: Ctx): Promise<void> {
   const { addresses, deployer, longMarket: market, weth } = ctx
-  const adapter = addresses.lendingAdapters.morphoBlue!
+  const adapter = addresses.lendingAdapters.morphoBlue![0]
   const router = addresses.marginRouter
 
   section('06 · Withdraw collateral (mirrors ACCOUNT_WITHDRAW_COLLATERAL + the owner escape hatch)')

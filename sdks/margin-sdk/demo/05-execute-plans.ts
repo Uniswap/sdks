@@ -45,7 +45,7 @@ const SUB_ID = 6n
 
 export async function run(ctx: Ctx): Promise<void> {
   const { addresses, deployer, longMarket: market, weth, usdc } = ctx
-  const adapter = addresses.lendingAdapters.morphoBlue!
+  const adapter = addresses.lendingAdapters.morphoBlue![0]
   const router = addresses.marginRouter
   const account = getMarginAccountAddress(1, deployer, SUB_ID)
 

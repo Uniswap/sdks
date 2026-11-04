@@ -49,7 +49,7 @@ const SUB_ID = 0n
 
 export async function run(ctx: Ctx): Promise<void> {
   const { addresses, deployer, longMarket: market, weth } = ctx
-  const adapter = addresses.lendingAdapters.morphoBlue!
+  const adapter = addresses.lendingAdapters.morphoBlue![0]
   const router = addresses.marginRouter
 
   section('01 · Long lifecycle on Morpho Blue (mirrors MarginRouterIntegration + E2E fork tests)')

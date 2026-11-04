@@ -23,6 +23,7 @@ import { type Market } from './types.js'
 
 export interface DiscoveredMarket {
   venue: LendingVenue
+  adapter: Address
   market: Market
 }
 
@@ -97,7 +98,7 @@ export async function discoverAaveV3Markets(
     for (const debt of debtEligible) {
       if (isAddressEqual(collateral, debt)) continue
       if (!marketPasses(collateral, debt, filter)) continue
-      out.push({ venue: 'aaveV3', market: { collateral, debt, data: EMPTY_MARKET_DATA } })
+      out.push({ venue: 'aaveV3', adapter, market: { collateral, debt, data: EMPTY_MARKET_DATA } })
     }
   }
   return out
@@ -207,6 +208,7 @@ export async function discoverAaveV4Markets(
       if (!marketPasses(collateral, debt, filter)) continue
       out.push({
         venue: 'aaveV4',
+        adapter,
         market: {
           collateral,
           debt,
@@ -260,7 +262,7 @@ export async function discoverCompoundV3Markets(
   const out: DiscoveredMarket[] = []
   for (const info of assets) {
     if (!marketPasses(info.asset, debt, filter)) continue
-    out.push({ venue: 'compoundV3', market: { collateral: info.asset, debt, data: EMPTY_MARKET_DATA } })
+    out.push({ venue: 'compoundV3', adapter, market: { collateral: info.asset, debt, data: EMPTY_MARKET_DATA } })
   }
   return out
 }
@@ -304,7 +306,11 @@ interface MorphoRestMarketsResponse {
  * Discovers Morpho Blue markets via Morpho's public REST API (`GET /v1/blue/markets`), the
  * documented default over its GraphQL counterpart. `market.data` encodes `(oracle, irm, lltv)`.
  */
-export async function discoverMorphoMarkets(chainId: number, filter?: MorphoMarketFilter): Promise<DiscoveredMarket[]> {
+export async function discoverMorphoMarkets(
+  chainId: number,
+  adapter: Address,
+  filter?: MorphoMarketFilter
+): Promise<DiscoveredMarket[]> {
   const baseUrl = filter?.apiUrl ?? MORPHO_DEFAULT_API_URL
   const listedOnly = filter?.listedOnly ?? true
 
@@ -330,6 +336,7 @@ export async function discoverMorphoMarkets(chainId: number, filter?: MorphoMark
     for (const m of body.data) {
       out.push({
         venue: 'morphoBlue',
+        adapter,
         market: {
           collateral: m.collateral_token,
           debt: m.loan_token,
@@ -355,9 +362,9 @@ export interface DiscoverAllMarketsOptions extends MarketDiscoveryFilter {
 }
 
 /**
- * Discovers every market across every venue `addresses.lendingAdapters` actually has deployed.
- * Venues run concurrently; a venue absent from `addresses` (not yet deployed on this chain) is
- * skipped rather than erroring.
+ * Discovers every market across every adapter `addresses.lendingAdapters` lists, tagging each
+ * result with the adapter that routes it. Adapters run concurrently; a venue absent from
+ * `addresses` (not yet deployed on this chain) is skipped rather than erroring.
  */
 export async function discoverAllMarkets(
   client: PublicClient,
@@ -366,20 +373,13 @@ export async function discoverAllMarkets(
   opts?: DiscoverAllMarketsOptions
 ): Promise<DiscoveredMarket[]> {
   const filter: MarketDiscoveryFilter = { collateralToken: opts?.collateralToken, debtToken: opts?.debtToken }
-  const tasks: Promise<DiscoveredMarket[]>[] = []
-
-  if (addresses.lendingAdapters.morphoBlue) {
-    tasks.push(discoverMorphoMarkets(chainId, { ...filter, ...opts?.morpho }))
-  }
-  if (addresses.lendingAdapters.aaveV3) {
-    tasks.push(discoverAaveV3Markets(client, addresses.lendingAdapters.aaveV3, filter))
-  }
-  if (addresses.lendingAdapters.aaveV4) {
-    tasks.push(discoverAaveV4Markets(client, addresses.lendingAdapters.aaveV4, filter, opts?.aaveV4))
-  }
-  if (addresses.lendingAdapters.compoundV3) {
-    tasks.push(discoverCompoundV3Markets(client, addresses.lendingAdapters.compoundV3, filter))
-  }
+  const { morphoBlue = [], aaveV3 = [], aaveV4 = [], compoundV3 = [] } = addresses.lendingAdapters
+  const tasks: Promise<DiscoveredMarket[]>[] = [
+    ...morphoBlue.map((adapter) => discoverMorphoMarkets(chainId, adapter, { ...filter, ...opts?.morpho })),
+    ...aaveV3.map((adapter) => discoverAaveV3Markets(client, adapter, filter)),
+    ...aaveV4.map((adapter) => discoverAaveV4Markets(client, adapter, filter, opts?.aaveV4)),
+    ...compoundV3.map((adapter) => discoverCompoundV3Markets(client, adapter, filter)),
+  ]
 
   const results = await Promise.all(tasks)
   return results.flat()

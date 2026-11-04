@@ -50,7 +50,7 @@ const AAVE_V4_USDC_RESERVE_ID = 7n
 
 async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
   const { addresses, deployer, shortMarket } = ctx
-  const adapter = addresses.lendingAdapters[venue]!
+  const adapter = addresses.lendingAdapters[venue]![0]
   const router = addresses.marginRouter
   const subId = SUB_IDS[venue]!
   // market.data is venue-specific: Aave v3 requires it empty, Aave v4 requires the

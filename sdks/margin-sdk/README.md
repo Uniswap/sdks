@@ -119,7 +119,7 @@ const { request } = await publicClient.simulateContract({
   ...increasePositionCall({
     marginRouter: addresses.marginRouter,
     params: {
-      adapter: addresses.lendingAdapters.morphoBlue!,
+      adapter: addresses.lendingAdapters.morphoBlue![0],
       market,
       equity,
       collateralToBuy,
@@ -154,7 +154,7 @@ import { getMarginAccountAddress, getPosition, healthFactor } from '@uniswap/mar
 const account = getMarginAccountAddress(mainnet.id, owner, 0n)
 
 const position = await getPosition(publicClient, {
-  adapter: addresses.lendingAdapters.morphoBlue!,
+  adapter: addresses.lendingAdapters.morphoBlue![0],
   account,
   market,
 })
@@ -316,7 +316,7 @@ const shortRoute = buildV4ExactOutRoute({
   recipient: shortAccount, // getMarginAccountAddress(chainId, owner, 1n)
 })
 const params = {
-  adapter: addresses.lendingAdapters.aaveV3!, // or aaveV4, compoundV3
+  adapter: addresses.lendingAdapters.aaveV3![0], // or aaveV4, compoundV3
   market: shortMarket,
   equity: parseUnits('3000', 6), // ⚠️ USDC decimals now
   collateralToBuy, // 6-decimal USDC
@@ -354,7 +354,7 @@ const selection = selectMarket(
     {
       id: 'morpho-weth-usdc-86',
       venue: 'MORPHO',
-      adapter: addresses.lendingAdapters.morphoBlue!,
+      adapter: addresses.lendingAdapters.morphoBlue![0],
       market,
       eligible: true, // passed the allowlist gates
       riskRank: 2, // tiebreak inside the cost band: lower is safer

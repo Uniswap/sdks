@@ -36,7 +36,7 @@ const SUB_ID = 1n
 
 export async function run(ctx: Ctx): Promise<void> {
   const { addresses, deployer, longMarket: market, weth } = ctx
-  const adapter = addresses.lendingAdapters.morphoBlue!
+  const adapter = addresses.lendingAdapters.morphoBlue![0]
   const router = addresses.marginRouter
 
   section('02 · Native-ETH equity (mirrors MarginRouterNative.t.sol)')

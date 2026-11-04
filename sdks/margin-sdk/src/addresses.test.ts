@@ -15,7 +15,7 @@ describe('addresses', () => {
         addresses.permit2,
         addresses.poolManager,
         addresses.weth9,
-        ...Object.values(addresses.lendingAdapters),
+        ...Object.values(addresses.lendingAdapters).flat(),
       ]
       for (const address of flat) {
         expect(address).toBe(getAddress(address))

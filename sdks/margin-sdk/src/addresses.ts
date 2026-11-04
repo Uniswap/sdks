@@ -14,13 +14,14 @@ export interface MarginAddresses {
   /** The MarginAccount implementation every account clone delegates to (CWIA template). */
   marginAccountImplementation: Address
   /**
-   * Deployed lending adapters by venue. Each is a singleton encoder over a governed market
-   * routing table; the caller selects the venue per call by passing the matching adapter. The
-   * Aave v4 adapter is bound to a single Spoke and the Compound v3 adapter to a single Comet
-   * (whose base token is the only borrowable debt) — a second Spoke/Comet is a second adapter
-   * instance. A venue absent from the record is not in that chain's live deployment yet.
+   * Deployed lending adapters, listed per venue; a venue can have several. Each is a singleton
+   * encoder over a governed market routing table; the caller selects the venue per call by passing
+   * the matching adapter. The Aave v4 adapter is bound to a single Spoke and the Compound v3
+   * adapter to a single Comet (whose base token is the only borrowable debt) — a second Spoke/Comet
+   * is a second adapter instance in that venue's list. A venue absent from the record is not in
+   * that chain's live deployment yet.
    */
-  lendingAdapters: Partial<Record<LendingVenue, Address>>
+  lendingAdapters: Partial<Record<LendingVenue, readonly Address[]>>
   /** Permit2 (canonical address on every chain). Equity/collateral is pulled through it. */
   permit2: Address
   /** The canonical Uniswap v4 PoolManager the leverage swaps run through. */
@@ -49,10 +50,10 @@ export const MARGIN_ADDRESSES: Partial<Record<number, MarginAddresses>> = {
     marginRouter: getAddress('0x0000000000890d0ee01040c8855A0423e37c757B'),
     marginAccountImplementation: getAddress('0xD9568a09F242fDDd01Be180359f67FbE31D4FaB7'),
     lendingAdapters: {
-      morphoBlue: getAddress('0x9770eB2e1e4e50126aC290F40340D4eB86c9ba91'),
-      aaveV3: getAddress('0xBcdd5ae0cf217439d0B84Bc2ABA5E5238200Ee75'),
-      aaveV4: getAddress('0x6ED39e59c72aa67488a72b4544C680369373d81B'),
-      compoundV3: getAddress('0x13352E9b6C57261Ce906a2984A15356547B40708'),
+      morphoBlue: [getAddress('0x9770eB2e1e4e50126aC290F40340D4eB86c9ba91')],
+      aaveV3: [getAddress('0xBcdd5ae0cf217439d0B84Bc2ABA5E5238200Ee75')],
+      aaveV4: [getAddress('0x6ED39e59c72aa67488a72b4544C680369373d81B')],
+      compoundV3: [getAddress('0x13352E9b6C57261Ce906a2984A15356547B40708')],
     },
     permit2: PERMIT2,
     poolManager: getAddress('0x000000000004444c5dc75cB358380D2e3dE08A90'),

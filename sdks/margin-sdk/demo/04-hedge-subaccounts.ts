@@ -38,8 +38,8 @@ const SHORT_SUB_ID = 5n
 export async function run(ctx: Ctx): Promise<void> {
   const { addresses, deployer, longMarket, shortMarket, weth, usdc } = ctx
   const router = addresses.marginRouter
-  const morpho = addresses.lendingAdapters.morphoBlue!
-  const aaveV3 = addresses.lendingAdapters.aaveV3!
+  const morpho = addresses.lendingAdapters.morphoBlue![0]
+  const aaveV3 = addresses.lendingAdapters.aaveV3![0]
 
   section('04 · Cross-venue hedge on sub-accounts (mirrors MarginRouterHedge.fork.t.sol)')
 
