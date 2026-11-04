@@ -579,10 +579,11 @@ const INK_ADDRESSES: ChainAddresses = {
   permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
-// TODO(SWAP-3759): fill multicallAddress, quoterAddress (QuoterV2), tickLensAddress, swapRouter02Address,
-// mixedRouteQuoterV2Address, v4StateView and v4QuoterAddress from Uniswap/contracts
-// deployments/json/99901.json once it is published. The two required fields are left out on purpose so
-// this does not compile until they are real.
+// TODO(SWAP-3759): fill multicallAddress, quoterAddress (QuoterV2), v3MigratorAddress, tickLensAddress,
+// swapRouter02Address, mixedRouteQuoterV2Address, v4StateView and v4QuoterAddress, plus
+// V2_ROUTER_ADDRESSES[ChainId.ELYSIUM] (backend LP endpoints need the migrator and V2 router), from
+// Uniswap/contracts deployments/json/99901.json once it is published. The two required fields are left out
+// on purpose so this does not compile until they are real.
 const ELYSIUM_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f',
   nonfungiblePositionManagerAddress: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
