@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.20.1
+
+### Patch Changes
+
+- baa5fad: Point `v4QuoterAddress` on Unichain Sepolia, Base Sepolia and Arbitrum Sepolia at the msgSender-capable V4Quoter deployments
+
 ## 7.20.0
 
 ### Minor Changes
