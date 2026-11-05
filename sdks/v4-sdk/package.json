@@ -1,7 +1,7 @@
 {
   "name": "@uniswap/v4-sdk",
   "version": "2.4.4",
-  "description": "⚒️ An SDK for building applications on top of Uniswap V4",
+  "description": "\u2692\ufe0f An SDK for building applications on top of Uniswap V4",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
@@ -46,7 +46,10 @@
     "jsbi": "^3.1.4",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@ethersproject/address": "^5.7.0",
+    "@ethersproject/bignumber": "^5.7.0",
+    "@ethersproject/constants": "^5.7.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.3",
