@@ -1461,6 +1461,7 @@ describe('omitRedundantSettlementSweep', () => {
         recipient: SENDER_AS_RECIPIENT,
       })
       expect(check(spec, [step])).to.equal(true)
+      expect(check(enabled(), [step])).to.equal(false)
     })
 
     it('requires the opt-in flag and direct transfers', () => {
@@ -1497,7 +1498,12 @@ describe('omitRedundantSettlementSweep', () => {
       ).to.equal(false)
     })
 
-    it('rejects a nonzero floor', () => {
+    it('rejects router-balance input and a nonzero floor', () => {
+      expect(
+        check(buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, routerBalanceInput: {} }), [
+          directV3(),
+        ])
+      ).to.equal(false)
       expect(check(enabled(), [directV3()], BigNumber.from(1))).to.equal(false)
     })
 
@@ -1516,6 +1522,34 @@ describe('omitRedundantSettlementSweep', () => {
       expect(check(enabled(), [buildV2ExactOutStep()])).to.equal(false)
       expect(check(enabled(), [buildV3ExactInStep()])).to.equal(false)
       expect(check(enabled(), [buildV3ExactOutStep()])).to.equal(false)
+    })
+
+    it('rejects V2, V3 and UNWRAP_WETH output to anyone other than the recipient', () => {
+      const amountOutMin = NET_MIN.toString()
+      expect(
+        check(enabled(), [buildV3ExactInStep({ recipient: FEE_RECIPIENT, payerIsUser: true, amountOutMin })])
+      ).to.equal(false)
+      expect(
+        check(enabled(), [buildV2ExactInStep({ recipient: FEE_RECIPIENT, payerIsUser: true, amountOutMin })])
+      ).to.equal(false)
+      expect(
+        check(enabled(), [buildV3ExactInStep({ recipient: SENDER_AS_RECIPIENT, payerIsUser: true, amountOutMin })])
+      ).to.equal(false)
+      expect(
+        check(nativeSpec(), [
+          buildV3ExactInStep({ amountOutMin: '0' }),
+          { type: 'UNWRAP_WETH', recipient: FEE_RECIPIENT, amountMin: amountOutMin },
+        ])
+      ).to.equal(false)
+    })
+
+    it('rejects the output token in an intermediate V2 position', () => {
+      const path = [USDC.address, WETH.address, DAI.address, WETH.address]
+      expect(
+        check(enabled(), [
+          buildV2ExactInStep({ recipient: TEST_RECIPIENT, payerIsUser: true, amountOutMin: NET_MIN.toString(), path }),
+        ])
+      ).to.equal(false)
     })
 
     it('rejects the output token in an intermediate V3 position', () => {
@@ -1579,7 +1613,7 @@ describe('omitRedundantSettlementSweep', () => {
       )
     })
 
-    it('uses router WETH configuration on X Layer and fails closed when WETH is unavailable', () => {
+    it('uses router WETH configuration on X Layer', () => {
       const xWeth = new Token(ChainId.XLAYER, WETH_ADDRESS(ChainId.XLAYER), 18, 'WETH')
       const xInput = new Token(ChainId.XLAYER, USDC.address, 6, 'USDC')
       const xSpec = buildSpec(
@@ -1591,14 +1625,6 @@ describe('omitRedundantSettlementSweep', () => {
       )
       expect(check(xSpec, [directV3()])).to.equal(true)
       expect(check(xSpec, [{ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: 1 }])).to.equal(false)
-      const tempoInput = new Token(ChainId.TEMPO, USDC.address, 6, 'USDC')
-      const tempoOutput = new Token(ChainId.TEMPO, WETH.address, 18, 'OUT')
-      const tempoSpec = buildSpec(
-        { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
-        { inputToken: tempoInput, outputToken: tempoOutput }
-      )
-      expect(check(tempoSpec, [directV3()])).to.equal(true)
-      expect(check(tempoSpec, [{ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: 1 }])).to.equal(false)
     })
 
     it('rejects same-asset swaps, native-ERC20 input, and native balance aliases', () => {
@@ -1627,19 +1653,34 @@ describe('omitRedundantSettlementSweep', () => {
           [directV3()]
         )
       ).to.equal(false)
-      for (const celoChain of [ChainId.CELO, ChainId.CELO_ALFAJORES]) {
-        const celoInput = new Token(celoChain, USDC.address, 6, 'USDC')
-        const celoOutput = new Token(celoChain, WETH.address, 18, 'CELO')
+      for (const aliasChain of [
+        ChainId.CELO,
+        ChainId.CELO_ALFAJORES,
+        ChainId.TEMPO,
+        ChainId.POLYGON,
+        ChainId.POLYGON_MUMBAI,
+      ]) {
+        const aliasInput = new Token(aliasChain, USDC.address, 6, 'USDC')
+        const aliasOutput = new Token(aliasChain, WETH.address, 18, 'OUT')
         expect(
           check(
             buildSpec(
               { allowDirectTransfers: true, omitRedundantSettlementSweep: true },
-              { inputToken: celoInput, outputToken: celoOutput }
+              { inputToken: aliasInput, outputToken: aliasOutput }
             ),
             [directV3()]
           )
         ).to.equal(false)
       }
+    })
+
+    it('rejects the router placeholder as the recipient', () => {
+      expect(
+        check(
+          buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, recipient: ROUTER_AS_RECIPIENT }),
+          [buildV3ExactInStep({ recipient: ROUTER_AS_RECIPIENT, payerIsUser: true, amountOutMin: NET_MIN.toString() })]
+        )
+      ).to.equal(false)
     })
 
     it('rejects a router recipient and an unavailable router', () => {

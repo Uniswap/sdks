@@ -4,7 +4,7 @@ import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encode
 import {
   CONTRACT_BALANCE,
   ETH_ADDRESS,
-  NATIVE_ERC20_BALANCE_ALIAS_CHAINS,
+  CHAIN_CONFIGS,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
   UNIVERSAL_ROUTER_ADDRESS,
@@ -65,6 +65,7 @@ export function isSettlementSweepRedundant(
     spec.allowDirectTransfers !== true ||
     spec.tradeType !== TradeType.EXACT_INPUT ||
     toFeeList(spec.fee).length !== 0 ||
+    spec.routerBalanceInput !== undefined ||
     !sweepFloor.isZero() ||
     spec.nativeErc20Input ||
     spec.routing.inputToken.wrapped.equals(spec.routing.outputToken.wrapped)
@@ -74,9 +75,10 @@ export function isSettlementSweepRedundant(
 
   const outputToken = spec.routing.outputToken
   const chainId = outputToken.chainId
-  if (NATIVE_ERC20_BALANCE_ALIAS_CHAINS.includes(chainId)) return false
+  if (!(chainId in CHAIN_CONFIGS) || CHAIN_CONFIGS[chainId].nativeErc20BalanceAlias) return false
   const settlementToken = getCurrencyAddress(outputToken).toLowerCase()
   const recipient = spec.recipient.toLowerCase()
+  if (recipient === ROUTER_AS_RECIPIENT) return false
   // A native SWEEP to the router reverts, so keeping it avoids leaving ETH on the router.
   try {
     if (UNIVERSAL_ROUTER_ADDRESS(spec.urVersion, chainId).toLowerCase() === recipient) return false
@@ -88,11 +90,11 @@ export function isSettlementSweepRedundant(
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT': {
-        const pathOutput = step.path[step.path.length - 1]
-        if (pathOutput === undefined) return false
-        if (step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT && pathOutput.toLowerCase() === settlementToken) {
-          return false
-        }
+        const tokens = step.path.map((token) => token.toLowerCase())
+        if (tokens.length === 0) return false
+        const outputIndex = tokens.length - 1
+        if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false
+        if (tokens[outputIndex] === settlementToken && step.recipient.toLowerCase() !== recipient) return false
         break
       }
       case 'V3_SWAP_EXACT_IN':
@@ -101,9 +103,7 @@ export function isSettlementSweepRedundant(
         if (!tokens) return false
         const outputIndex = step.type === 'V3_SWAP_EXACT_IN' ? tokens.length - 1 : 0
         if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false
-        if (step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT && tokens[outputIndex] === settlementToken) {
-          return false
-        }
+        if (tokens[outputIndex] === settlementToken && step.recipient.toLowerCase() !== recipient) return false
         break
       }
       case 'WRAP_ETH':
@@ -115,7 +115,7 @@ export function isSettlementSweepRedundant(
         }
         break
       case 'UNWRAP_WETH':
-        if (outputToken.isNative && step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return false
+        if (outputToken.isNative && step.recipient.toLowerCase() !== recipient) return false
         break
       case 'V4_SWAP':
         for (const action of step.v4Actions) {
@@ -134,9 +134,11 @@ export function isSettlementSweepRedundant(
                 return false
               }
               break
+            case 'TAKE_ALL':
+              if (action.currency.toLowerCase() === settlementToken && recipient !== SENDER_AS_RECIPIENT) return false
+              break
             case 'SETTLE':
             case 'SETTLE_ALL':
-            case 'TAKE_ALL':
               break
             default:
               return false
