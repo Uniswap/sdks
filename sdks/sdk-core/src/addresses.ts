@@ -101,6 +101,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.MEGAETH]: '0xb73055db2b3a3eae87a331dd88e4a80b43602690',
   [ChainId.ARC]: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
   [ChainId.ROBINHOOD]: '0x89e5db8b5aa49aa85ac63f691524311aeb649eba',
+  [ChainId.ELYSIUM]: '0xE783DE89a7F0408687f051e3E6D0BEb62719EbAd',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -579,17 +580,19 @@ const INK_ADDRESSES: ChainAddresses = {
   permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
-// TODO(SWAP-3759): fill multicallAddress, quoterAddress (QuoterV2), v3MigratorAddress, tickLensAddress,
-// swapRouter02Address, mixedRouteQuoterV2Address, v4StateView and v4QuoterAddress, plus
-// V2_ROUTER_ADDRESSES[ChainId.ELYSIUM] (backend LP endpoints need the migrator and V2 router), from
-// Uniswap/contracts deployments/json/99901.json once it is published. The two required fields are left out
-// on purpose so this does not compile until they are real.
+// TODO(SWAP-3759): fill multicallAddress, v3MigratorAddress (backend LP endpoints need it), tickLensAddress
+// and mixedRouteQuoterV2Address once they are deployed. multicallAddress is required and left out on purpose
+// so this does not compile until it is real.
 const ELYSIUM_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f',
+  quoterAddress: '0x204FAca1764B154221e35c0d20aBb3c525710498',
   nonfungiblePositionManagerAddress: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
+  swapRouter02Address: '0x2d01411773c8C24805306E89A41F7855C3c4Fe65',
 
   v4PoolManagerAddress: '0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1',
   v4PositionManagerAddress: '0x1d1C51b9d07fD27d36412A2b66CC23D19Eb3E518',
+  v4StateView: '0x27eD73aE0652fdCf71d6793412A7525f32bE9dfE',
+  v4QuoterAddress: '0x379F556c5a748BD7Cc9baF0F7A344094Ac1814f5',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {

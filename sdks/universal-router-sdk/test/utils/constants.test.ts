@@ -210,6 +210,11 @@ describe('Universal Router Constants', () => {
       )
     })
 
+    it('returns each router creation block', () => {
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_2, ELYSIUM_CHAIN_ID)).to.equal(256483)
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_2_0, ELYSIUM_CHAIN_ID)).to.equal(257585)
+    })
+
     it('has no router before 2.1.2', () => {
       ;[UniversalRouterVersion.V1_2, UniversalRouterVersion.V2_0, UniversalRouterVersion.V2_1_1].forEach((version) => {
         expect(() => UNIVERSAL_ROUTER_ADDRESS(version, ELYSIUM_CHAIN_ID)).to.throw(

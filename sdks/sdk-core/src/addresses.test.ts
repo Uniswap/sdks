@@ -1,4 +1,11 @@
-import { SWAP_ROUTER_02_ADDRESSES, V2_FACTORY_ADDRESSES, V3_CORE_FACTORY_ADDRESSES } from './addresses'
+import {
+  CHAIN_TO_ADDRESSES_MAP,
+  QUOTER_ADDRESSES,
+  SWAP_ROUTER_02_ADDRESSES,
+  V2_FACTORY_ADDRESSES,
+  V2_ROUTER_ADDRESSES,
+  V3_CORE_FACTORY_ADDRESSES,
+} from './addresses'
 import { ChainId } from './chains'
 import { WETH9 } from './entities/weth9'
 
@@ -84,6 +91,19 @@ describe('addresses', () => {
     it('should return the v2 and v3 factory addresses', () => {
       expect(V2_FACTORY_ADDRESSES[ChainId.ELYSIUM]).toEqual('0xBbBcC62853a5fA27b93d6Bab3E6F7ce841E25Df2')
       expect(V3_CORE_FACTORY_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f')
+    })
+
+    it('should return the v2 router, quoter and swap router 02', () => {
+      expect(V2_ROUTER_ADDRESSES[ChainId.ELYSIUM]).toEqual('0xE783DE89a7F0408687f051e3E6D0BEb62719EbAd')
+      expect(QUOTER_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x204FAca1764B154221e35c0d20aBb3c525710498')
+      expect(SWAP_ROUTER_02_ADDRESSES(ChainId.ELYSIUM)).toEqual('0x2d01411773c8C24805306E89A41F7855C3c4Fe65')
+    })
+
+    it('should return the v4 state view and quoter', () => {
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.ELYSIUM].v4StateView).toEqual('0x27eD73aE0652fdCf71d6793412A7525f32bE9dfE')
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.ELYSIUM].v4QuoterAddress).toEqual(
+        '0x379F556c5a748BD7Cc9baF0F7A344094Ac1814f5'
+      )
     })
 
     it('should wrap HYPE as WHYPE', () => {
