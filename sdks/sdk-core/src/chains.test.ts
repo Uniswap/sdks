@@ -4,6 +4,7 @@ describe('getAverageBlockTimeSecs', () => {
   it('returns the registered block time for a known chain', () => {
     expect(getAverageBlockTimeSecs(ChainId.MAINNET)).toEqual(12)
     expect(getAverageBlockTimeSecs(ChainId.ARBITRUM_ONE)).toEqual(0.25)
+    expect(getAverageBlockTimeSecs(ChainId.BASE)).toEqual(0.2)
     expect(getAverageBlockTimeSecs(ChainId.ROBINHOOD)).toEqual(0.1)
     expect(getAverageBlockTimeSecs(ChainId.MEGAETH)).toEqual(1)
     expect(getAverageBlockTimeSecs(ChainId.ARC)).toEqual(0.5)
@@ -28,6 +29,7 @@ describe('secondsToBlocks', () => {
   it('converts wallclock seconds to a block count using ceil', () => {
     expect(secondsToBlocks(8, ChainId.MAINNET)).toEqual(1) // ceil(8/12)
     expect(secondsToBlocks(8, ChainId.ARBITRUM_ONE)).toEqual(32) // ceil(8/0.25)
+    expect(secondsToBlocks(8, ChainId.BASE)).toEqual(40) // ceil(8/0.2)
     expect(secondsToBlocks(8, ChainId.TEMPO)).toEqual(16) // ceil(8/0.5)
     expect(secondsToBlocks(8, ChainId.MEGAETH)).toEqual(8) // ceil(8/1)
     expect(secondsToBlocks(8, ChainId.ARC)).toEqual(16) // ceil(8/0.5)
