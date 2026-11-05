@@ -35,32 +35,26 @@ export function getV3HopCount(path: string): number | undefined {
   return variableSegmentLength / 23
 }
 
-export function v3PathFirstToken(path: string): string | undefined {
-  if (getV3HopCount(path) === undefined) return undefined
-  return '0x' + path.slice(2, 42)
-}
-
-export function v3PathLastToken(path: string): string | undefined {
-  if (getV3HopCount(path) === undefined) return undefined
-  return '0x' + path.slice(-40)
-}
-
 function v3PathTokens(path: string): string[] | undefined {
   const hops = getV3HopCount(path)
   if (hops === undefined) return undefined
   const tokens: string[] = []
   for (let i = 0; i <= hops; i++) {
     const start = 2 + i * 46
-    tokens.push(('0x' + path.slice(start, start + 40)).toLowerCase())
+    tokens.push('0x' + path.slice(start, start + 40))
   }
   return tokens
 }
 
-/**
- * Checks a validated spec and validated steps against their computed settlement sweep floor.
- * The caller must ensure the router has no pre-existing output balance and tokens have no
- * transfer side effects that credit the router; such a balance is not forwarded if omitted.
- */
+export function v3PathFirstToken(path: string): string | undefined {
+  return v3PathTokens(path)?.[0]
+}
+
+export function v3PathLastToken(path: string): string | undefined {
+  const tokens = v3PathTokens(path)
+  return tokens?.[tokens.length - 1]
+}
+
 export function isSettlementSweepRedundant(
   spec: NormalizedSwapSpecification,
   swapSteps: SwapStep[],
@@ -83,8 +77,7 @@ export function isSettlementSweepRedundant(
   if (NATIVE_ERC20_BALANCE_ALIAS_CHAINS.includes(chainId)) return false
   const settlementToken = getCurrencyAddress(outputToken).toLowerCase()
   const recipient = spec.recipient.toLowerCase()
-  // With the router as recipient, a native SWEEP is a self-send that reverts; keep it so the plan
-  // reverts instead of leaving ETH on the router (for ERC20 the sweep is a self-transfer either way).
+  // A native SWEEP to the router reverts, so keeping it avoids leaving ETH on the router.
   try {
     if (UNIVERSAL_ROUTER_ADDRESS(spec.urVersion, chainId).toLowerCase() === recipient) return false
   } catch {
@@ -104,7 +97,7 @@ export function isSettlementSweepRedundant(
       }
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
-        const tokens = v3PathTokens(step.path)
+        const tokens = v3PathTokens(step.path)?.map((token) => token.toLowerCase())
         if (!tokens) return false
         const outputIndex = step.type === 'V3_SWAP_EXACT_IN' ? tokens.length - 1 : 0
         if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false

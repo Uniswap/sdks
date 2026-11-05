@@ -1748,7 +1748,9 @@ describe('omitRedundantSettlementSweep', () => {
           expect(token.toLowerCase()).to.equal(settlementToken.toLowerCase())
           expect(sweepRecipient.toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
           expect(amountMin.toString()).to.equal('0')
-          expect(offCommandBytes.slice(2 + removedIndex * 2, 4 + removedIndex * 2)).to.equal('04')
+          expect(offCommandBytes.slice(2 + removedIndex * 2, 4 + removedIndex * 2)).to.equal(
+            CommandType.SWEEP.toString(16).padStart(2, '0')
+          )
           expect(onCommandBytes).to.equal(
             offCommandBytes.slice(0, 2 + removedIndex * 2) + offCommandBytes.slice(4 + removedIndex * 2)
           )

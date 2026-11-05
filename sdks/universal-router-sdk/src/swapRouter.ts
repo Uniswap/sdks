@@ -182,11 +182,6 @@ export abstract class SwapRouter {
    * Amount convention: on `EXACT_INPUT`, `spec.routing.quote` is the GROSS output (before fees).
    * The fee cascade is deducted from it when sizing the sweep floor; passing a net
    * (post-fee) quote double-counts the fees and floors the sweep below the real minimum.
-   * With `omitRedundantSettlementSweep`, a zero-floor settlement sweep is omitted only for
-   * direct-transfer plans that leave no output in router custody. This assumes the router holds
-   * no pre-existing output balance and tokens have no transfer side effects that credit it;
-   * such a balance is not forwarded when the sweep is omitted (the `safeMode` ETH sweep still
-   * forwards native balance).
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
@@ -297,8 +292,7 @@ export abstract class SwapRouter {
 
     // Assumes routers already normalized final gross output into `routing.outputToken`.
     // Direct-output minimums (contract-enforced, delivered straight to the recipient)
-    // reduce the floor. With `omitRedundantSettlementSweep`, a zero-floor sweep is omitted when no
-    // step can leave output in router custody; otherwise it remains to forward any custody balance.
+    // reduce the floor; the sweep remains unless `omitRedundantSettlementSweep` proves it redundant.
     const sweepFloor = normalizedSpec.allowDirectTransfers
       ? directTransferSweepFloor(normalizedSpec, netMinOrExactAmountOut, swapSteps, getCurrencyAddress(outputToken))
       : netMinOrExactAmountOut
