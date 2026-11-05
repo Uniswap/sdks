@@ -116,6 +116,8 @@ The safety contract is unchanged (the user pays at most `exactOrMaxAmountIn`; th
 
 Step amounts are never trusted — only counted or capped.
 
+**Omitting the settlement sweep.** When direct legs cover the minimum, the final `SWEEP` has a zero floor and usually moves nothing. Set `omitRedundantSettlementSweep: true` to drop it. The SDK drops it only when all of these hold: the trade is exact-input with no fee, the floor is zero, no V4 pool in the plan has a hook, no step can leave the output token on the router, input and output are different assets, and the chain has no native/ERC20 balance alias. Otherwise the sweep stays. The `safeMode` ETH sweep is not affected. The flag assumes the router holds no balance of the output token before the swap; any such balance stays on the router when the sweep is dropped.
+
 ### Per-Hop Slippage
 
 Per-hop bounds require Universal Router v2.1.1+ — set `urVersion: UniversalRouterVersion.V2_1_1` on `spec` to enable.

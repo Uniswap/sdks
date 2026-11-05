@@ -73,19 +73,18 @@ export type SwapSpecification = {
   routerBalanceInput?: RouterBalanceInput
 }
 
-// Output of `normalizeEncodeSwapsSpec`: the six fields below are guaranteed
+// Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed
 // non-undefined, encoding the precondition for `validateEncodeSwaps` and
 // `computeEncodeSwapsAmounts` at the type level.
 export type NormalizedSwapSpecification = Omit<
   SwapSpecification,
-  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers' | 'omitRedundantSettlementSweep'
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers'
 > & {
   recipient: string
   tokenTransferMode: TokenTransferMode
   urVersion: UniversalRouterVersion
   safeMode: boolean
   allowDirectTransfers: boolean
-  omitRedundantSettlementSweep: boolean
 }
 
 export type V2SwapExactIn = {

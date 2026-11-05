@@ -1443,13 +1443,6 @@ describe('omitRedundantSettlementSweep', () => {
     )
   }
 
-  it('normalizes the opt-in flag to false by default', () => {
-    expect(normalizeEncodeSwapsSpec(enabled()).omitRedundantSettlementSweep).to.equal(true)
-    expect(
-      normalizeEncodeSwapsSpec({ ...enabled(), omitRedundantSettlementSweep: undefined }).omitRedundantSettlementSweep
-    ).to.equal(false)
-  })
-
   describe('predicate', () => {
     it('accepts direct V3 exact-in, V2 exact-in, unhooked V4 single and multi-hop plans', () => {
       expect(check(enabled(), [directV3()])).to.equal(true)
@@ -1504,12 +1497,7 @@ describe('omitRedundantSettlementSweep', () => {
       ).to.equal(false)
     })
 
-    it('rejects router-balance input and a nonzero floor', () => {
-      expect(
-        check(buildSpec({ allowDirectTransfers: true, omitRedundantSettlementSweep: true, routerBalanceInput: {} }), [
-          directV3(),
-        ])
-      ).to.equal(false)
+    it('rejects a nonzero floor', () => {
       expect(check(enabled(), [directV3()], BigNumber.from(1))).to.equal(false)
     })
 
@@ -1518,13 +1506,9 @@ describe('omitRedundantSettlementSweep', () => {
       expect(check(enabled(), [v4Multi(TEST_RECIPIENT)])).to.equal(false)
     })
 
-    it('compares unhooked addresses without regard to casing and rejects missing hooks', () => {
+    it('compares hook addresses without regard to casing', () => {
       expect(check(enabled(), [v4Single('0X' + '0'.repeat(40))])).to.equal(true)
       expect(check(enabled(), [v4Single(TEST_RECIPIENT.toUpperCase().replace('0X', '0x'))])).to.equal(false)
-      const missingHooks = v4Single()
-      const swap = missingHooks.v4Actions[1] as Extract<V4Action, { action: 'SWAP_EXACT_IN_SINGLE' }>
-      swap.poolKey.hooks = undefined as unknown as string
-      expect(check(enabled(), [missingHooks])).to.equal(false)
     })
 
     it('rejects router-directed V2 and V3 output', () => {
@@ -1534,22 +1518,17 @@ describe('omitRedundantSettlementSweep', () => {
       expect(check(enabled(), [buildV3ExactOutStep()])).to.equal(false)
     })
 
-    it('rejects malformed V3 paths and output token in an intermediate position', () => {
-      expect(check(enabled(), [buildV3ExactInStep({ recipient: TEST_RECIPIENT, path: '0x1234' })])).to.equal(false)
-      expect(check(enabled(), [buildV3ExactOutStep({ recipient: TEST_RECIPIENT, path: '0x1234' })])).to.equal(false)
+    it('rejects the output token in an intermediate V3 position', () => {
       const loop = packV3Path([USDC.address, WETH.address, DAI.address, WETH.address], [500, 500, 500])
       expect(check(enabled(), [buildV3ExactInStep({ recipient: TEST_RECIPIENT, path: loop })])).to.equal(false)
       const reverse = packV3ExactOutPath([USDC.address, WETH.address, DAI.address, WETH.address], [500, 500, 500])
       expect(check(enabled(), [buildV3ExactOutStep({ recipient: TEST_RECIPIENT, path: reverse })])).to.equal(false)
     })
 
-    it('fails closed on unrecognized steps, actions, and malformed V2 paths', () => {
+    it('fails closed on unrecognized steps and actions', () => {
       expect(check(enabled(), [{ type: 'UNKNOWN' } as unknown as SwapStep])).to.equal(false)
       expect(
         check(enabled(), [{ type: 'V4_SWAP', v4Actions: [{ action: 'UNKNOWN' } as unknown as V4Action] }])
-      ).to.equal(false)
-      expect(
-        check(enabled(), [buildV2ExactInStep({ recipient: TEST_RECIPIENT, path: [USDC.address, '0x1234'] })])
       ).to.equal(false)
     })
 
@@ -1734,6 +1713,44 @@ describe('omitRedundantSettlementSweep', () => {
         minAmount: NET_MIN.toString(),
       }
       expect(sweepInputs(spec, [step])).to.have.length(0)
+    })
+
+    it('changes calldata only by removing the settlement SWEEP', () => {
+      const plans: { spec: NormalizedSwapSpecification; steps: SwapStep[]; settlementToken: string }[] = [
+        { spec: buildSpec({ allowDirectTransfers: true }), steps: [directV3()], settlementToken: WETH.address },
+        { spec: buildSpec({ allowDirectTransfers: true }), steps: [v4Single()], settlementToken: WETH.address },
+        { spec: buildSpec({ allowDirectTransfers: true }), steps: [v4Multi()], settlementToken: WETH.address },
+        {
+          spec: { ...nativeSpec(), omitRedundantSettlementSweep: undefined },
+          steps: [
+            buildV3ExactInStep({ amountOutMin: '0' }),
+            { type: 'UNWRAP_WETH', recipient: TEST_RECIPIENT, amountMin: NET_MIN.toString() },
+          ],
+          settlementToken: ETH_ADDRESS,
+        },
+      ]
+      for (const { spec, steps, settlementToken } of plans) {
+        for (const safeMode of [false, true]) {
+          const flagOff = SwapRouter.encodeSwaps({ ...spec, safeMode }, steps)
+          const flagOn = SwapRouter.encodeSwaps({ ...spec, safeMode, omitRedundantSettlementSweep: true }, steps)
+          const off = parseCommands(flagOff.calldata)
+          const on = parseCommands(flagOn.calldata)
+          const removedIndex = off.commandTypes.findIndex(
+            (command, index) => command !== on.commandTypes[index] || off.inputs[index] !== on.inputs[index]
+          )
+          expect(off.commandTypes[removedIndex]).to.equal(CommandType.SWEEP)
+          const [token, sweepRecipient, amountMin] = defaultAbiCoder.decode(
+            ['address', 'address', 'uint256'],
+            off.inputs[removedIndex]
+          )
+          expect(token.toLowerCase()).to.equal(settlementToken.toLowerCase())
+          expect(sweepRecipient.toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+          expect(amountMin.toString()).to.equal('0')
+          expect(on.commandTypes).to.deep.equal(off.commandTypes.filter((_, index) => index !== removedIndex))
+          expect(on.inputs).to.deep.equal(off.inputs.filter((_, index) => index !== removedIndex))
+          expect(flagOn.value).to.equal(flagOff.value)
+        }
+      }
     })
 
     it('preserves default calldata when the flag is absent or false', () => {

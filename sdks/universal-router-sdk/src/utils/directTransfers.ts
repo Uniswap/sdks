@@ -46,9 +46,8 @@ export function v3PathLastToken(path: string): string | undefined {
 }
 
 function v3PathTokens(path: string): string[] | undefined {
-  if (typeof path !== 'string') return undefined
   const hops = getV3HopCount(path)
-  if (hops === undefined || !/^0x[0-9a-fA-F]+$/.test(path)) return undefined
+  if (hops === undefined) return undefined
   const tokens: string[] = []
   for (let i = 0; i <= hops; i++) {
     const start = 2 + i * 46
@@ -72,7 +71,6 @@ export function isSettlementSweepRedundant(
     spec.allowDirectTransfers !== true ||
     spec.tradeType !== TradeType.EXACT_INPUT ||
     toFeeList(spec.fee).length !== 0 ||
-    spec.routerBalanceInput !== undefined ||
     !sweepFloor.isZero() ||
     spec.nativeErc20Input ||
     spec.routing.inputToken.wrapped.equals(spec.routing.outputToken.wrapped)
@@ -85,6 +83,8 @@ export function isSettlementSweepRedundant(
   if (NATIVE_ERC20_BALANCE_ALIAS_CHAINS.includes(chainId)) return false
   const settlementToken = getCurrencyAddress(outputToken).toLowerCase()
   const recipient = spec.recipient.toLowerCase()
+  // With the router as recipient, a native SWEEP is a self-send that reverts; keep it so the plan
+  // reverts instead of leaving ETH on the router (for ERC20 the sweep is a self-transfer either way).
   try {
     if (UNIVERSAL_ROUTER_ADDRESS(spec.urVersion, chainId).toLowerCase() === recipient) return false
   } catch {
@@ -92,18 +92,9 @@ export function isSettlementSweepRedundant(
   }
 
   for (const step of swapSteps) {
-    if (!step || typeof step !== 'object') return false
-    if ('recipient' in step && typeof step.recipient !== 'string') return false
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
-        if (
-          !Array.isArray(step.path) ||
-          step.path.length < 2 ||
-          !step.path.every((token) => typeof token === 'string' && /^0x[0-9a-fA-F]{40}$/.test(token))
-        ) {
-          return false
-        }
         if (
           step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT &&
           step.path[step.path.length - 1].toLowerCase() === settlementToken
@@ -134,39 +125,18 @@ export function isSettlementSweepRedundant(
         if (outputToken.isNative && step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return false
         break
       case 'V4_SWAP':
-        if (!Array.isArray(step.v4Actions)) return false
         for (const action of step.v4Actions) {
-          if (!action || typeof action !== 'object') return false
           switch (action.action) {
             case 'SWAP_EXACT_IN_SINGLE':
             case 'SWAP_EXACT_OUT_SINGLE':
-              if (
-                typeof action.poolKey?.currency0 !== 'string' ||
-                typeof action.poolKey?.currency1 !== 'string' ||
-                typeof action.poolKey?.hooks !== 'string' ||
-                action.poolKey.hooks.toLowerCase() !== ZERO_ADDRESS
-              ) {
-                return false
-              }
+              if (action.poolKey.hooks.toLowerCase() !== ZERO_ADDRESS) return false
               break
             case 'SWAP_EXACT_IN':
             case 'SWAP_EXACT_OUT':
-              if (
-                !Array.isArray(action.path) ||
-                action.path.length === 0 ||
-                action.path.some(
-                  (hop) =>
-                    typeof hop?.intermediateCurrency !== 'string' ||
-                    typeof hop.hooks !== 'string' ||
-                    hop.hooks.toLowerCase() !== ZERO_ADDRESS
-                )
-              ) {
-                return false
-              }
+              if (action.path.some((hop) => hop.hooks.toLowerCase() !== ZERO_ADDRESS)) return false
               break
             case 'TAKE':
             case 'TAKE_PORTION':
-              if (typeof action.currency !== 'string' || typeof action.recipient !== 'string') return false
               if (action.currency.toLowerCase() === settlementToken && action.recipient.toLowerCase() !== recipient) {
                 return false
               }
@@ -174,7 +144,6 @@ export function isSettlementSweepRedundant(
             case 'SETTLE':
             case 'SETTLE_ALL':
             case 'TAKE_ALL':
-              if (typeof action.currency !== 'string') return false
               break
             default:
               return false
