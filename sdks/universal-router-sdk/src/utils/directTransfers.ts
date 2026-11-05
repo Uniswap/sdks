@@ -59,7 +59,7 @@ function v3PathTokens(path: string): string[] | undefined {
 /**
  * Checks a validated spec and validated steps against their computed settlement sweep floor.
  * The caller must ensure the router has no pre-existing output balance and tokens have no
- * transfer side effects that credit the router; incidental output is not forwarded if omitted.
+ * transfer side effects that credit the router; such a balance is not forwarded if omitted.
  */
 export function isSettlementSweepRedundant(
   spec: NormalizedSwapSpecification,
@@ -94,14 +94,14 @@ export function isSettlementSweepRedundant(
   for (const step of swapSteps) {
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
-      case 'V2_SWAP_EXACT_OUT':
-        if (
-          step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT &&
-          step.path[step.path.length - 1].toLowerCase() === settlementToken
-        ) {
+      case 'V2_SWAP_EXACT_OUT': {
+        const pathOutput = step.path[step.path.length - 1]
+        if (pathOutput === undefined) return false
+        if (step.recipient.toLowerCase() === ROUTER_AS_RECIPIENT && pathOutput.toLowerCase() === settlementToken) {
           return false
         }
         break
+      }
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
         const tokens = v3PathTokens(step.path)

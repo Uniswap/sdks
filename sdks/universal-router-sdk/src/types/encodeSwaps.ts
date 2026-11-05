@@ -52,10 +52,11 @@ export type SwapSpecification = {
    */
   allowDirectTransfers?: boolean
   /**
-   * Omit the settlement SWEEP when it can enforce nothing and the router never receives the
-   * output token (see `isSettlementSweepRedundant`). Default false. Only takes effect with
+   * Omit the settlement SWEEP when it can enforce nothing and no step can leave the output token
+   * on the router (see `isSettlementSweepRedundant`). Default false. Only takes effect with
    * `allowDirectTransfers`. Assumes the router holds no pre-existing output balance and tokens
-   * have no transfer side effects that credit the router. Incidental output balance is not forwarded.
+   * have no transfer side effects that credit the router. Such a balance is not forwarded when the
+   * sweep is omitted, except that the `safeMode` ETH sweep still forwards native balance.
    */
   omitRedundantSettlementSweep?: boolean
   /**

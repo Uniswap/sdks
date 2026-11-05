@@ -185,7 +185,8 @@ export abstract class SwapRouter {
    * With `omitRedundantSettlementSweep`, a zero-floor settlement sweep is omitted only for
    * direct-transfer plans that leave no output in router custody. This assumes the router holds
    * no pre-existing output balance and tokens have no transfer side effects that credit it;
-   * incidental output balance is not forwarded when the sweep is omitted.
+   * such a balance is not forwarded when the sweep is omitted (the `safeMode` ETH sweep still
+   * forwards native balance).
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)

@@ -1735,6 +1735,8 @@ describe('omitRedundantSettlementSweep', () => {
           const flagOn = SwapRouter.encodeSwaps({ ...spec, safeMode, omitRedundantSettlementSweep: true }, steps)
           const off = parseCommands(flagOff.calldata)
           const on = parseCommands(flagOn.calldata)
+          const offCommandBytes = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', flagOff.calldata)[0]
+          const onCommandBytes = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', flagOn.calldata)[0]
           const removedIndex = off.commandTypes.findIndex(
             (command, index) => command !== on.commandTypes[index] || off.inputs[index] !== on.inputs[index]
           )
@@ -1746,11 +1748,20 @@ describe('omitRedundantSettlementSweep', () => {
           expect(token.toLowerCase()).to.equal(settlementToken.toLowerCase())
           expect(sweepRecipient.toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
           expect(amountMin.toString()).to.equal('0')
+          expect(offCommandBytes.slice(2 + removedIndex * 2, 4 + removedIndex * 2)).to.equal('04')
+          expect(onCommandBytes).to.equal(
+            offCommandBytes.slice(0, 2 + removedIndex * 2) + offCommandBytes.slice(4 + removedIndex * 2)
+          )
           expect(on.commandTypes).to.deep.equal(off.commandTypes.filter((_, index) => index !== removedIndex))
           expect(on.inputs).to.deep.equal(off.inputs.filter((_, index) => index !== removedIndex))
           expect(flagOn.value).to.equal(flagOff.value)
         }
       }
+    })
+
+    it('keeps the sweep instead of throwing for an empty V2 path', () => {
+      const steps: SwapStep[] = [directV3(), buildV2ExactInStep({ path: [] })]
+      expect(sweepInputs(enabled(), steps)).to.have.length(1)
     })
 
     it('preserves default calldata when the flag is absent or false', () => {
