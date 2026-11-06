@@ -1,0 +1,86 @@
+name: "Margin SDK ABI Consistency"
+
+# CONSISTENCY GATE — proves the committed forge-generated ABI bindings in sdks/margin-sdk
+# (src/generated/abis.ts) actually match a fresh build of the v4-periphery margin contracts at
+# the commit they claim to be pinned to. viem encodes tuples positionally, so a contract field
+# reorder with stale bindings would produce silently-wrong calldata; if someone edits the pin or
+# the bindings and forgets to regenerate (or hand-edits the generated file), this job fails the PR.
+#
+# It compiles the pinned commit with forge and diffs the regenerated bindings against the
+# committed file via `bun run check:abis` (the generator's --check mode). Nothing is written; the
+# job only reports pass/fail. Mirrors the liquidity-launcher lock-bytecode gate.
+#
+# Runs only when the package changes (path filter) — this is not needed on unrelated PRs.
+
+on:
+  pull_request:
+    paths:
+      - "sdks/margin-sdk/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check-margin-abis:
+    name: Verify ABI bindings match the pinned v4-periphery commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout sdks
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 💽 Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0"
+
+      - name: 🪨 Install Foundry
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
+        with:
+          version: nightly
+
+      - name: 📌 Read the pinned v4-periphery commit from the bindings header
+        id: pin
+        run: |
+          # Single source of truth: the "Pinned to v4-periphery commit <sha>" line in the
+          # committed bindings. Keeps the pin human-readable and reviewable in diffs.
+          sha=$(grep -oE 'Pinned to v4-periphery commit [0-9a-f]{40}' \
+            sdks/margin-sdk/src/generated/abis.ts | grep -oE '[0-9a-f]{40}')
+          if [ -z "$sha" ]; then echo "could not read pinned commit"; exit 1; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Pinned v4-periphery commit: $sha"
+
+      - name: ⬇️ Clone v4-periphery at the pinned commit (submodules over https)
+        run: |
+          # Rewrite any SSH submodule URLs to https BEFORE submodule init so the runner (which
+          # has no SSH key) can fetch the public repos. The generator script runs
+          # `git submodule update --init --recursive` itself.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git clone https://github.com/Uniswap/v4-periphery.git "$RUNNER_TEMP/v4-periphery"
+          git -C "$RUNNER_TEMP/v4-periphery" fetch origin "$PINNED_SHA" || true
+          git -C "$RUNNER_TEMP/v4-periphery" checkout "$PINNED_SHA"
+        env:
+          PINNED_SHA: ${{ steps.pin.outputs.sha }}
+
+      - name: 🔎 Check committed bindings against the pinned commit's build
+        working-directory: sdks/margin-sdk
+        env:
+          V4_PERIPHERY_PATH: ${{ runner.temp }}/v4-periphery
+          V4_PERIPHERY_COMMIT: ${{ steps.pin.outputs.sha }}
+        run: bun run check:abis
