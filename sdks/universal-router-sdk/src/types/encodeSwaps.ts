@@ -52,6 +52,12 @@ export type SwapSpecification = {
    */
   allowDirectTransfers?: boolean
   /**
+   * Omit the zero-floor settlement SWEEP when no step can leave the output token on the router.
+   * Default false. Needs `allowDirectTransfers`. Assumes the router starts with no output balance
+   * and token transfers do not credit it; see the README "Direct Transfers" section.
+   */
+  omitRedundantSettlementSweep?: boolean
+  /**
    * Fund the swap from the Universal Router's own balance of the input token: no Permit2
    * ingress is emitted, the first hop spends the CONTRACT_BALANCE sentinel, and an optional
    * `minimumAmount` emits a BALANCE_CHECK_ERC20 (requires `chainId` to resolve the router

@@ -1,7 +1,18 @@
 import { BigNumber } from 'ethers'
 import { TradeType } from '@uniswap/sdk-core'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
-import { CONTRACT_BALANCE, ETH_ADDRESS, SENDER_AS_RECIPIENT } from './constants'
+import {
+  CONTRACT_BALANCE,
+  ETH_ADDRESS,
+  CHAIN_CONFIGS,
+  ROUTER_AS_RECIPIENT,
+  SENDER_AS_RECIPIENT,
+  UNIVERSAL_ROUTER_ADDRESS,
+  WETH_ADDRESS,
+  ZERO_ADDRESS,
+} from './constants'
+import { getCurrencyAddress } from './getCurrencyAddress'
+import { toFeeList } from './normalizeEncodeSwapsSpec'
 
 export type UserPaidPull = {
   // token the step pulls from the user; undefined when not extractable (malformed path)
@@ -24,14 +35,121 @@ export function getV3HopCount(path: string): number | undefined {
   return variableSegmentLength / 23
 }
 
+function v3PathTokens(path: string): string[] | undefined {
+  const hops = getV3HopCount(path)
+  if (hops === undefined) return undefined
+  const tokens: string[] = []
+  for (let i = 0; i <= hops; i++) {
+    const start = 2 + i * 46
+    tokens.push('0x' + path.slice(start, start + 40))
+  }
+  return tokens
+}
+
 export function v3PathFirstToken(path: string): string | undefined {
-  if (getV3HopCount(path) === undefined) return undefined
-  return '0x' + path.slice(2, 42)
+  return v3PathTokens(path)?.[0]
 }
 
 export function v3PathLastToken(path: string): string | undefined {
-  if (getV3HopCount(path) === undefined) return undefined
-  return '0x' + path.slice(-40)
+  const tokens = v3PathTokens(path)
+  return tokens?.[tokens.length - 1]
+}
+
+export function isSettlementSweepRedundant(
+  spec: NormalizedSwapSpecification,
+  swapSteps: SwapStep[],
+  sweepFloor: BigNumber
+): boolean {
+  if (
+    spec.omitRedundantSettlementSweep !== true ||
+    spec.allowDirectTransfers !== true ||
+    spec.tradeType !== TradeType.EXACT_INPUT ||
+    toFeeList(spec.fee).length !== 0 ||
+    spec.routerBalanceInput !== undefined ||
+    !sweepFloor.isZero() ||
+    spec.nativeErc20Input ||
+    spec.routing.inputToken.wrapped.equals(spec.routing.outputToken.wrapped)
+  ) {
+    return false
+  }
+
+  const outputToken = spec.routing.outputToken
+  const chainId = outputToken.chainId
+  if (!(chainId in CHAIN_CONFIGS) || CHAIN_CONFIGS[chainId].nativeErc20BalanceAlias) return false
+  const settlementToken = getCurrencyAddress(outputToken).toLowerCase()
+  const recipient = spec.recipient.toLowerCase()
+  if (recipient === ROUTER_AS_RECIPIENT) return false
+  // A native SWEEP to the router reverts, so keeping it avoids leaving ETH on the router.
+  try {
+    if (UNIVERSAL_ROUTER_ADDRESS(spec.urVersion, chainId).toLowerCase() === recipient) return false
+  } catch {
+    return false
+  }
+
+  for (const step of swapSteps) {
+    switch (step.type) {
+      case 'V2_SWAP_EXACT_IN':
+      case 'V2_SWAP_EXACT_OUT': {
+        const tokens = step.path.map((token) => token.toLowerCase())
+        if (tokens.length === 0) return false
+        const outputIndex = tokens.length - 1
+        if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false
+        if (tokens[outputIndex] === settlementToken && step.recipient.toLowerCase() !== recipient) return false
+        break
+      }
+      case 'V3_SWAP_EXACT_IN':
+      case 'V3_SWAP_EXACT_OUT': {
+        const tokens = v3PathTokens(step.path)?.map((token) => token.toLowerCase())
+        if (!tokens) return false
+        const outputIndex = step.type === 'V3_SWAP_EXACT_IN' ? tokens.length - 1 : 0
+        if (tokens.some((token, index) => index !== outputIndex && token === settlementToken)) return false
+        if (tokens[outputIndex] === settlementToken && step.recipient.toLowerCase() !== recipient) return false
+        break
+      }
+      case 'WRAP_ETH':
+        try {
+          const wethAddress = WETH_ADDRESS(chainId)
+          if (!outputToken.isNative && wethAddress.toLowerCase() === settlementToken) return false
+        } catch {
+          return false
+        }
+        break
+      case 'UNWRAP_WETH':
+        if (outputToken.isNative && step.recipient.toLowerCase() !== recipient) return false
+        break
+      case 'V4_SWAP':
+        for (const action of step.v4Actions) {
+          switch (action.action) {
+            case 'SWAP_EXACT_IN_SINGLE':
+            case 'SWAP_EXACT_OUT_SINGLE':
+              if (action.poolKey.hooks.toLowerCase() !== ZERO_ADDRESS) return false
+              break
+            case 'SWAP_EXACT_IN':
+            case 'SWAP_EXACT_OUT':
+              if (action.path.some((hop) => hop.hooks.toLowerCase() !== ZERO_ADDRESS)) return false
+              break
+            case 'TAKE':
+            case 'TAKE_PORTION':
+              if (action.currency.toLowerCase() === settlementToken && action.recipient.toLowerCase() !== recipient) {
+                return false
+              }
+              break
+            case 'TAKE_ALL':
+              if (action.currency.toLowerCase() === settlementToken && recipient !== SENDER_AS_RECIPIENT) return false
+              break
+            case 'SETTLE':
+            case 'SETTLE_ALL':
+              break
+            default:
+              return false
+          }
+        }
+        break
+      default:
+        return false
+    }
+  }
+  return true
 }
 
 // SETTLE_ALL / TAKE_ALL are intrinsically direct (no flag on-chain) and are gated separately
