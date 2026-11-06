@@ -1,5 +1,11 @@
 # @uniswap/universal-router-sdk
 
+## 5.17.0
+
+### Minor Changes
+
+- 1291425: Add an opt-in `omitRedundantSettlementSweep` field to `encodeSwaps` for direct-transfer plans with a redundant settlement sweep.
+
 ## 5.16.2
 
 ### Patch Changes
