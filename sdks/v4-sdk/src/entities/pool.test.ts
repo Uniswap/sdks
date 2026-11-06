@@ -1,5 +1,5 @@
 import { Token, CurrencyAmount, WETH9, Ether, ChainId } from '@uniswap/sdk-core'
-import { Pool, DYNAMIC_FEE_FLAG } from './pool'
+import { Pool, DYNAMIC_FEE_FLAG, calculateSwapFee } from './pool'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import {
@@ -60,6 +60,43 @@ describe('Pool', () => {
         []
       )
       expect(pool.fee).toEqual(DYNAMIC_FEE_FLAG)
+    })
+
+    it('calculateSwapFee matches ProtocolFeeLibrary formula', () => {
+      // 30 bps LP + 5 bps protocol → 349850 pips (not 3500)
+      expect(calculateSwapFee(500, 3000)).toEqual(500 + 3000 - Math.floor((500 * 3000) / 1_000_000))
+      expect(calculateSwapFee(0, 3000)).toEqual(3000)
+    })
+
+    it('protocolFee affects swapFee but not poolKey', () => {
+      const without = new Pool(
+        USDC,
+        WETH9[1],
+        FEE_AMOUNT_MEDIUM,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
+      const withProtocol = new Pool(
+        USDC,
+        WETH9[1],
+        FEE_AMOUNT_MEDIUM,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        [],
+        500
+      )
+      expect(withProtocol.protocolFee).toEqual(500)
+      expect(withProtocol.swapFee).toEqual(calculateSwapFee(500, FEE_AMOUNT_MEDIUM))
+      expect(withProtocol.poolId).toEqual(without.poolId)
+      expect(withProtocol.poolKey).toEqual(without.poolKey)
+      expect(without.swapFee).toEqual(FEE_AMOUNT_MEDIUM)
     })
 
     it('dynamic fee pool requires hook', () => {
