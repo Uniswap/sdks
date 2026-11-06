@@ -9,6 +9,7 @@ describe('getAverageBlockTimeSecs', () => {
     expect(getAverageBlockTimeSecs(ChainId.MEGAETH)).toEqual(1)
     expect(getAverageBlockTimeSecs(ChainId.ARC)).toEqual(0.5)
     expect(getAverageBlockTimeSecs(ChainId.INK)).toEqual(1)
+    expect(getAverageBlockTimeSecs(ChainId.ELYSIUM)).toEqual(0.1)
   })
 
   it('returns the registered block time for a testnet', () => {
@@ -35,6 +36,7 @@ describe('secondsToBlocks', () => {
     expect(secondsToBlocks(8, ChainId.ARC)).toEqual(16) // ceil(8/0.5)
     expect(secondsToBlocks(8, ChainId.ROBINHOOD)).toEqual(80) // ceil(8/0.1)
     expect(secondsToBlocks(8, ChainId.INK)).toEqual(8) // ceil(8/1)
+    expect(secondsToBlocks(8, ChainId.ELYSIUM)).toEqual(80) // ceil(8/0.1)
     expect(secondsToBlocks(1, ChainId.MAINNET)).toEqual(1) // ceil(1/12) — rounds up to a full block
   })
 

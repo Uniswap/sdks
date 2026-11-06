@@ -38,6 +38,7 @@ export enum ChainId {
   ARC = 5042,
   ROBINHOOD = 4663,
   INK = 57073,
+  ELYSIUM = 99901,
 }
 
 /**
@@ -69,6 +70,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.ARC]: 0.5,
   [ChainId.ROBINHOOD]: 0.1,
   [ChainId.INK]: 1,
+  [ChainId.ELYSIUM]: 0.1, // 100ms canonical blocks per Kinetiq's docs
   // Testnets
   [ChainId.SEPOLIA]: 12,
   [ChainId.OPTIMISM_SEPOLIA]: 2,
@@ -138,6 +140,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.ARC,
   ChainId.ROBINHOOD,
   ChainId.INK,
+  ChainId.ELYSIUM,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 

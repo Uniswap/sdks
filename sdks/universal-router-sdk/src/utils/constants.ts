@@ -672,6 +672,25 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     // SwapProxy on Ink is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
     swapProxy: '0x0000000085E102724e78eCd2F45DC9cA239Affad',
   },
+  // elysium
+  [99901]: {
+    // WHYPE: Elysium's gas token is HYPE
+    weth: '0xbA876237B0F021A6c6D852d6c26E107997cC5E81',
+    routerConfigs: {
+      // Only 2.1.2 and 2.2.0 are deployed on Elysium
+      [UniversalRouterVersion.V2_1_2]: {
+        address: '0xA13f7611115752DEB2B13813BDDE16A5073e4b45',
+        creationBlock: 256483,
+      },
+      // Not the superseded 0x1BD4d69B…3B0D, which is wired to a stale PermissionsAdapterFactory
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0x1B341FDD55d56F8E08409A2C25DDFad93Eb03C1a',
+        creationBlock: 257585,
+      },
+    },
+    // SwapProxy on Elysium is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
+    swapProxy: '0x0000000085E102724e78eCd2F45DC9cA239Affad',
+  },
   // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',

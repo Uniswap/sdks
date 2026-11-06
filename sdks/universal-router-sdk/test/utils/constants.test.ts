@@ -17,6 +17,7 @@ describe('Universal Router Constants', () => {
   // MegaETH skipped 2.1.1 entirely: 2.0 -> 2.1.2
   const MEGAETH_CHAIN_ID = 4326
   const INK_CHAIN_ID = 57073
+  const ELYSIUM_CHAIN_ID = 99901
 
   describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
@@ -139,14 +140,19 @@ describe('Universal Router Constants', () => {
   })
 
   describe('V2_1_2', () => {
-    it('is deployed on every chain that has V2_1_1, plus MegaETH and Ink', () => {
+    it('is deployed on every chain that has V2_1_1, plus MegaETH, Ink and Elysium', () => {
       const with211 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_1])
       const with212 = chainIds.filter((id) => CHAIN_CONFIGS[id].routerConfigs[UniversalRouterVersion.V2_1_2])
-      expect(with212).to.have.lengthOf(24)
-      // every 2.1.1 chain got 2.1.2. MegaETH never had a 2.1.1, and Ink's was an
-      // alias to v2.2.0 that has since been removed, so both have 2.1.2 without 2.1.1.
+      expect(with212).to.have.lengthOf(25)
+      // every 2.1.1 chain got 2.1.2. MegaETH never had a 2.1.1, Ink's was an alias to
+      // v2.2.0 that has since been removed, and Elysium launched on 2.1.2, so all three
+      // have 2.1.2 without 2.1.1.
       expect(with211.filter((id) => !with212.includes(id))).to.deep.equal([])
-      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([MEGAETH_CHAIN_ID, INK_CHAIN_ID])
+      expect(with212.filter((id) => !with211.includes(id))).to.deep.equal([
+        MEGAETH_CHAIN_ID,
+        INK_CHAIN_ID,
+        ELYSIUM_CHAIN_ID,
+      ])
     })
 
     it('has no V2_1_1 on MegaETH to fall back to', () => {
@@ -194,9 +200,41 @@ describe('Universal Router Constants', () => {
     })
   })
 
+  describe('Elysium (99901)', () => {
+    it('returns the deployed V2_1_2 and V2_2_0 routers', () => {
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_2, ELYSIUM_CHAIN_ID)).to.equal(
+        '0xA13f7611115752DEB2B13813BDDE16A5073e4b45'
+      )
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_2_0, ELYSIUM_CHAIN_ID)).to.equal(
+        '0x1B341FDD55d56F8E08409A2C25DDFad93Eb03C1a'
+      )
+    })
+
+    it('returns each router creation block', () => {
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_2, ELYSIUM_CHAIN_ID)).to.equal(256483)
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_2_0, ELYSIUM_CHAIN_ID)).to.equal(257585)
+    })
+
+    it('has no router before 2.1.2', () => {
+      ;[UniversalRouterVersion.V1_2, UniversalRouterVersion.V2_0, UniversalRouterVersion.V2_1_1].forEach((version) => {
+        expect(() => UNIVERSAL_ROUTER_ADDRESS(version, ELYSIUM_CHAIN_ID)).to.throw(
+          `Universal Router version ${version} not deployed on chain ${ELYSIUM_CHAIN_ID}`
+        )
+      })
+    })
+
+    it('returns WHYPE as the wrapped native', () => {
+      expect(WETH_ADDRESS(ELYSIUM_CHAIN_ID)).to.equal('0xbA876237B0F021A6c6D852d6c26E107997cC5E81')
+    })
+  })
+
   describe('SWAP_PROXY_ADDRESS', () => {
     it('should return the Ink SwapProxy address', () => {
       expect(SWAP_PROXY_ADDRESS(57073)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
+    })
+
+    it('should return the Elysium SwapProxy address', () => {
+      expect(SWAP_PROXY_ADDRESS(ELYSIUM_CHAIN_ID)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
     })
 
     it('should throw for an unsupported chain', () => {
