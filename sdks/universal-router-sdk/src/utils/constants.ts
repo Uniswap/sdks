@@ -673,7 +673,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     swapProxy: '0x0000000085E102724e78eCd2F45DC9cA239Affad',
   },
   // elysium
-  // TODO(SWAP-3759): fill swapProxy once it is deployed on Elysium.
   [99901]: {
     // WHYPE: Elysium's gas token is HYPE
     weth: '0xbA876237B0F021A6c6D852d6c26E107997cC5E81',
@@ -689,6 +688,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 257585,
       },
     },
+    // SwapProxy on Elysium is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
+    swapProxy: '0x0000000085E102724e78eCd2F45DC9cA239Affad',
   },
   // xlayer
   [196]: {

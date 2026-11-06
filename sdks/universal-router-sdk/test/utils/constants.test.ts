@@ -233,6 +233,10 @@ describe('Universal Router Constants', () => {
       expect(SWAP_PROXY_ADDRESS(57073)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
     })
 
+    it('should return the Elysium SwapProxy address', () => {
+      expect(SWAP_PROXY_ADDRESS(ELYSIUM_CHAIN_ID)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
+    })
+
     it('should throw for an unsupported chain', () => {
       expect(() => SWAP_PROXY_ADDRESS(999999)).to.throw('SwapProxy not deployed on chain 999999')
     })

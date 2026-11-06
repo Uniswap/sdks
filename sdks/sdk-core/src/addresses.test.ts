@@ -1,10 +1,13 @@
 import {
   CHAIN_TO_ADDRESSES_MAP,
+  MULTICALL_ADDRESSES,
   QUOTER_ADDRESSES,
   SWAP_ROUTER_02_ADDRESSES,
+  TICK_LENS_ADDRESSES,
   V2_FACTORY_ADDRESSES,
   V2_ROUTER_ADDRESSES,
   V3_CORE_FACTORY_ADDRESSES,
+  V3_MIGRATOR_ADDRESSES,
 } from './addresses'
 import { ChainId } from './chains'
 import { WETH9 } from './entities/weth9'
@@ -97,6 +100,15 @@ describe('addresses', () => {
       expect(V2_ROUTER_ADDRESSES[ChainId.ELYSIUM]).toEqual('0xE783DE89a7F0408687f051e3E6D0BEb62719EbAd')
       expect(QUOTER_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x204FAca1764B154221e35c0d20aBb3c525710498')
       expect(SWAP_ROUTER_02_ADDRESSES(ChainId.ELYSIUM)).toEqual('0x2d01411773c8C24805306E89A41F7855C3c4Fe65')
+    })
+
+    it('should return the multicall, v3 migrator, tick lens and mixed route quoter v2', () => {
+      expect(MULTICALL_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x4B2ab38DBF28D31D467aA8993f6c2585981D6804')
+      expect(V3_MIGRATOR_ADDRESSES[ChainId.ELYSIUM]).toEqual('0xABfb859E6c3324fE522bFbB19CB41345003ceD65')
+      expect(TICK_LENS_ADDRESSES[ChainId.ELYSIUM]).toEqual('0x58ead433EA99708604C4dD7c9b7E80C70976E202')
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.ELYSIUM].mixedRouteQuoterV2Address).toEqual(
+        '0x976183AC3d09840D243A88c0268BADb3B3e3259f'
+      )
     })
 
     it('should return the v4 state view and quoter', () => {

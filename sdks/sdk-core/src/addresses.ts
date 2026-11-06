@@ -580,14 +580,15 @@ const INK_ADDRESSES: ChainAddresses = {
   permissionedV4HooksAddress: '0x3c5903cEa9F15e1e59758c8f9267d39C16ea28c0',
 }
 
-// TODO(SWAP-3759): fill multicallAddress, v3MigratorAddress (backend LP endpoints need it), tickLensAddress
-// and mixedRouteQuoterV2Address once they are deployed. multicallAddress is required and left out on purpose
-// so this does not compile until it is real.
 const ELYSIUM_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x1707327F626496A7b5b3872e7E4d2879Df7d7a9f',
+  multicallAddress: '0x4B2ab38DBF28D31D467aA8993f6c2585981D6804',
   quoterAddress: '0x204FAca1764B154221e35c0d20aBb3c525710498',
+  v3MigratorAddress: '0xABfb859E6c3324fE522bFbB19CB41345003ceD65',
   nonfungiblePositionManagerAddress: '0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f',
+  tickLensAddress: '0x58ead433EA99708604C4dD7c9b7E80C70976E202',
   swapRouter02Address: '0x2d01411773c8C24805306E89A41F7855C3c4Fe65',
+  mixedRouteQuoterV2Address: '0x976183AC3d09840D243A88c0268BADb3B3e3259f',
 
   v4PoolManagerAddress: '0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1',
   v4PositionManagerAddress: '0x1d1C51b9d07fD27d36412A2b66CC23D19Eb3E518',
