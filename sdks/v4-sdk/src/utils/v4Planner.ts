@@ -81,7 +81,7 @@ export type ParamType = {
 
 const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
 
-const PATH_KEY_STRUCT = '(address intermediateCurrency,uint256 fee,int24 tickSpacing,address hooks,bytes hookData)'
+const PATH_KEY_STRUCT = '(address intermediateCurrency,uint24 fee,int24 tickSpacing,address hooks,bytes hookData)'
 
 // UR 2.0 swap structs (without minHopPriceX36)
 const SWAP_EXACT_IN_SINGLE_STRUCT_V2_0 =
