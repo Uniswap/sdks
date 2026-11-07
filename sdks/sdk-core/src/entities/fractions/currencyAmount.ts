@@ -66,6 +66,26 @@ export class CurrencyAmount<T extends Currency> extends Fraction {
     return CurrencyAmount.fromFractionalAmount(this.currency, divided.numerator, divided.denominator)
   }
 
+  // Comparisons keep the base `Fraction | BigintIsh` signature so existing
+  // callers (e.g. `amount.equalTo(ZERO)` against a raw zero) keep working, and
+  // add the same currency-safety invariant that add/subtract enforce whenever
+  // the other side is itself a CurrencyAmount - so a cross-currency comparison
+  // throws instead of silently comparing raw numerators.
+  public lessThan(other: Fraction | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) invariant(this.currency.equals(other.currency), 'CURRENCY')
+    return super.lessThan(other)
+  }
+
+  public equalTo(other: Fraction | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) invariant(this.currency.equals(other.currency), 'CURRENCY')
+    return super.equalTo(other)
+  }
+
+  public greaterThan(other: Fraction | BigintIsh): boolean {
+    if (other instanceof CurrencyAmount) invariant(this.currency.equals(other.currency), 'CURRENCY')
+    return super.greaterThan(other)
+  }
+
   public toSignificant(
     significantDigits: number = 6,
     format?: object,
