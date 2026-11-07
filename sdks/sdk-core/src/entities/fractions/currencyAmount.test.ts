@@ -112,4 +112,36 @@ describe('CurrencyAmount', () => {
       expect(amount.toExact()).toEqual('0.00123')
     })
   })
+
+  describe('comparison', () => {
+    const token1 = new Token(1, ADDRESS_ONE, 18)
+    const token2 = new Token(1, '0x0000000000000000000000000000000000000002', 18)
+    const amount1 = CurrencyAmount.fromRawAmount(token1, 100)
+    const amount2 = CurrencyAmount.fromRawAmount(token1, 200)
+    const amount3 = CurrencyAmount.fromRawAmount(token2, 100)
+
+    it('lessThan', () => {
+      expect(amount1.lessThan(amount2)).toBe(true)
+      expect(amount2.lessThan(amount1)).toBe(false)
+      expect(amount1.lessThan(0)).toBe(false)
+      expect(amount1.lessThan(200)).toBe(true)
+      expect(() => amount1.lessThan(amount3)).toThrow('CURRENCY')
+    })
+
+    it('equalTo', () => {
+      expect(amount1.equalTo(amount2)).toBe(false)
+      expect(amount1.equalTo(CurrencyAmount.fromRawAmount(token1, 100))).toBe(true)
+      expect(amount1.equalTo(0)).toBe(false)
+      expect(amount1.equalTo(100)).toBe(true)
+      expect(() => amount1.equalTo(amount3)).toThrow('CURRENCY')
+    })
+
+    it('greaterThan', () => {
+      expect(amount1.greaterThan(amount2)).toBe(false)
+      expect(amount2.greaterThan(amount1)).toBe(true)
+      expect(amount1.greaterThan(0)).toBe(true)
+      expect(amount1.greaterThan(200)).toBe(false)
+      expect(() => amount1.greaterThan(amount3)).toThrow('CURRENCY')
+    })
+  })
 })
