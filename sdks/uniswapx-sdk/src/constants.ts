@@ -125,6 +125,9 @@ export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
   7777777: "0x0000000000000000000000000000000000000000",
 };
 
+export const EIP7708_ETH_TRANSFER_EMITTER =
+  "0xfffffffffffffffffffffffffffffffffffffffe";
+
 export enum KNOWN_EVENT_SIGNATURES {
   ERC20_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
 }

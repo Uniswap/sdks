@@ -6,6 +6,7 @@ import {
 import { BaseContract, BigNumber, Event, utils } from "ethers";
 
 import MockERC20Abi from "../../abis/MockERC20.json";
+import { EIP7708_ETH_TRANSFER_EMITTER } from "../constants";
 import {
   ExclusiveDutchOrderReactor,
   ExclusiveDutchOrderReactor__factory,
@@ -100,6 +101,11 @@ abstract class EventWatcher<TReactor extends BaseContract> {
   getTokenTransfers(logs: Log[], recipient: string) {
     const ERC20Interface = new utils.Interface(MockERC20Abi.abi);
     return logs.reduce((logAcc, log) => {
+      if (
+        log.address.toLowerCase() === EIP7708_ETH_TRANSFER_EMITTER.toLowerCase()
+      ) {
+        return logAcc;
+      }
       try {
         const parsedLog = ERC20Interface.parseLog(log);
         if (parsedLog.name === TRANSFER && parsedLog.args.to === recipient) {
