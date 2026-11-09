@@ -227,6 +227,10 @@ describe('Universal Router Constants', () => {
     it('returns WHYPE as the wrapped native', () => {
       expect(WETH_ADDRESS(ELYSIUM_CHAIN_ID)).to.equal('0xbA876237B0F021A6c6D852d6c26E107997cC5E81')
     })
+
+    it('has no native/ERC20 balance alias, because HYPE is plain native gas and WHYPE a separate wrapper', () => {
+      expect(CHAIN_CONFIGS[ELYSIUM_CHAIN_ID].nativeErc20BalanceAlias).to.equal(false)
+    })
   })
 
   describe('SWAP_PROXY_ADDRESS', () => {

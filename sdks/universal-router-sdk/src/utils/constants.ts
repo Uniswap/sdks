@@ -708,6 +708,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [99901]: {
     // WHYPE: Elysium's gas token is HYPE
     weth: '0xbA876237B0F021A6c6D852d6c26E107997cC5E81',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       // Only 2.1.2 and 2.2.0 are deployed on Elysium
       [UniversalRouterVersion.V2_1_2]: {
