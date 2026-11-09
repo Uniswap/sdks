@@ -6,6 +6,7 @@ import {
   WETH_ADDRESS,
   SWAP_PROXY_ADDRESS,
   CHAIN_CONFIGS,
+  ZERO_ADDRESS,
 } from '../../src/utils/constants'
 
 describe('Universal Router Constants', () => {
@@ -249,6 +250,14 @@ describe('Universal Router Constants', () => {
 
     it('should return Robinhood WETH', () => {
       expect(WETH_ADDRESS(4663)).to.equal('0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73')
+    })
+
+    it('should mark every chain without WETH as a native/ERC20 balance alias chain', () => {
+      for (const chainId of chainIds) {
+        if (CHAIN_CONFIGS[chainId].weth === ZERO_ADDRESS) {
+          expect(CHAIN_CONFIGS[chainId].nativeErc20BalanceAlias, `chain ${chainId}`).to.equal(true)
+        }
+      }
     })
   })
 })

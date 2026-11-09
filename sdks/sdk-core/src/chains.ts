@@ -57,7 +57,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.CELO]: 1,
   [ChainId.BNB]: 0.45, // post-Maxwell hardfork
   [ChainId.AVALANCHE]: 1,
-  [ChainId.BASE]: 2,
+  [ChainId.BASE]: 0.2, // post-Denim hardfork
   [ChainId.ZORA]: 2,
   [ChainId.BLAST]: 2,
   [ChainId.WORLDCHAIN]: 2,

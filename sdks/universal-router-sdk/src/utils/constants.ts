@@ -41,6 +41,7 @@ export type RouterConfig = {
 
 type ChainConfig = {
   weth: string
+  nativeErc20BalanceAlias: boolean
   routerConfigs: { [key in UniversalRouterVersion]?: RouterConfig }
   swapProxy?: string
 }
@@ -53,6 +54,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // mainnet
   [1]: {
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -80,6 +82,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // goerli
   [5]: {
     weth: '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -94,6 +97,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // sepolia
   [11155111]: {
     weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -121,6 +125,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // polygon
   [137]: {
     weth: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
@@ -144,6 +149,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   //polygon mumbai
   [80001]: {
     weth: '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -158,6 +164,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   //optimism
   [10]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
@@ -181,6 +188,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // optimism goerli
   [420]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -195,6 +203,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // arbitrum
   [42161]: {
     weth: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x5E325eDA8064b456f4781070C0738d849c824258',
@@ -218,6 +227,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // arbitrum goerli
   [421613]: {
     weth: '0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -232,6 +242,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // celo
   [42220]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
@@ -255,6 +266,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // celo alfajores
   [44787]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -269,6 +281,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // binance smart chain
   [56]: {
     weth: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
@@ -292,6 +305,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // avalanche
   [43114]: {
     weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
@@ -315,6 +329,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // base goerli
   [84531]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
@@ -329,6 +344,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // base mainnet
   [8453]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
@@ -356,6 +372,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // blast
   [81457]: {
     weth: '0x4300000000000000000000000000000000000004',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
@@ -379,6 +396,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // zora
   [7777777]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x2986d9721A49838ab4297b695858aF7F17f38014',
@@ -402,6 +420,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // zksync
   [324]: {
     weth: '0x5aea5775959fbc2557cc8789bc1bf90a239d9a91',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
@@ -417,6 +436,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // worldchain
   [480]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
@@ -440,6 +460,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // unichain sepolia
   [1301]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
@@ -463,6 +484,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // unichain mainnet
   [130]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x4D73A4411CA1c660035e4AECC8270E5DdDEC8C17',
@@ -486,6 +508,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // monad testnet
   [10143]: {
     weth: '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893',
@@ -501,6 +524,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // base sepolia
   [84532]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x492e6456d9528771018deb9e87ef7750ef184104',
@@ -524,6 +548,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // soneium
   [1868]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x0e2850543f69f678257266e0907ff9a58b3f13de',
@@ -547,6 +572,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // monad
   [143]: {
     weth: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x0d97dc33264bfc1c226207428a79b26757fb9dc3',
@@ -570,6 +596,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // linea
   [59144]: {
     weth: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V2_0]: {
         address: '0x661e93cca42afacb172121ef892830ca3b70f08d',
@@ -589,6 +616,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // tempo
   [4217]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V2_0]: {
         address: '0x1febb76be10aaf3a1402f04e8e835f2c382f7914',
@@ -608,6 +636,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // megaeth
   [4326]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V2_0]: {
         address: '0x48fd03529d2a91be835f07f6b72f53b4aad6093d',
@@ -624,6 +653,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // arc
   [5042]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    nativeErc20BalanceAlias: true,
     routerConfigs: {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
@@ -639,6 +669,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // robinhood
   [4663]: {
     weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8876789976decbfcbbbe364623c63652db8c0904',
@@ -654,6 +685,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // ink
   [57073]: {
     weth: '0x4200000000000000000000000000000000000006',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V2_0]: {
         address: '0x112908dac86e20e7241b0927479ea3bf935d1fa0',
@@ -694,6 +726,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
+    nativeErc20BalanceAlias: false,
     routerConfigs: {
       [UniversalRouterVersion.V2_0]: {
         address: '0x5507749f2c558bb3e162c6e90c314c092e7372ff',

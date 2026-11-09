@@ -1,5 +1,17 @@
 # @uniswap/sdk-core
 
+## 7.21.0
+
+### Minor Changes
+
+- 74c9d3d: Set Base's average block time to 0.2 s for the Denim hard fork (200 ms blocks, live on Base mainnet since 2026-11-05), so `getAverageBlockTimeSecs` and `secondsToBlocks` give post-Denim block counts on Base.
+
+## 7.20.1
+
+### Patch Changes
+
+- baa5fad: Point `v4QuoterAddress` on Unichain Sepolia, Base Sepolia and Arbitrum Sepolia at the msgSender-capable V4Quoter deployments
+
 ## 7.20.0
 
 ### Minor Changes
