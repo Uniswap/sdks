@@ -1,5 +1,21 @@
 # @uniswap/universal-router-sdk
 
+## 5.17.0
+
+### Minor Changes
+
+- 1291425: Add an opt-in `omitRedundantSettlementSweep` field to `encodeSwaps` for direct-transfer plans with a redundant settlement sweep.
+- 54d79dd: Add Elysium (chain 99901), whose gas token is HYPE: the chain ID, WHYPE as the wrapped native, the V2, V3 and V4 core addresses, and Universal Router 2.1.2 and 2.2.0.
+
+### Patch Changes
+
+- Updated dependencies [54d79dd]
+  - @uniswap/sdk-core@7.22.0
+  - @uniswap/router-sdk@2.11.12
+  - @uniswap/v2-sdk@4.21.11
+  - @uniswap/v3-sdk@3.31.11
+  - @uniswap/v4-sdk@2.4.7
+
 ## 5.16.2
 
 ### Patch Changes
