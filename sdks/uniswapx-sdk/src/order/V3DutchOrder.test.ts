@@ -3,7 +3,7 @@ import { BigNumber, ethers } from "ethers";
 
 import { getEndAmount } from "../utils/dutchBlockDecay";
 
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, encodeRelativeBlocks, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 
 const TIME= 1725379823;
 const BLOCK_NUMBER = 20671221;
@@ -269,6 +269,279 @@ describe("V3DutchOrder", () => {
             expect(resolved.outputs.length).eq(1);
             expect(resolved.outputs[0].token).eq(order.info.outputs[0].token);
             expect(resolved.outputs[0].amount).eq(order.info.cosignerData.outputOverrides[0]);
+        });
+
+        // The reactor bounds the decayed input to the signed maxAmount and the
+        // decayed output to the signed minAmount. Resolving without those
+        // bounds reports economics inverted from the ones the reactor settles
+        // with, which would drain a filler that priced the order locally.
+        it("bounds a curve that resolves across maxAmount and minAmount", () => {
+            const DRAIN_AMOUNT = BigNumber.from(1_000_000);
+            const order = new CosignedV3DutchOrder(
+                getFullOrderInfo({
+                    cosignerData: COSIGNER_DATA_WITHOUT_OVERRIDES,
+                    input: {
+                        token: INPUT_TOKEN,
+                        startAmount: BigNumber.from(1),
+                        curve: {
+                            relativeBlocks: [1],
+                            relativeAmounts: [BigInt(-999_999)],
+                        },
+                        maxAmount: BigNumber.from(1),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
+                    },
+                    outputs: [
+                        {
+                            token: OUTPUT_TOKEN,
+                            startAmount: DRAIN_AMOUNT,
+                            curve: {
+                                relativeBlocks: [1],
+                                relativeAmounts: [BigInt(999_999)],
+                            },
+                            recipient: ethers.constants.AddressZero,
+                            minAmount: DRAIN_AMOUNT,
+                            adjustmentPerGweiBaseFee: BigNumber.from(0),
+                        },
+                    ],
+                }),
+                CHAIN_ID
+            );
+            const resolved = order.resolve({ currentBlock: BLOCK_NUMBER + 1 });
+            expect(resolved.input.amount.toString()).eq("1");
+            expect(resolved.outputs[0].amount.toString()).eq(
+                DRAIN_AMOUNT.toString()
+            );
+        });
+
+        // The reactor adjusts the base amounts by the base fee delta before
+        // decaying, so an order can move its amounts with an empty curve.
+        it("applies the base fee adjustment to an empty curve", () => {
+            const DRAIN_AMOUNT = BigNumber.from(1_000_000);
+            const ONE_GWEI = BigNumber.from(10).pow(9);
+            const order = new CosignedV3DutchOrder(
+                getFullOrderInfo({
+                    startingBaseFee: ONE_GWEI.mul(2),
+                    cosignerData: COSIGNER_DATA_WITHOUT_OVERRIDES,
+                    input: {
+                        token: INPUT_TOKEN,
+                        startAmount: BigNumber.from(1),
+                        curve: { relativeBlocks: [], relativeAmounts: [] },
+                        maxAmount: BigNumber.from(1),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
+                    },
+                    outputs: [
+                        {
+                            token: OUTPUT_TOKEN,
+                            startAmount: BigNumber.from(1),
+                            curve: { relativeBlocks: [], relativeAmounts: [] },
+                            recipient: ethers.constants.AddressZero,
+                            minAmount: BigNumber.from(1),
+                            adjustmentPerGweiBaseFee: DRAIN_AMOUNT.sub(1),
+                        },
+                    ],
+                }),
+                CHAIN_ID
+            );
+            const resolved = order.resolve({
+                currentBlock: BLOCK_NUMBER + 1,
+                blockBaseFee: ONE_GWEI,
+            });
+            expect(resolved.input.amount.toString()).eq("1");
+            expect(resolved.outputs[0].amount.toString()).eq(
+                DRAIN_AMOUNT.toString()
+            );
+        });
+
+        it("throws rather than ignoring a base fee adjustment it cannot apply", () => {
+            const order = new CosignedV3DutchOrder(
+                getFullOrderInfo({
+                    outputs: [
+                        {
+                            ...getFullOrderInfo({}).outputs[0],
+                            adjustmentPerGweiBaseFee: BigNumber.from(1),
+                        },
+                    ],
+                }),
+                CHAIN_ID
+            );
+            expect(() => order.resolve({ currentBlock: BLOCK_NUMBER })).to.throw(
+                "options.blockBaseFee"
+            );
+        });
+
+        // The reactor scales outputs by exclusivityOverrideBps for any filler
+        // without exclusive rights, so a filler that resolved the order without
+        // the override would pay more than it was shown.
+        describe("exclusivity override", () => {
+            const exclusiveFiller = ethers.Wallet.createRandom().address;
+            const otherFiller = ethers.Wallet.createRandom().address;
+
+            const exclusiveOrder = (exclusivityOverrideBps: number) =>
+                new CosignedV3DutchOrder(
+                    getFullOrderInfo({
+                        cosignerData: {
+                            ...COSIGNER_DATA_WITH_OVERRIDES,
+                            exclusiveFiller,
+                            exclusivityOverrideBps: BigNumber.from(
+                                exclusivityOverrideBps
+                            ),
+                        },
+                    }),
+                    CHAIN_ID
+                );
+
+            it("scales outputs for a non-exclusive filler inside the window", () => {
+                const order = exclusiveOrder(100); // 1%
+                const resolved = order.resolve({
+                    currentBlock: BLOCK_NUMBER - 1,
+                    filler: otherFiller,
+                });
+                // 2163420 * 10100 / 10000 rounds up to 2185055
+                expect(resolved.outputs[0].amount.toString()).eq("2185055");
+                // the input is never scaled by the override
+                expect(resolved.input.amount).eq(
+                    order.info.cosignerData.inputOverride
+                );
+            });
+
+            it("does not scale outputs for the exclusive filler", () => {
+                const order = exclusiveOrder(100);
+                const resolved = order.resolve({
+                    currentBlock: BLOCK_NUMBER - 1,
+                    filler: exclusiveFiller,
+                });
+                expect(resolved.outputs[0].amount).eq(
+                    order.info.cosignerData.outputOverrides[0]
+                );
+            });
+
+            it("does not scale outputs once the exclusivity window has passed", () => {
+                const order = exclusiveOrder(100);
+                const currentBlock = BLOCK_NUMBER + 1;
+                expect(
+                    order
+                        .resolve({ currentBlock, filler: otherFiller })
+                        .outputs[0].amount.toString()
+                ).eq(
+                    order
+                        .resolve({ currentBlock, filler: exclusiveFiller })
+                        .outputs[0].amount.toString()
+                );
+            });
+
+            it("resolves for an arbitrary filler when none is given", () => {
+                const order = exclusiveOrder(100);
+                expect(
+                    order
+                        .resolve({ currentBlock: BLOCK_NUMBER - 1 })
+                        .outputs[0].amount.toString()
+                ).eq("2185055");
+            });
+
+            it("throws for a strictly exclusive order it cannot fill", () => {
+                const order = exclusiveOrder(0);
+                expect(() =>
+                    order.resolve({
+                        currentBlock: BLOCK_NUMBER - 1,
+                        filler: otherFiller,
+                    })
+                ).to.throw("NoExclusiveOverride");
+            });
+        });
+
+        // The reactor rejects an override that worsens the order for the
+        // swapper, so resolving one would report amounts it never settles.
+        describe("cosigner amount validation", () => {
+            it("throws when the input override exceeds the signed startAmount", () => {
+                const order = new CosignedV3DutchOrder(
+                    getFullOrderInfo({
+                        cosignerData: {
+                            ...COSIGNER_DATA_WITH_OVERRIDES,
+                            inputOverride: RAW_AMOUNT.add(1),
+                        },
+                    }),
+                    CHAIN_ID
+                );
+                expect(() =>
+                    order.resolve({ currentBlock: BLOCK_NUMBER })
+                ).to.throw("InvalidCosignerInput");
+            });
+
+            it("throws when an output override is below the signed startAmount", () => {
+                const order = new CosignedV3DutchOrder(
+                    getFullOrderInfo({
+                        cosignerData: {
+                            ...COSIGNER_DATA_WITH_OVERRIDES,
+                            outputOverrides: [RAW_AMOUNT.sub(1)],
+                        },
+                    }),
+                    CHAIN_ID
+                );
+                expect(() =>
+                    order.resolve({ currentBlock: BLOCK_NUMBER })
+                ).to.throw("InvalidCosignerOutput");
+            });
+
+            it("throws when outputOverrides does not cover every output", () => {
+                const order = new CosignedV3DutchOrder(
+                    getFullOrderInfo({
+                        cosignerData: {
+                            ...COSIGNER_DATA_WITH_OVERRIDES,
+                            outputOverrides: [],
+                        },
+                    }),
+                    CHAIN_ID
+                );
+                expect(() =>
+                    order.resolve({ currentBlock: BLOCK_NUMBER })
+                ).to.throw("InvalidCosignerOutput");
+            });
+        });
+    });
+
+    // relativeBlocks are packed one uint16 per slot. Both directions of that
+    // packing had range bugs: encoding a value above uint16 silently overwrote
+    // the neighbouring slot, and decoding called toNumber() on the whole packed
+    // value before masking, which overflows the JS safe integer range.
+    describe("relativeBlocks packing", () => {
+        it("rejects a relativeBlock that does not fit in a uint16", () => {
+            // 65536 would shift into the next slot and silently replace it
+            expect(() => encodeRelativeBlocks([65536, 5])).to.throw(
+                "out of uint16 range"
+            );
+        });
+
+        it("accepts the largest valid uint16", () => {
+            expect(encodeRelativeBlocks([65535]).toString()).to.eq("65535");
+        });
+
+        it("round-trips a full 16-point curve", () => {
+            const relativeBlocks = Array.from(
+                { length: 16 },
+                (_, i) => (i + 1) * 4
+            );
+            const relativeAmounts = relativeBlocks.map((_, i) => BigInt(i + 1));
+            const orderInfo = getFullOrderInfo({
+                cosignerData: COSIGNER_DATA_WITHOUT_OVERRIDES,
+                outputs: [
+                    {
+                        token: OUTPUT_TOKEN,
+                        startAmount: RAW_AMOUNT,
+                        curve: { relativeBlocks, relativeAmounts },
+                        recipient: ethers.constants.AddressZero,
+                        minAmount: RAW_AMOUNT.sub(16),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
+                    },
+                ],
+            });
+            const order = new CosignedV3DutchOrder(orderInfo, CHAIN_ID);
+            const parsed = CosignedV3DutchOrder.parse(
+                order.serialize(),
+                CHAIN_ID
+            );
+            expect(parsed.info.outputs[0].curve.relativeBlocks).to.deep.eq(
+                relativeBlocks
+            );
         });
     });
 });
