@@ -5,6 +5,7 @@ import {
   DCAIntent,
   DCAOrderCosignerData,
   FeedInfo,
+  FeedTemplate,
   HybridCosignerData,
   HybridInput,
   HybridOutput,
@@ -281,11 +282,24 @@ export function hashHybridCosignerData(
   );
 }
 
+const keccakUtf8 = (value: string): string =>
+  ethers.utils.keccak256(ethers.utils.toUtf8Bytes(value));
+
+const hashPackedBytes32 = (hashes: string[]): string =>
+  ethers.utils.keccak256(ethers.utils.hexConcat(hashes));
+
+const FEED_TEMPLATE_TYPE_STRING =
+  "FeedTemplate(string name,string expression,string[] parameters,string[] secrets,uint256 retryCount)";
+
+const FEED_TEMPLATE_TYPE_HASH = keccakUtf8(FEED_TEMPLATE_TYPE_STRING);
+
 /**
  * EIP-712 type string for FeedInfo
  */
-const FEED_INFO_TYPE =
-  "FeedInfo(bytes32 feedId,address feed_address,string feedType)";
+const FEED_INFO_TYPE_STRING =
+  "FeedInfo(FeedTemplate feedTemplate,address feedAddress,string feedType)";
+
+const FEED_INFO_TYPE = FEED_INFO_TYPE_STRING + FEED_TEMPLATE_TYPE_STRING;
 
 /**
  * EIP-712 type hash for FeedInfo
@@ -297,10 +311,14 @@ const FEED_INFO_TYPE_HASH = ethers.utils.keccak256(
 /**
  * EIP-712 type string for PrivateIntent
  */
-const PRIVATE_INTENT_TYPE =
+const PRIVATE_INTENT_TYPE_STRING =
   "PrivateIntent(uint256 totalAmount,uint256 exactFrequency," +
-  "uint256 numChunks,bytes32 salt,FeedInfo[] oracleFeeds)" +
-  FEED_INFO_TYPE;
+  "uint256 numChunks,bytes32 salt,FeedInfo[] oracleFeeds)";
+
+const PRIVATE_INTENT_TYPE =
+  PRIVATE_INTENT_TYPE_STRING +
+  FEED_INFO_TYPE_STRING +
+  FEED_TEMPLATE_TYPE_STRING;
 
 /**
  * EIP-712 type hash for PrivateIntent
@@ -308,6 +326,22 @@ const PRIVATE_INTENT_TYPE =
 const PRIVATE_INTENT_TYPE_HASH = ethers.utils.keccak256(
   ethers.utils.toUtf8Bytes(PRIVATE_INTENT_TYPE)
 );
+
+function hashFeedTemplate(template: FeedTemplate): string {
+  return ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ["bytes32", "bytes32", "bytes32", "bytes32", "bytes32", "uint256"],
+      [
+        FEED_TEMPLATE_TYPE_HASH,
+        keccakUtf8(template.name),
+        keccakUtf8(template.expression),
+        hashPackedBytes32(template.parameters.map(keccakUtf8)),
+        hashPackedBytes32(template.secrets.map(keccakUtf8)),
+        template.retryCount,
+      ]
+    )
+  );
+}
 
 /**
  * Hash FeedInfo structure
@@ -317,8 +351,13 @@ const PRIVATE_INTENT_TYPE_HASH = ethers.utils.keccak256(
 function hashFeedInfo(feed: FeedInfo): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "bytes32", "address", "string"],
-      [FEED_INFO_TYPE_HASH, feed.feedId, feed.feed_address, feed.feedType]
+      ["bytes32", "bytes32", "address", "bytes32"],
+      [
+        FEED_INFO_TYPE_HASH,
+        hashFeedTemplate(feed.feedTemplate),
+        feed.feedAddress,
+        keccakUtf8(feed.feedType),
+      ]
     )
   );
 }
@@ -329,10 +368,7 @@ function hashFeedInfo(feed: FeedInfo): string {
  * @returns The keccak256 hash of the array
  */
 function hashFeedInfoArray(feeds: FeedInfo[]): string {
-  const hashes = feeds.map(hashFeedInfo);
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
-  );
+  return hashPackedBytes32(feeds.map(hashFeedInfo));
 }
 
 /**
@@ -395,16 +431,13 @@ function hashOutputAllocation(allocation: OutputAllocation): string {
  * @returns The keccak256 hash of the array
  */
 function hashOutputAllocations(allocations: OutputAllocation[]): string {
-  const hashes = allocations.map(hashOutputAllocation);
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
-  );
+  return hashPackedBytes32(allocations.map(hashOutputAllocation));
 }
 
 /**
- * EIP-712 type string for DCAIntent
+ * EIP-712 type string for DCAIntent (referenced structs in alphabetical order)
  */
-const DCA_INTENT_TYPE =
+const DCA_INTENT_TYPE_STRING =
   "DCAIntent(" +
   "address swapper," +
   "uint256 nonce," +
@@ -421,9 +454,14 @@ const DCA_INTENT_TYPE =
   "uint256 minPrice," +
   "uint256 deadline," +
   "OutputAllocation[] outputAllocations," +
-  "PrivateIntent privateIntent)" +
+  "PrivateIntent privateIntent)";
+
+const DCA_INTENT_TYPE =
+  DCA_INTENT_TYPE_STRING +
+  FEED_INFO_TYPE_STRING +
+  FEED_TEMPLATE_TYPE_STRING +
   OUTPUT_ALLOCATION_TYPE +
-  PRIVATE_INTENT_TYPE;
+  PRIVATE_INTENT_TYPE_STRING;
 
 /**
  * EIP-712 type hash for DCAIntent
@@ -527,6 +565,7 @@ export function hashDCACosignerData(
 
 /**
  * EIP-712 type definitions for DCAIntent
+ * NOTE: Types must be in alphabetical order for EIP-712 spec compliance
  */
 export const DCA_INTENT_TYPES = {
   DCAIntent: [
@@ -547,6 +586,18 @@ export const DCA_INTENT_TYPES = {
     { name: "outputAllocations", type: "OutputAllocation[]" },
     { name: "privateIntent", type: "PrivateIntent" },
   ],
+  FeedInfo: [
+    { name: "feedTemplate", type: "FeedTemplate" },
+    { name: "feedAddress", type: "address" },
+    { name: "feedType", type: "string" },
+  ],
+  FeedTemplate: [
+    { name: "name", type: "string" },
+    { name: "expression", type: "string" },
+    { name: "parameters", type: "string[]" },
+    { name: "secrets", type: "string[]" },
+    { name: "retryCount", type: "uint256" },
+  ],
   OutputAllocation: [
     { name: "recipient", type: "address" },
     { name: "basisPoints", type: "uint16" },
@@ -557,10 +608,5 @@ export const DCA_INTENT_TYPES = {
     { name: "numChunks", type: "uint256" },
     { name: "salt", type: "bytes32" },
     { name: "oracleFeeds", type: "FeedInfo[]" },
-  ],
-  FeedInfo: [
-    { name: "feedId", type: "bytes32" },
-    { name: "feed_address", type: "address" },
-    { name: "feedType", type: "string" },
   ],
 };

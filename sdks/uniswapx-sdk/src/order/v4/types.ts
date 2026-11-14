@@ -193,11 +193,22 @@ export type OutputAllocation = {
 };
 
 /**
+ * Oracle feed template configuration
+ */
+export type FeedTemplate = {
+  name: string;
+  expression: string;
+  parameters: string[];
+  secrets: string[];
+  retryCount: BigNumber;
+};
+
+/**
  * Oracle feed information
  */
 export type FeedInfo = {
-  feedId: string; // bytes32 feed identifier
-  feed_address: string; // Feed contract address
+  feedTemplate: FeedTemplate; // Oracle feed template
+  feedAddress: string; // Feed contract address
   feedType: string; // Feed type string
 };
 
@@ -240,6 +251,14 @@ export type PermitData = {
   signature: string;
 };
 
+export type FeedTemplateJSON = Omit<FeedTemplate, "retryCount"> & {
+  retryCount: string;
+};
+
+export type FeedInfoJSON = Omit<FeedInfo, "feedTemplate"> & {
+  feedTemplate: FeedTemplateJSON;
+};
+
 /**
  * JSON serialization format for DCAIntent
  */
@@ -266,7 +285,7 @@ export type DCAIntentJSON = Omit<
     exactFrequency: string;
     numChunks: string;
     salt: string;
-    oracleFeeds: FeedInfo[];
+    oracleFeeds: FeedInfoJSON[];
   };
 };
 
