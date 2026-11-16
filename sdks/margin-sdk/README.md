@@ -12,8 +12,9 @@ The SDK covers:
   validated against the deployed contracts byte-for-byte.
 - **Offchain account derivation** — `predictMarginAccountAddress` mirrors `router.accountOf`
   (Solady clone-with-immutable-args CREATE2) with no RPC round-trip.
-- **Leverage & health math** — decimal-aware position sizing (`sizeIncrease` / `sizeDecrease`),
-  leverage↔LTV conversions, health factors, slippage helpers.
+- **Leverage & health math** — decimal-aware position sizing (`sizeIncrease` / `sizeDecrease`,
+  plus `sizeIncreaseForLeverageCap` when the target leverage must be a ceiling), leverage↔LTV
+  conversions, health factors, slippage helpers.
 - **Universal Router route builders** — the position swap is a caller-built UR command plan
   supplied per call; `buildV4ExactOutRoute` covers the canonical single-pool v4 case.
 - **A plan builder** (`MarginPlanner`) for the advanced `execute` entry point: compose v4 routing
@@ -132,6 +133,25 @@ const { request } = await publicClient.simulateContract({
   }),
 })
 await walletClient.writeContract(request)
+```
+
+**Capping leverage**: `sizeIncrease` sizes the buy for the quote, so a fill that uses the slippage
+budget lands above the target (2x at 1% slippage realizes 2.02x). `sizeIncreaseForLeverageCap`
+sizes for the worst fill instead, `equity * (L - 1) / (1 + L * slippage)`, and returns the matching
+`maxLtvAfter` (`impliedLtv(L)`): a fill that spends the whole `maxDebtIn` lands exactly at the
+target, a better fill lands below it (`leverageAtQuoteX18` at a perfect fill), and anything that
+would exceed it reverts. Pass `maxLtvAfter` through `increasePositionCall` so the ceiling is
+enforced onchain. The router checks it at the venue oracle while the swap fills at the pool, so pad
+the bound by the expected oracle/pool basis if an in-budget fill must never be rejected.
+
+```ts
+const { collateralToBuy, maxDebtIn, maxLtvAfter } = sizeIncreaseForLeverageCap({
+  equity,
+  leverageX18: parseLeverageX18(2),
+  priceDebtPerCollateralToken: parseUnits('3000', 6),
+  collateralDecimals: 18,
+  slippageBps: 50,
+})
 ```
 
 **Native ETH equity**: pass `nativeEquity` instead (the router wraps it to WETH; the market
