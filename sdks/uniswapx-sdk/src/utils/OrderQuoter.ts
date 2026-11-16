@@ -63,6 +63,11 @@ export interface UniswapXOrderQuote {
   validation: OrderValidation;
   // not specified if validation is not OK
   quote: ResolvedUniswapXOrder | undefined;
+  /**
+   * Raw revert data returned by multicall (hex string starting with `0x`).
+   * Present only when the quote call reverted; useful for diagnosing `UnknownError`.
+   */
+  validationErrorData?: string;
 }
 
 export interface ResolvedRelayOrder {
@@ -89,6 +94,10 @@ const BASIC_ERROR = "0x08c379a0";
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "8baa579f": OrderValidation.InvalidSignature,
   "815e1d64": OrderValidation.InvalidSignature,
+  // Permit2 SignatureVerification:InvalidContractSignature() (ERC-1271 signer rejected the signature)
+  "b0669cbc": OrderValidation.InvalidSignature,
+  // Permit2 SignatureVerification:InvalidSignatureLength()
+  "4be6321b": OrderValidation.InvalidSignature,
   "756688fe": OrderValidation.NonceUsed,
   // invalid dutch decay time
   "302e5b7c": OrderValidation.InvalidOrderFields,
@@ -239,9 +248,11 @@ export class UniswapXOrderQuoter
     );
 
     return validations.map((validation, i) => {
+      const { success, returnData } = results[i];
       return {
         validation,
         quote: quotes[i],
+        ...(success ? {} : { validationErrorData: returnData }),
       };
     });
   }
