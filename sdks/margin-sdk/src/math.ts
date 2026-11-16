@@ -57,6 +57,22 @@ export function collateralToBuyForLeverage(equity: bigint, leverageX18: bigint):
 }
 
 /**
+ * The collateral to buy so that a fill using the whole `slippageBps` budget lands exactly at
+ * `leverageX18` and any better fill lands below it: `equity * (L - 1) / (1 + L * s)` with
+ * `s = slippageBps / 10_000`. Compare {@link collateralToBuyForLeverage}, which sizes for the
+ * quote and lets a worse fill push realized leverage above the target. Same units as `equity`.
+ */
+export function collateralToBuyForLeverageCap(equity: bigint, leverageX18: bigint, slippageBps: number): bigint {
+  assertLeverageX18(leverageX18)
+  validateBps(slippageBps)
+  // both sides scaled by WAD * BPS so the division happens once and rounds down (buys less, never more)
+  return (
+    (equity * (leverageX18 - ONE_X18) * BPS_DENOMINATOR) /
+    (WAD * BPS_DENOMINATOR + leverageX18 * BigInt(slippageBps))
+  )
+}
+
+/**
  * The oracle-price-independent LTV a fresh position lands at for a target leverage:
  * `(L - 1) / L` in WAD. 2x ≈ 50%, 3x ≈ 67%, 4x ≈ 75%.
  */
@@ -162,16 +178,8 @@ export function toUint128(amount: bigint, label = 'amount'): bigint {
   return amount
 }
 
-/**
- * Sizes an `increasePosition` swap from equity and target leverage:
- * `collateralToBuy = equity * (L - 1) / 1e18` (the exact-output side) and
- * `maxDebtIn = quote(collateralToBuy) + slippage` (the binding input cap).
- *
- * `priceDebtPerCollateralToken` is debt-wei per one whole collateral token from a real quote —
- * e.g. a 3_000 USDC/WETH quote is `parseUnits('3000', 6)`. For a short the decimals reverse
- * naturally: price in WETH-wei per whole USDC.
- */
-export function sizeIncrease(p: {
+/** Inputs shared by {@link sizeIncrease} and {@link sizeIncreaseForLeverageCap}. */
+export type IncreaseSizingParams = {
   /** Equity in the collateral token's native decimals. */
   equity: bigint
   /** Target leverage as WAD (use {@link parseLeverageX18}). */
@@ -182,11 +190,78 @@ export function sizeIncrease(p: {
   collateralDecimals: number
   /** Slippage headroom in bps applied to the quoted debt cost. */
   slippageBps: number
-}): { collateralToBuy: bigint; maxDebtIn: bigint; totalCollateral: bigint } {
+}
+
+/**
+ * Sizes an `increasePosition` swap from equity and target leverage:
+ * `collateralToBuy = equity * (L - 1) / 1e18` (the exact-output side) and
+ * `maxDebtIn = quote(collateralToBuy) + slippage` (the binding input cap).
+ *
+ * `priceDebtPerCollateralToken` is debt-wei per one whole collateral token from a real quote —
+ * e.g. a 3_000 USDC/WETH quote is `parseUnits('3000', 6)`. For a short the decimals reverse
+ * naturally: price in WETH-wei per whole USDC.
+ *
+ * Sized for the quote, so realized leverage slips up with the fill: a fill that spends the whole
+ * slippage budget lands above `leverageX18` (2x at 1% realizes 2.02x). Use
+ * {@link sizeIncreaseForLeverageCap} when the target must be a ceiling.
+ */
+export function sizeIncrease(p: IncreaseSizingParams): {
+  collateralToBuy: bigint
+  maxDebtIn: bigint
+  totalCollateral: bigint
+} {
   if (p.equity <= 0n) {
     throw new MarginSdkError('INVALID_AMOUNT', 'equity must be positive to size an increase from leverage')
   }
   const collateralToBuy = toUint128(collateralToBuyForLeverage(p.equity, p.leverageX18), 'collateralToBuy')
+  const maxDebtIn = capDebtInForBuy(collateralToBuy, p)
+  return { collateralToBuy, maxDebtIn, totalCollateral: totalExposure(p.equity, p.leverageX18) }
+}
+
+/**
+ * Sizes an `increasePosition` swap so realized leverage can only slip down from the target:
+ * `collateralToBuy = equity * (L - 1) / (1 + L * s)` (see {@link collateralToBuyForLeverageCap}),
+ * `maxDebtIn = quote(collateralToBuy) + slippage`, and `maxLtvAfter = impliedLtv(L)`. A fill that
+ * spends the whole `maxDebtIn` lands exactly at `leverageX18` (LTV on the bound, which the router
+ * accepts); a better fill lands below it, down to `leverageAtQuoteX18` at the quoted price; a
+ * worse fill fails on `maxDebtIn` before the bound is ever checked. Pass `maxLtvAfter` through to
+ * `increasePositionCall` so the cap is enforced onchain and not just by sizing.
+ *
+ * The router checks the bound at the venue oracle while the swap fills at the pool. With the two
+ * prices equal the worst fill sits exactly on the bound, so when the oracle lags the pool an
+ * in-budget fill can still be rejected: pad `maxLtvAfter` by the expected basis, or size at a
+ * lower target, if that is not the behavior wanted.
+ */
+export function sizeIncreaseForLeverageCap(p: IncreaseSizingParams): {
+  collateralToBuy: bigint
+  maxDebtIn: bigint
+  /** `impliedLtv(leverageX18)`: the post-trade bound that makes the target a hard ceiling. */
+  maxLtvAfter: bigint
+  /** `equity + collateralToBuy`: what the position holds whatever the fill (exact-output buy). */
+  totalCollateral: bigint
+  /** The leverage realized if the swap fills exactly at the quote (the floor; worst fill is the target). */
+  leverageAtQuoteX18: bigint
+} {
+  if (p.equity <= 0n) {
+    throw new MarginSdkError('INVALID_AMOUNT', 'equity must be positive to size an increase from leverage')
+  }
+  const collateralToBuy = toUint128(
+    collateralToBuyForLeverageCap(p.equity, p.leverageX18, p.slippageBps),
+    'collateralToBuy'
+  )
+  const maxDebtIn = capDebtInForBuy(collateralToBuy, p)
+  const totalCollateral = p.equity + collateralToBuy
+  return {
+    collateralToBuy,
+    maxDebtIn,
+    maxLtvAfter: impliedLtv(p.leverageX18),
+    totalCollateral,
+    leverageAtQuoteX18: (totalCollateral * WAD) / p.equity,
+  }
+}
+
+/** `quote(collateralToBuy) + slippage` as a uint128, rejecting a buy or cap that sizes to nothing. */
+function capDebtInForBuy(collateralToBuy: bigint, p: IncreaseSizingParams): bigint {
   if (collateralToBuy === 0n) {
     throw new MarginSdkError(
       'INVALID_AMOUNT',
@@ -202,7 +277,7 @@ export function sizeIncrease(p: {
   if (maxDebtIn === 0n) {
     throw new MarginSdkError('INVALID_AMOUNT', 'quoted debt input rounds to zero; check the price scale and decimals')
   }
-  return { collateralToBuy, maxDebtIn, totalCollateral: totalExposure(p.equity, p.leverageX18) }
+  return maxDebtIn
 }
 
 /**

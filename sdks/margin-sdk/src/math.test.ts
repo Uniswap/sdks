@@ -5,6 +5,7 @@ import { MAX_UINT128, MAX_UINT256, WAD } from './constants.js'
 import { MarginSdkError } from './errors.js'
 import {
   collateralToBuyForLeverage,
+  collateralToBuyForLeverageCap,
   estimateLtv,
   healthFactor,
   impliedLtv,
@@ -14,6 +15,7 @@ import {
   quoteDebtForCollateral,
   sizeDecrease,
   sizeIncrease,
+  sizeIncreaseForLeverageCap,
   toUint128,
   totalExposure,
   withSlippageDown,
@@ -148,6 +150,90 @@ describe('sizeIncrease (docs §7.3 example)', () => {
         slippageBps: 50,
       })
     ).toThrow(MarginSdkError)
+  })
+})
+
+describe('sizeIncreaseForLeverageCap', () => {
+  // 1 ETH equity, 2x, 2000 USDC/WETH quote, 1% slippage: buy 0.9804 ETH for at most 1980.39 USDC
+  const example = {
+    equity: parseUnits('1', 18),
+    leverageX18: parseLeverageX18(2),
+    priceDebtPerCollateralToken: parseUnits('2000', 6),
+    collateralDecimals: 18,
+    slippageBps: 100,
+  }
+
+  test('buys less than the quote sizing so the worst fill lands on the target', () => {
+    const sized = sizeIncreaseForLeverageCap(example)
+    expect(sized.collateralToBuy).toBe(980392156862745098n) // 1 / 1.02 ETH
+    expect(sized.maxDebtIn).toBe(1980392156n) // 1980.39 USDC
+    expect(sized.maxLtvAfter).toBe(impliedLtv(example.leverageX18))
+    expect(sized.totalCollateral).toBe(example.equity + sized.collateralToBuy)
+    expect(sized.leverageAtQuoteX18).toBe(1980392156862745098n) // 1.98x at a perfect fill
+    expect(sized.collateralToBuy).toBeLessThan(sizeIncrease(example).collateralToBuy)
+  })
+
+  test('the worst fill sits on the bound and a better fill sits below it', () => {
+    const sized = sizeIncreaseForLeverageCap(example)
+    const ltvAt = (debtAmount: bigint) =>
+      estimateLtv({
+        collateralAmount: sized.totalCollateral,
+        debtAmount,
+        priceDebtPerCollateralToken: example.priceDebtPerCollateralToken,
+        collateralDecimals: example.collateralDecimals,
+      })
+    const worstFill = ltvAt(sized.maxDebtIn)
+    expect(worstFill).toBeLessThanOrEqual(sized.maxLtvAfter)
+    expect(worstFill).toBeGreaterThan(sized.maxLtvAfter - 10n ** 12n) // tight, not loose
+    const quoteFill = ltvAt(withSlippageDown(sized.maxDebtIn, 100))
+    expect(quoteFill).toBeLessThan(worstFill)
+  })
+
+  test('holds for other targets and budgets (3x at 50 bps, 5x at 300 bps)', () => {
+    for (const [leverage, slippageBps] of [
+      [3, 50],
+      [5, 300],
+    ] as const) {
+      const sized = sizeIncreaseForLeverageCap({ ...example, leverageX18: parseLeverageX18(leverage), slippageBps })
+      const worstFill = estimateLtv({
+        collateralAmount: sized.totalCollateral,
+        debtAmount: sized.maxDebtIn,
+        priceDebtPerCollateralToken: example.priceDebtPerCollateralToken,
+        collateralDecimals: example.collateralDecimals,
+      })
+      expect(worstFill).toBeLessThanOrEqual(sized.maxLtvAfter)
+      expect(worstFill).toBeGreaterThan(sized.maxLtvAfter - 10n ** 12n)
+      expect(sized.leverageAtQuoteX18).toBeLessThan(parseLeverageX18(leverage))
+    }
+  })
+
+  test('zero slippage reduces to the quote sizing', () => {
+    const capped = sizeIncreaseForLeverageCap({ ...example, slippageBps: 0 })
+    const plain = sizeIncrease({ ...example, slippageBps: 0 })
+    expect(capped.collateralToBuy).toBe(plain.collateralToBuy)
+    expect(capped.maxDebtIn).toBe(plain.maxDebtIn)
+    expect(capped.leverageAtQuoteX18).toBe(example.leverageX18)
+    expect(collateralToBuyForLeverageCap(example.equity, example.leverageX18, 0)).toBe(
+      collateralToBuyForLeverage(example.equity, example.leverageX18)
+    )
+  })
+
+  test('short sizing (6-decimal collateral, 18-decimal debt)', () => {
+    const sized = sizeIncreaseForLeverageCap({
+      equity: parseUnits('3000', 6),
+      leverageX18: parseLeverageX18(2),
+      priceDebtPerCollateralToken: parseUnits('0.000333333333333333', 18),
+      collateralDecimals: 6,
+      slippageBps: 100,
+    })
+    expect(sized.collateralToBuy).toBe(2941176470n) // 3000 / 1.02 USDC
+    expect(sized.maxDebtIn).toBe(990196078233332342n) // about 0.99 WETH
+  })
+
+  test('rejects 1x (nothing to buy), zero equity and bad slippage', () => {
+    expect(() => sizeIncreaseForLeverageCap({ ...example, leverageX18: WAD })).toThrow(MarginSdkError)
+    expect(() => sizeIncreaseForLeverageCap({ ...example, equity: 0n })).toThrow(MarginSdkError)
+    expect(() => sizeIncreaseForLeverageCap({ ...example, slippageBps: -1 })).toThrow(MarginSdkError)
   })
 })
 
