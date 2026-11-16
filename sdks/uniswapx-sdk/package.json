@@ -75,6 +75,7 @@
   "exports": {
     ".": {
       "types": "./dist/types/src/index.d.ts",
+      "node": "./dist/cjs/src/index.js",
       "import": "./dist/esm/src/index.js",
       "require": "./dist/cjs/src/index.js"
     }
