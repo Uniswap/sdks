@@ -95,7 +95,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "8baa579f": OrderValidation.InvalidSignature,
   "815e1d64": OrderValidation.InvalidSignature,
   // Permit2 SignatureVerification:InvalidContractSignature() (ERC-1271 signer rejected the signature)
-  b0669cbc: OrderValidation.InvalidSignature,
+  "b0669cbc": OrderValidation.InvalidSignature,
   // Permit2 SignatureVerification:InvalidSignatureLength()
   "4be6321b": OrderValidation.InvalidSignature,
   "756688fe": OrderValidation.NonceUsed,
