@@ -161,7 +161,9 @@ export function buildV4NativePoolExactOutRoute(p: ExactOutRouteParams & { weth9:
       ]),
       inputs: [
         encodeAbiParameters(PERMIT2_TRANSFER_FROM_ABI, [p.weth9, ADDRESS_THIS, amountInMaximum]),
-        encodeAbiParameters(RECIPIENT_AMOUNT_ABI, [ADDRESS_THIS, amountInMaximum]),
+        // the pull above already fixes the balance, so no unwrap minimum is asserted (the same bytes
+        // as the periphery's fork-tested helper)
+        encodeAbiParameters(RECIPIENT_AMOUNT_ABI, [ADDRESS_THIS, 0n]),
         encodeV4ExactOutSwap(p, {
           zeroForOne: true,
           settleCurrency: zeroAddress,
