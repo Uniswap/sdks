@@ -16,7 +16,8 @@ The SDK covers:
   plus `sizeIncreaseForLeverageCap` when the target leverage must be a ceiling), leverage↔LTV
   conversions, health factors, slippage helpers.
 - **Universal Router route builders** — the position swap is a caller-built UR command plan
-  supplied per call; `buildV4ExactOutRoute` covers the canonical single-pool v4 case.
+  supplied per call; `buildV4ExactOutRoute` covers the canonical single-pool v4 case, including
+  native ETH pools for WETH markets.
 - **A plan builder** (`MarginPlanner`) for the advanced `execute` entry point: compose v4 routing
   actions, `ROUTE_SWAP` Universal Router legs, and margin account actions into one atomic
   flash-accounted plan.
@@ -153,6 +154,18 @@ const { collateralToBuy, maxDebtIn, maxLtvAfter } = sizeIncreaseForLeverageCap({
   slippageBps: 50,
 })
 ```
+
+**Native pools**: a v4 pool with ETH on one side (`currency0 == address(0)`) can serve a WETH
+market. Pass `weth9: addresses.weth9` to `buildV4ExactOutRoute` (or call
+`buildV4NativePoolExactOutRoute`) and the plan wraps and unwraps inside the Universal Router.
+Selling WETH pulls the cap with `PERMIT2_TRANSFER_FROM`, unwraps it, settles the swap from the
+Universal Router's own ETH and wraps the change back to the margin router with
+`WRAP_ETH(MSG_SENDER, CONTRACT_BALANCE)`; buying WETH takes the ETH into the Universal Router and
+wraps exactly `amountOut` to the account. Every route must return unspent input to the margin
+router in the input currency: a route that wraps its change to the account instead (the
+universal-router-sdk default of paying change to the trade recipient) leaves the router's
+accounting at the full cap, so the position borrows or withdraws the cap rather than the actual
+cost.
 
 **Native ETH equity**: pass `nativeEquity` instead (the router wraps it to WETH; the market
 collateral must be WETH, and `params.equity` must be `0n`):
