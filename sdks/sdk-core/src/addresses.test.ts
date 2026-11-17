@@ -2,6 +2,7 @@ import {
   CHAIN_TO_ADDRESSES_MAP,
   MULTICALL_ADDRESSES,
   QUOTER_ADDRESSES,
+  NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   SWAP_ROUTER_02_ADDRESSES,
   TICK_LENS_ADDRESSES,
   V2_FACTORY_ADDRESSES,
@@ -121,6 +122,25 @@ describe('addresses', () => {
     it('should wrap HYPE as WHYPE', () => {
       expect(WETH9[ChainId.ELYSIUM].address).toEqual('0xbA876237B0F021A6c6D852d6c26E107997cC5E81')
       expect(WETH9[ChainId.ELYSIUM].symbol).toEqual('WHYPE')
+    })
+  })
+
+  describe('abstract', () => {
+    it('should expose the v3 deployment addresses', () => {
+      expect(V3_CORE_FACTORY_ADDRESSES[ChainId.ABSTRACT]).toEqual('0xA1160e73B63F322ae88cC2d8E700833e71D0b2a1')
+      expect(MULTICALL_ADDRESSES[ChainId.ABSTRACT]).toEqual('0x9CA4dcb2505fbf536F6c54AA0a77C79f4fBC35C0')
+      expect(QUOTER_ADDRESSES[ChainId.ABSTRACT]).toEqual('0x728BD3eC25D5EDBafebB84F3d67367Cd9EBC7693')
+      expect(NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.ABSTRACT]).toEqual(
+        '0xfA928D3ABc512383b8E5E77edd2d5678696084F9'
+      )
+      expect(TICK_LENS_ADDRESSES[ChainId.ABSTRACT]).toEqual('0x9c7d30F93812f143b6Efa673DB8448EfCB9f747E')
+      expect(SWAP_ROUTER_02_ADDRESSES(ChainId.ABSTRACT)).toEqual('0x7712FA47387542819d4E35A23f8116C90C18767C')
+    })
+
+    it('should not register v2 or v4 addresses', () => {
+      expect(V2_FACTORY_ADDRESSES[ChainId.ABSTRACT]).toBeUndefined()
+      expect(V2_ROUTER_ADDRESSES[ChainId.ABSTRACT]).toBeUndefined()
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.ABSTRACT].v4PoolManagerAddress).toBeUndefined()
     })
   })
 })

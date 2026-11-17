@@ -1,4 +1,4 @@
-import { Token, CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
+import { Token, CurrencyAmount, WETH9, ChainId } from '@uniswap/sdk-core'
 import { FeeAmount, TICK_SPACINGS } from '../constants'
 import { nearestUsableTick } from '../utils/nearestUsableTick'
 import { TickMath } from '../utils/tickMath'
@@ -65,6 +65,18 @@ describe('Pool', () => {
   })
 
   describe('#getAddress', () => {
+    it('uses the Abstract factory and ZK Stack derivation', () => {
+      const weth = new Token(ChainId.ABSTRACT, '0x3439153EB7AF838Ad19d56E1571FBD09333C2809', 18)
+      const usdc = new Token(ChainId.ABSTRACT, '0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1', 6)
+      expect(Pool.getAddress(weth, usdc, FeeAmount.MEDIUM)).toEqual('0xe089D0C10d8d576430c97BdA83acDcB142beB3E8')
+    })
+
+    it('keeps an explicit factory override', () => {
+      expect(
+        Pool.getAddress(USDC, DAI, FeeAmount.LOW, undefined, '0x1111111111111111111111111111111111111111')
+      ).toEqual('0x90B1b09A9715CaDbFD9331b3A7652B24BfBEfD32')
+    })
+
     it('matches an example', () => {
       const result = Pool.getAddress(USDC, DAI, FeeAmount.LOW)
       expect(result).toEqual('0x6c6Bc977E13Df9b0de53b251522280BB72383700')

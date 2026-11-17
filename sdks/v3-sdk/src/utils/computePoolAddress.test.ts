@@ -1,5 +1,5 @@
 import { defaultAbiCoder } from '@ethersproject/abi'
-import { Token } from '@uniswap/sdk-core'
+import { ChainId, Token } from '@uniswap/sdk-core'
 import { computeZksyncCreate2Address } from '@uniswap/sdk-core'
 import { FeeAmount } from '../constants'
 import { computePoolAddress } from './computePoolAddress'
@@ -43,6 +43,25 @@ describe('#computePoolAddress', () => {
     })
 
     expect(resultA).toEqual(resultB)
+  })
+
+  it('computes the deployed Abstract pool in either token order', () => {
+    const weth = new Token(ChainId.ABSTRACT, '0x3439153EB7AF838Ad19d56E1571FBD09333C2809', 18)
+    const usdc = new Token(ChainId.ABSTRACT, '0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1', 6)
+    for (const [tokenA, tokenB] of [
+      [weth, usdc],
+      [usdc, weth],
+    ]) {
+      expect(
+        computePoolAddress({
+          factoryAddress: '0xA1160e73B63F322ae88cC2d8E700833e71D0b2a1',
+          tokenA,
+          tokenB,
+          fee: FeeAmount.MEDIUM,
+          chainId: ChainId.ABSTRACT,
+        })
+      ).toEqual('0xe089D0C10d8d576430c97BdA83acDcB142beB3E8')
+    }
   })
 
   it('should correctly compute zkevm pool address', () => {

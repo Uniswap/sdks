@@ -40,6 +40,7 @@ export function computePoolAddress({
   // Most likely all ZKEVM chains will use the different computation from standard create2
   switch (chainId) {
     case ChainId.ZKSYNC:
+    case ChainId.ABSTRACT:
       return computeZksyncCreate2Address(factoryAddress, initCodeHash, salt)
     default:
       return getCreate2Address(factoryAddress, salt, initCodeHash)
