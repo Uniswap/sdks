@@ -97,6 +97,7 @@ export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   8453: 2, // base — pre-Denim only; BLOCK_TIME_SCHEDULE_BY_CHAIN takes precedence
   42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche
+  57073: 1, // ink
   84532: 2, // base sepolia — pre-Denim only; BLOCK_TIME_SCHEDULE_BY_CHAIN takes precedence
   11155111: 12, // sepolia
 }

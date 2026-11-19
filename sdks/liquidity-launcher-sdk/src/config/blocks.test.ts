@@ -42,6 +42,7 @@ describe('getBlockTimeSeconds', () => {
     expect(getBlockTimeSeconds(SupportedChainId.BASE, 1_793_000_000n)).toBe(2)
     expect(getBlockTimeSeconds(SupportedChainId.AVALANCHE)).toBe(1)
     expect(getBlockTimeSeconds(SupportedChainId.XLAYER)).toBe(1)
+    expect(getBlockTimeSeconds(SupportedChainId.INK)).toBe(1)
     expect(getBlockTimeSeconds(999_999)).toBe(DEFAULT_BLOCK_TIME_SECONDS)
   })
 })

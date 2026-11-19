@@ -170,8 +170,9 @@ const { predictedAddress, deployData } = buildLockRecipient({
 ## Supported chains
 
 `getLauncherAddresses(chainId)` returns the deployed stack, or `undefined` if the launcher isn't on
-that chain. Currently: Ethereum (1), Unichain (130), Base (8453), Arbitrum One (42161), Sepolia
-(11155111), Base Sepolia (84532).
+that chain. Currently: Ethereum (1), Unichain (130), Base (8453), Arbitrum One (42161), Avalanche
+(43114), XLayer (196), Robinhood (4663), Arc (5042), Ink (57073), Sepolia (11155111), Base Sepolia
+(84532).
 
 ## Error handling
 
