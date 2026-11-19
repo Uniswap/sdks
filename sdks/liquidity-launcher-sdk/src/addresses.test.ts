@@ -32,10 +32,16 @@ describe('getLauncherAddresses', () => {
     expect(addresses?.lbpStrategy).toBe(getAddress('0x48F55E7E8ac229aA4e2f3F2d44aa9284D86da000'))
   })
 
-  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood and Arc', () => {
+  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood, Arc and Ink', () => {
     const sharedLauncher = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
     for (const chainId of Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')) {
-      if (chainId === SupportedChainId.ROBINHOOD || chainId === SupportedChainId.ARC) continue
+      if (
+        chainId === SupportedChainId.ROBINHOOD ||
+        chainId === SupportedChainId.ARC ||
+        chainId === SupportedChainId.INK
+      ) {
+        continue
+      }
       expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(sharedLauncher)
     }
   })
@@ -46,6 +52,19 @@ describe('getLauncherAddresses', () => {
       expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(redeployLauncher)
       expect(getInstantLaunchContracts(chainId)?.liquidityLauncher).toBe(redeployLauncher)
     }
+  })
+
+  it('returns the Ink (57073) stack: redeployed launcher, shared CCA factory, uERC20 factory only', () => {
+    const addresses = getLauncherAddresses(SupportedChainId.INK)!
+    expect(addresses.liquidityLauncher).toBe(getAddress('0x0000FffFBE8efE702c8703aE3477FF5dE3d319C0'))
+    expect(addresses.ccaFactory).toBe(getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8'))
+    expect(addresses.positionManager).toBe(getAddress('0x1b35d13a2e2528f192637f14b05f0dc0e7deb566'))
+    expect(selectTokenFactory(addresses)).toEqual({
+      factory: getAddress('0x000000e200088D55C39a11F609E5F667729ad49b'),
+      kind: 'uerc20',
+    })
+    expect(addresses.universalRouterStrategy).toBeUndefined()
+    expect(getInstantLaunchContracts(SupportedChainId.INK)).toBeUndefined()
   })
 
   it('returns undefined for an unsupported chain', () => {
@@ -87,6 +106,7 @@ describe('getLauncherAddresses', () => {
       [SupportedChainId.XLAYER]: '0xde758D7B3202b7f4f842E8313Fc04Bf19c6Be000',
       [SupportedChainId.ROBINHOOD]: '0xbf1aB81f7d534b2CC0Da76fcf4d541322bB0e000',
       [SupportedChainId.ARC]: '0x542BCDA1015485ef0B1cD11B835DC58DF5102000',
+      [SupportedChainId.INK]: '0x0cB98d78be96D5119E49664a9F24fDA22f83E000',
       [SupportedChainId.SEPOLIA]: '0x95434E898Af471945Cab33D5064d2aC1A6Ba2000',
       [SupportedChainId.BASE_SEPOLIA]: '0x73ad52384798AdADfBe19fCfD28ff09D2CC82000',
     }

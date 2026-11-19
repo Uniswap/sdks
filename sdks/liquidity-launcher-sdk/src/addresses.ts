@@ -94,6 +94,7 @@ const POSITION_MANAGER_AVALANCHE = getAddress('0xB74b1F14d2754AcfcbBe1a221023a5c
 const POSITION_MANAGER_XLAYER = getAddress('0xcF1EAFC6928dC385A342E7C6491d371d2871458b')
 const POSITION_MANAGER_ROBINHOOD = getAddress('0x58daec3116aae6D93017bAAea7749052E8a04fA7')
 const POSITION_MANAGER_ARC = getAddress('0x6049c9a0e26405C0985f9E3685C87d0aE917f82B')
+const POSITION_MANAGER_INK = getAddress('0x1b35D13a2E2528f192637F14B05f0Dc0e7dEB566')
 const POSITION_MANAGER_SEPOLIA = getAddress('0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4')
 const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80')
 
@@ -175,6 +176,17 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     universalRouterStrategy: UNIVERSAL_ROUTER_STRATEGY_ARC,
     uerc20Factory: UERC20_FACTORY_ARC,
     positionManager: POSITION_MANAGER_ARC,
+  },
+  [SupportedChainId.INK]: {
+    // Both launchers are deployed on Ink; this is the one the liquidity-launcher README lists.
+    liquidityLauncher: LIQUIDITY_LAUNCHER_REDEPLOYED,
+    lbpStrategy: getAddress('0x0cB98d78be96D5119E49664a9F24fDA22f83E000'),
+    tokenSplitter: TOKEN_SPLITTER,
+    ccaFactory: CCA_FACTORY,
+    permit2: PERMIT2,
+    // Ink is a superchain, but only the uERC20 factory is deployed there.
+    uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_INK,
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,

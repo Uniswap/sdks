@@ -12,6 +12,7 @@ export enum SupportedChainId {
   XLAYER = 196,
   ROBINHOOD = 4663,
   ARC = 5042,
+  INK = 57073,
   SEPOLIA = 11155111,
   BASE_SEPOLIA = 84532,
 }
