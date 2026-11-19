@@ -1,0 +1,248 @@
+{
+  "_comment": "Provenance + regeneration manifest for abis/*.json. Read by scripts/regenerate-abis.ts and documented in abis/PROVENANCE.md. Each abis/<abiFile> is a compiled contract artifact (or a hand-authored ABI) copied from an upstream repo; nothing here is generated from source in this repo. `scripted: true` entries are refreshed by regenerate-abis.ts from a local checkout of `source`; `scripted: false` entries are hand-maintained (third-party / interface-only / hand-authored) and the script leaves them untouched. `pinnedCommit` is the upstream commit the current bytes correspond to; it was NOT recorded when these files were first copied (the monorepo migration squashed their history), so it is empty until the next scripted refresh records it. See abis/PROVENANCE.md.",
+  "repos": {
+    "uniswapx": {
+      "url": "https://github.com/Uniswap/UniswapX",
+      "toolchain": "foundry",
+      "outDir": "out",
+      "pinnedCommit": "",
+      "envVar": "UNISWAPX_REPO"
+    },
+    "permit2": {
+      "url": "https://github.com/Uniswap/permit2",
+      "toolchain": "foundry",
+      "outDir": "out",
+      "pinnedCommit": "",
+      "envVar": "PERMIT2_REPO"
+    }
+  },
+  "artifacts": [
+    {
+      "abiFile": "DSTokenInterface.json",
+      "source": "third-party",
+      "contract": "DSTokenInterface",
+      "sourcePath": null,
+      "solc": null,
+      "format": "raw",
+      "kind": "interface",
+      "scripted": false,
+      "note": "Hand-maintained interface ABI (no compiler metadata). Consumed by PermissionedTokenValidator."
+    },
+    {
+      "abiFile": "ERC1967Proxy.json",
+      "source": "third-party",
+      "contract": "ERC1967Proxy",
+      "sourcePath": "contracts/proxy/ERC1967/ERC1967Proxy.sol",
+      "solc": "0.8.27+commit.40a35a09",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": false,
+      "note": "OpenZeppelin proxy artifact (contracts/ layout, not a UniswapX src/ path)."
+    },
+    {
+      "abiFile": "ExclusiveDutchOrderReactor.json",
+      "source": "uniswapx",
+      "contract": "ExclusiveDutchOrderReactor",
+      "sourcePath": "src/reactors/ExclusiveDutchOrderReactor.sol",
+      "solc": "0.8.19+commit.7dd6d404",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "ExclusiveFillerValidation.json",
+      "source": "uniswapx",
+      "contract": "ExclusiveFillerValidation",
+      "sourcePath": "src/sample-validation-contracts/ExclusiveFillerValidation.sol",
+      "solc": "0.8.19+commit.7dd6d404",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "HybridAuctionResolver.json",
+      "source": "uniswapx",
+      "contract": "HybridAuctionResolver",
+      "sourcePath": "src/v4/resolvers/HybridAuctionResolver.sol",
+      "solc": "0.8.30+commit.73712a01",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "ISuperstateTokenV4.json",
+      "source": "uniswapx",
+      "contract": "ISuperstateTokenV4",
+      "sourcePath": "src/interfaces/ISuperstateTokenV4.sol",
+      "solc": "0.8.28+commit.7893614a",
+      "format": "foundry",
+      "kind": "interface",
+      "scripted": true
+    },
+    {
+      "abiFile": "MockDSTokenInterface.json",
+      "source": "third-party",
+      "contract": "MockDSTokenInterface",
+      "sourcePath": "contracts/MockDSTokenInterface.sol",
+      "solc": "0.8.26+commit.8a97fa7a",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": false,
+      "note": "Test mock from a contracts/ layout (not a UniswapX src/ path)."
+    },
+    {
+      "abiFile": "MockERC20.json",
+      "source": "uniswapx",
+      "contract": "MockERC20",
+      "sourcePath": "test/util/mock/MockERC20.sol",
+      "solc": "0.8.16+commit.07a7930e",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "MockSuperstateTokenV4.json",
+      "source": "third-party",
+      "contract": "MockSuperstateTokenV4",
+      "sourcePath": null,
+      "solc": null,
+      "format": "hardhat",
+      "kind": "deployable",
+      "scripted": false,
+      "note": "Hardhat-format artifact (hh-sol-artifact-1) from an external build; provenance unrecorded."
+    },
+    {
+      "abiFile": "OrderQuoter.json",
+      "source": "uniswapx",
+      "contract": "OrderQuoter",
+      "sourcePath": "src/lens/OrderQuoter.sol",
+      "solc": "0.8.19+commit.7dd6d404",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "OrderQuoterV4.json",
+      "source": "uniswapx",
+      "contract": "OrderQuoterV4",
+      "sourcePath": "src/v4/lens/OrderQuoterV4.sol",
+      "solc": "0.8.30+commit.73712a01",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "Permit2.json",
+      "source": "permit2",
+      "contract": "Permit2",
+      "sourcePath": "src/Permit2.sol",
+      "solc": "0.8.17+commit.8df45f5f",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "PriorityOrderReactor.json",
+      "source": "uniswapx",
+      "contract": "PriorityOrderReactor",
+      "sourcePath": "src/reactors/PriorityOrderReactor.sol",
+      "solc": "0.8.24+commit.e11b9ed9",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "Proxy.json",
+      "source": "third-party",
+      "contract": "Proxy",
+      "sourcePath": "contracts/Proxy.sol",
+      "solc": "0.8.26+commit.8a97fa7a",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": false,
+      "note": "Proxy artifact from a contracts/ layout (not a UniswapX src/ path)."
+    },
+    {
+      "abiFile": "Reactor.json",
+      "source": "uniswapx",
+      "contract": "Reactor",
+      "sourcePath": "src/v4/Reactor.sol",
+      "solc": "0.8.30+commit.73712a01",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "RelayOrderReactor.json",
+      "source": "uniswapx",
+      "contract": "RelayOrderReactor",
+      "sourcePath": "src/reactors/RelayOrderReactor.sol",
+      "solc": "0.8.24+commit.e11b9ed9",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "SwapRouter02Executor.json",
+      "source": "uniswapx",
+      "contract": "SwapRouter02Executor",
+      "sourcePath": "src/sample-executors/SwapRouter02Executor.sol",
+      "solc": "0.8.19+commit.7dd6d404",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "TokenTransferHook.json",
+      "source": "uniswapx",
+      "contract": "TokenTransferHook",
+      "sourcePath": "src/v4/hooks/TokenTransferHook.sol",
+      "solc": "0.8.30+commit.73712a01",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "V2DutchOrderReactor.json",
+      "source": "uniswapx",
+      "contract": "V2DutchOrderReactor",
+      "sourcePath": "src/reactors/V2DutchOrderReactor.sol",
+      "solc": "0.8.24+commit.e11b9ed9",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "V3DutchOrderReactor.json",
+      "source": "uniswapx",
+      "contract": "V3DutchOrderReactor",
+      "sourcePath": "src/reactors/V3DutchOrderReactor.sol",
+      "solc": "0.8.24+commit.e11b9ed9",
+      "format": "foundry",
+      "kind": "deployable",
+      "scripted": true
+    },
+    {
+      "abiFile": "deploylessMulticall2.json",
+      "source": "hand-authored",
+      "contract": "DeploylessMulticall2",
+      "sourcePath": null,
+      "solc": null,
+      "format": "abi-only",
+      "kind": "abi-only",
+      "scripted": false,
+      "note": "Hand-authored ABI array (no bytecode); standard Multicall helper."
+    },
+    {
+      "abiFile": "multicall2.json",
+      "source": "hand-authored",
+      "contract": "Multicall2",
+      "sourcePath": null,
+      "solc": null,
+      "format": "abi-only",
+      "kind": "abi-only",
+      "scripted": false,
+      "note": "Hand-authored ABI array (no bytecode); standard Multicall2 helper."
+    }
+  ]
+}
