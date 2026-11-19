@@ -33,9 +33,41 @@ describe('addresses', () => {
     expect(isMarginSupportedChain(1)).toBe(true)
   })
 
+  test('Base and Arbitrum One have Morpho Blue, Aave v3 and Compound v3, no Aave v4', () => {
+    for (const chainId of [SupportedChainId.BASE, SupportedChainId.ARBITRUM_ONE]) {
+      const addresses = getMarginAddresses(chainId)
+      expect(addresses).toBeDefined()
+      expect(addresses!.lendingAdapters.morphoBlue).toBeDefined()
+      expect(addresses!.lendingAdapters.aaveV3).toBeDefined()
+      expect(addresses!.lendingAdapters.compoundV3).toBeDefined()
+      expect(addresses!.lendingAdapters.aaveV4).toBeUndefined()
+      expect(isMarginSupportedChain(chainId)).toBe(true)
+    }
+  })
+
+  test('Robinhood Chain has Morpho Blue only', () => {
+    const robinhood = getMarginAddresses(SupportedChainId.ROBINHOOD_CHAIN)
+    expect(robinhood).toBeDefined()
+    expect(Object.keys(robinhood!.lendingAdapters)).toEqual(['morphoBlue'])
+    expect(isMarginSupportedChain(4663)).toBe(true)
+  })
+
+  test('the suite contracts share one address on every chain', () => {
+    const mainnet = getMarginAddresses(SupportedChainId.MAINNET)!
+    for (const addresses of Object.values(MARGIN_ADDRESSES)) {
+      if (!addresses) continue
+      expect(addresses.marginRouter).toBe(mainnet.marginRouter)
+      expect(addresses.marginAccountImplementation).toBe(mainnet.marginAccountImplementation)
+      expect(addresses.permit2).toBe(mainnet.permit2)
+      for (const [venue, adapters] of Object.entries(addresses.lendingAdapters)) {
+        expect(adapters).toEqual(mainnet.lendingAdapters[venue as keyof typeof mainnet.lendingAdapters])
+      }
+    }
+  })
+
   test('undeployed chains resolve to undefined', () => {
-    expect(getMarginAddresses(8453)).toBeUndefined()
-    expect(isMarginSupportedChain(8453)).toBe(false)
+    expect(getMarginAddresses(10)).toBeUndefined()
+    expect(isMarginSupportedChain(10)).toBe(false)
   })
 })
 

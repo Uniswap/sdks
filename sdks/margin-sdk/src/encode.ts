@@ -38,8 +38,9 @@ export function validateDeadline(deadline: bigint): void {
  *
  * Always `simulateContract` before `writeContract` so reverts (`SlippageBoundRequired`,
  * `LtvBoundRequired`, `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`,
- * `PositionUnhealthy`, `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface with
- * a decoded message.
+ * `PositionUnhealthy`, `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`,
+ * `UnboundedRouteAllowance`, `UniversalRouterDeltaNotZero`, `GasLimitTooLow`) surface with a
+ * decoded message.
  * The SDK validates the same inputs offchain first.
  */
 

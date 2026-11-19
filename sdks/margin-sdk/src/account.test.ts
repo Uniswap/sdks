@@ -17,24 +17,25 @@ const ROUTER = MAINNET.marginRouter
 const IMPL = MAINNET.marginAccountImplementation
 
 /**
- * Ground truth: `MarginRouter.accountOf(owner, subId)` read from the live mainnet router
- * (0x0000000000890d0ee01040c8855A0423e37c757B, the permissionless-market-key 2026-10-22
- * deployment) on 2026-10-22.
+ * Ground truth: `MarginRouter.accountOf(owner, subId)` read from the live router
+ * (0x000000000e69bAAd36D7569eA3Bd9cd07e3AA084, the 2026-11-19 CreateX deployment) on mainnet and
+ * on Base on 2026-11-19, with identical results: the router and the implementation have the same
+ * address on every chain, so an owner's accounts do too.
  */
 const ONCHAIN_VECTORS: ReadonlyArray<[Address, bigint, Address]> = [
-  ['0x0000000000000000000000000000000000000001', 0n, '0x7A564a52742D07329336B679C71FE04ce62150FF'],
-  ['0x0000000000000000000000000000000000000001', 1n, '0xC4D35B046b42561982f6A6D8De0D708E4D5FB6eb'],
-  ['0x0000000000000000000000000000000000000001', 42n, '0x8Ffcc991029f9299938bc58b616764c2FBF6C726'],
-  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 0n, '0x9fEE2C93041C4b6AfD81DbCC091611BC5c06cDd8'],
-  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 1n, '0x5ce7701092BFB0CEf237A8Aa77E86105Ea0B4a74'],
-  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 42n, '0x4a31046d0390793F7EBF5100B98cF1ea2a3123E4'],
-  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 0n, '0xd058a25Fa875440FBe85835dB1680043983F7A3F'],
-  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 1n, '0x55A5C9683C54F40d059CC6C478BFe25F6197347E'],
-  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 42n, '0xb02fD7D36D315821dC1EA2b2e2C9A7E57b94Bb47'],
+  ['0x0000000000000000000000000000000000000001', 0n, '0x9837854643Dc484ab70Bfcb38303C37C32b8Ba60'],
+  ['0x0000000000000000000000000000000000000001', 1n, '0xf1CB2E26a2252A11C523a2bBFdC58163ed032FFd'],
+  ['0x0000000000000000000000000000000000000001', 42n, '0xE67d94c1bd38b94699432D7b20825AD416Dc118b'],
+  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 0n, '0x04D064Ef7fbdDDC4377B5D8e9f9B24EA20fDB9D4'],
+  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 1n, '0x95b70Fb0f92B44917119609e1cAff3325AF755cd'],
+  ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 42n, '0x55580B30B80db8fab31D1ef776b6f55F6f1c9353'],
+  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 0n, '0x20B7857744837d0645e00A92D7Db8F32a99B5A5e'],
+  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 1n, '0xEF5B0F0C3Bd5Eee9Ee06d93edF49441c71DfD8d2'],
+  ['0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', 42n, '0x1E5FF97de7D18661121c5822E8C71896c878A4c2'],
 ]
 
 describe('predictMarginAccountAddress', () => {
-  test('matches the live mainnet router accountOf for every vector', () => {
+  test('matches the live router accountOf for every vector', () => {
     for (const [owner, subId, expected] of ONCHAIN_VECTORS) {
       expect(predictMarginAccountAddress({ owner, subId, marginRouter: ROUTER, accountImplementation: IMPL })).toBe(
         expected
@@ -44,14 +45,22 @@ describe('predictMarginAccountAddress', () => {
 
   test('getMarginAccountAddress resolves the mainnet deployment', () => {
     expect(getMarginAccountAddress(1, '0x0000000000000000000000000000000000000001', 42n)).toBe(
-      '0x8Ffcc991029f9299938bc58b616764c2FBF6C726'
+      '0xE67d94c1bd38b94699432D7b20825AD416Dc118b'
     )
   })
 
   test('getMarginAccountAddress defaults subId to 0', () => {
     expect(getMarginAccountAddress(1, '0x0000000000000000000000000000000000000001')).toBe(
-      '0x7A564a52742D07329336B679C71FE04ce62150FF'
+      '0x9837854643Dc484ab70Bfcb38303C37C32b8Ba60'
     )
+  })
+
+  test('getMarginAccountAddress gives the same account on every deployed chain', () => {
+    for (const chainId of [SupportedChainId.BASE, SupportedChainId.ARBITRUM_ONE, SupportedChainId.ROBINHOOD_CHAIN]) {
+      expect(getMarginAccountAddress(chainId, '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', 1n)).toBe(
+        '0x95b70Fb0f92B44917119609e1cAff3325AF755cd'
+      )
+    }
   })
 
   test('getMarginAccountAddress throws UNSUPPORTED_CHAIN off-deployment', () => {

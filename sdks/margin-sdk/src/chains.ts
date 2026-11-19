@@ -5,6 +5,9 @@
  */
 export enum SupportedChainId {
   MAINNET = 1,
+  BASE = 8453,
+  ARBITRUM_ONE = 42161,
+  ROBINHOOD_CHAIN = 4663,
 }
 
 const SUPPORTED_CHAIN_IDS = new Set<number>(

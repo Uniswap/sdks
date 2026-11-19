@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit d927e188749706fc39344e259c2dd774b371af5e
- * (https://github.com/Uniswap/v4-periphery/commit/d927e188749706fc39344e259c2dd774b371af5e)
+ * Pinned to v4-periphery commit dce24b92188c471deb9f3645c1cfe428bcf6d699
+ * (https://github.com/Uniswap/v4-periphery/commit/dce24b92188c471deb9f3645c1cfe428bcf6d699)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: 'd927e188749706fc39344e259c2dd774b371af5e',
+  commit: 'dce24b92188c471deb9f3645c1cfe428bcf6d699',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -46,6 +46,30 @@ export const MARGIN_ROUTER_ABI = [
   {
     type: 'receive',
     stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'POSITION_EVENT_GAS',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'uint256',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'POSITION_READ_GAS',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'uint256',
+        name: '',
+      },
+    ],
   },
   {
     type: 'function',
@@ -855,6 +879,11 @@ export const MARGIN_ROUTER_ABI = [
   },
   {
     type: 'error',
+    name: 'GasLimitTooLow',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'IncompleteFill',
     inputs: [
       {
@@ -951,6 +980,25 @@ export const MARGIN_ROUTER_ABI = [
     type: 'error',
     name: 'SlippageBoundRequired',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'UnboundedRouteAllowance',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'UniversalRouterDeltaNotZero',
+    inputs: [
+      {
+        type: 'address',
+        name: 'currency',
+      },
+      {
+        type: 'int256',
+        name: 'delta',
+      },
+    ],
   },
   {
     type: 'error',
@@ -2528,6 +2576,11 @@ export const AAVE_LENDING_ADAPTER_ABI = [
         name: 'debt',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'MathOverflowedMulDiv',
+    inputs: [],
   },
   {
     type: 'error',

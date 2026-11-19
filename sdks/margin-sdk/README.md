@@ -380,7 +380,13 @@ ranking; at high leverage liquidation risk dominates. Set `volatilityWad: 0n` to
 rate alone.
 
 ```ts
-import { WAD, morphoLiquidationIncentiveFactor, parseLeverageX18, perSecondToApr, selectMarket } from '@uniswap/margin-sdk'
+import {
+  WAD,
+  morphoLiquidationIncentiveFactor,
+  parseLeverageX18,
+  perSecondToApr,
+  selectMarket,
+} from '@uniswap/margin-sdk'
 
 const selection = selectMarket(
   [
@@ -408,7 +414,7 @@ const selection = selectMarket(
     quotePriceDebtPerCollateralToken: parseUnits('3015', 6), // maxDebtIn / collateralToBuy
     horizonSeconds: 30n * 24n * 60n * 60n,
     volatilityWad: parseUnits('0.8', 18), // annualized vol of the collateral/debt ratio
-  },
+  }
 )
 
 selection.recommended // cheapest expected cost; a lower riskRank within 25 bps wins the tie
@@ -457,27 +463,38 @@ claimable by the next caller). The planner enforces the structural rules it can 
 
 ## Deployments
 
-Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
+Resolved via `getMarginAddresses(chainId)`. The suite is deployed on Ethereum mainnet (1), Base
+(8453), Arbitrum One (42161) and Robinhood Chain (4663) at the **same addresses on every chain**
+(the 2026-11-19 CreateX CREATE3 deployment, v4-periphery commit `dce24b92`):
 
-| Contract                     | Address                                      |
-| ---------------------------- | -------------------------------------------- |
-| MarginRouter                 | `0x0000000000F57fCd0d5a78a19907240F1169EDEC` |
-| MarginAccount implementation | `0xdDD0967e90bCBc2D1F026b3977bb4dE39133b109` |
-| MorphoLendingAdapter         | `0x766C34DcFBA565a1b72ce83ECD96712376Ca1f3D` |
-| AaveLendingAdapter (v3)      | `0x7E1A543Bd8ed2F16D61DA4b6bC2eC5d240D098aC` |
-| AaveV4LendingAdapter         | `0xAb3C2661c810295Db32125942f04b92c61fAE2Eb` |
-| CompoundV3LendingAdapter     | `0x77598B845d0200fc707bD32A8Ad6DCF85C995e0d` |
+| Contract                     | Address                                      | Deployed on                 |
+| ---------------------------- | -------------------------------------------- | --------------------------- |
+| MarginRouter                 | `0x000000000e69bAAd36D7569eA3Bd9cd07e3AA084` | all four                    |
+| MarginAccount implementation | `0x0000000059D9B1aF8Aff1197dCd58c516E3C51ef` | all four                    |
+| MorphoLendingAdapter         | `0x00000000726B1941Ab9aE01f701428dDF556eCaE` | all four                    |
+| AaveLendingAdapter (v3)      | `0x0000000099e0dA20B62Bce6A0486522902d0db6D` | mainnet, Base, Arbitrum One |
+| AaveV4LendingAdapter         | `0x0000000069fAdFCb9dd203fb8EA34Aea3e0c7e2B` | mainnet                     |
+| CompoundV3LendingAdapter     | `0x00000000E7b8e964b29954cD7E28E14B09555de0` | mainnet, Base, Arbitrum One |
+
+An adapter exists on a chain only where its venue does, and `lendingAdapters` lists exactly those.
+Robinhood Chain has Morpho Blue only (neither Aave nor Compound is deployed there yet), so its stack
+is the router, the account implementation and the Morpho adapter. Base's Aave v4 spoke serves
+tokenized equities and is not registered. Because the router and the implementation share one
+address everywhere, an owner's account addresses are the same on every chain.
 
 The **Universal Router is deliberately not in this table**: it is a per-call parameter of the
-position flows, so callers pick the deployment their route targets. It must carry already-unlocked
-`V4_SWAP` support (universal-router PR #491) — deployments that predate it revert.
+position flows, so callers pick the deployment their route targets. It must run `V4_SWAP` inside
+an existing PoolManager unlock (universal-router PR #491 or later); deployments that predate it
+revert.
 
 The SDK's ABIs, selectors, and account derivation are test-anchored against this live deployment
-(see `src/*.test.ts`).
+(see `src/*.test.ts`). The 2026-10-22 mainnet suite (router
+`0x0000000000890d0ee01040c8855A0423e37c757B`) stays live for the positions opened there; this SDK
+version targets the new suite.
 
 > The margin contracts ([v4-periphery#563](https://github.com/Uniswap/v4-periphery/pull/563)) are
-> still in review and router governance has not yet moved to a timelock/multisig, so the package
-> is published as a `0.0.x` pre-release until the deployment is final.
+> still in review, so the package is published as a `0.0.x` pre-release until the deployment is
+> final.
 
 ## Validation gates
 
