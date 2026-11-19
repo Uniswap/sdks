@@ -40,11 +40,12 @@ export interface LauncherAddresses {
 
 const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
-// Deployed at the same CREATE2 address on every supported chain.
+// The original launcher, at the same CREATE2 address on every chain. Used on every supported chain
+// except Robinhood, Arc and Ink, which use LIQUIDITY_LAUNCHER_REDEPLOYED below.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
 // The #223/#227 redeployed launcher: the redeploy changed the launcher's bytecode so the original
-// mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Deployed on Robinhood (4663, the
-// 2026-08-05 full redeploy) and Arc (5042); once it is deployed on every chain, this constant
+// mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Used on Robinhood (4663, the
+// 2026-08-05 full redeploy), Arc (5042) and Ink (57073); once every chain uses it, this constant
 // collapses back into LIQUIDITY_LAUNCHER.
 //
 // 2026-08-05 full redeploy: the re-mined launcher, superseding the v3.1.1 interim launcher
