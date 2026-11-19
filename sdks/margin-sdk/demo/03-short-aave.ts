@@ -5,7 +5,7 @@
  * pairing reversed — collateral USDC (6 decimals), debt WETH (18 decimals) — and the venue chosen
  * per call by adapter. The same read code serves every venue.
  */
-import { parseUnits } from 'viem'
+import { type Address, parseUnits } from 'viem'
 
 import { type Ctx, withAnvil } from './lib/env'
 import {
@@ -26,9 +26,12 @@ import {
 } from './lib/helpers'
 import {
   type LendingVenue,
+  type Market,
   EMPTY_MARKET_DATA,
+  LENDING_ADAPTER_ABI,
   closePositionCall,
   collateralToBuyForLeverage,
+  decodeAaveV4MarketData,
   encodeAaveV4MarketData,
   getIsSupportedMarket,
   getMarginAccountAddress,
@@ -48,21 +51,123 @@ const SUB_IDS: Partial<Record<LendingVenue, bigint>> = { aaveV3: 2n, aaveV4: 3n 
 const AAVE_V4_WETH_RESERVE_ID = 0n
 const AAVE_V4_USDC_RESERVE_ID = 7n
 
-async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
-  const { addresses, deployer, shortMarket } = ctx
-  const adapter = addresses.lendingAdapters[venue]![0]
-  const router = addresses.marginRouter
-  const subId = SUB_IDS[venue]!
-  // market.data is venue-specific: Aave v3 requires it empty, Aave v4 requires the
-  // (collateralReserveId, debtReserveId) pair — the pool/Comet address alone cannot disambiguate
-  // v4's per-reserve markets the way it does for v3.
-  const market = {
-    ...shortMarket,
+/** The Aave v3 Pool read behind the collateral gate (demo-only ABI subset). */
+const AAVE_V3_POOL_ABI = [
+  {
+    type: 'function',
+    name: 'getConfiguration',
+    stateMutability: 'view',
+    inputs: [{ name: 'asset', type: 'address' }],
+    outputs: [{ name: '', type: 'tuple', components: [{ name: 'data', type: 'uint256' }] }],
+  },
+] as const
+
+/** The Aave v4 Spoke reads behind the collateral gate (demo-only ABI subset, mirrors `ISpoke`). */
+const AAVE_V4_SPOKE_ABI = [
+  {
+    type: 'function',
+    name: 'getReserve',
+    stateMutability: 'view',
+    inputs: [{ name: 'reserveId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'underlying', type: 'address' },
+          { name: 'hub', type: 'address' },
+          { name: 'assetId', type: 'uint16' },
+          { name: 'decimals', type: 'uint8' },
+          { name: 'collateralRisk', type: 'uint24' },
+          { name: 'flags', type: 'uint8' },
+          { name: 'dynamicConfigKey', type: 'uint32' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getDynamicReserveConfig',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'reserveId', type: 'uint256' },
+      { name: 'dynamicConfigKey', type: 'uint32' },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'collateralFactor', type: 'uint16' },
+          { name: 'maxLiquidationBonus', type: 'uint32' },
+          { name: 'liquidationFee', type: 'uint16' },
+        ],
+      },
+    ],
+  },
+] as const
+
+/**
+ * The short market for a venue. market.data is venue-specific: Aave v3 requires it empty, Aave v4
+ * requires the (collateralReserveId, debtReserveId) pair, since the pool/Comet address alone cannot
+ * disambiguate v4's per-reserve markets the way it does for v3.
+ */
+function shortMarketFor(ctx: Ctx, venue: LendingVenue): Market {
+  return {
+    ...ctx.shortMarket,
     data:
       venue === 'aaveV4'
-        ? encodeAaveV4MarketData({ collateralReserveId: AAVE_V4_USDC_RESERVE_ID, debtReserveId: AAVE_V4_WETH_RESERVE_ID })
+        ? encodeAaveV4MarketData({
+            collateralReserveId: AAVE_V4_USDC_RESERVE_ID,
+            debtReserveId: AAVE_V4_WETH_RESERVE_ID,
+          })
         : EMPTY_MARKET_DATA,
   }
+}
+
+/**
+ * Whether the venue currently lets the market's collateral back a new borrow: the reserve's LTV on
+ * Aave v3, its collateral factor on Aave v4. Both are governance parameters a venue can zero as an
+ * incident response (the liquidation threshold stays, so open positions are unaffected, but no new
+ * borrow can be opened against the asset). The adapter's market check does not cover it and no
+ * fork at the tip can get around it, so it is read live and the venue's leg is skipped while zero.
+ */
+async function collateralEnabled(ctx: Ctx, venue: LendingVenue, adapter: Address, market: Market): Promise<boolean> {
+  const protocol = await ctx.publicClient.readContract({
+    address: adapter,
+    abi: LENDING_ADAPTER_ABI,
+    functionName: 'lendingProtocol',
+  })
+  if (venue === 'aaveV3') {
+    const { data } = await ctx.publicClient.readContract({
+      address: protocol,
+      abi: AAVE_V3_POOL_ABI,
+      functionName: 'getConfiguration',
+      args: [market.collateral],
+    })
+    // bits 0-15 of the reserve configuration bitmap hold the LTV in basis points
+    return (data & 0xffffn) !== 0n
+  }
+  const { collateralReserveId } = decodeAaveV4MarketData(market.data)
+  const reserve = await ctx.publicClient.readContract({
+    address: protocol,
+    abi: AAVE_V4_SPOKE_ABI,
+    functionName: 'getReserve',
+    args: [collateralReserveId],
+  })
+  const config = await ctx.publicClient.readContract({
+    address: protocol,
+    abi: AAVE_V4_SPOKE_ABI,
+    functionName: 'getDynamicReserveConfig',
+    args: [collateralReserveId, reserve.dynamicConfigKey],
+  })
+  return config.collateralFactor !== 0
+}
+
+async function shortLifecycle(ctx: Ctx, venue: LendingVenue, adapter: Address, market: Market): Promise<void> {
+  const { addresses, deployer } = ctx
+  const router = addresses.marginRouter
+  const subId = SUB_IDS[venue]!
 
   note(`— venue: ${venue} (adapter ${adapter}, subId ${subId}) —`)
   assert(
@@ -175,10 +280,28 @@ export async function run(ctx: Ctx): Promise<void> {
   await ensurePermit2(ctx, ctx.usdc)
   ok('dealt 50,000 USDC and completed the Permit2 setup')
 
-  await shortLifecycle(ctx, 'aaveV3')
-  await shortLifecycle(ctx, 'aaveV4')
+  const ran: LendingVenue[] = []
+  for (const venue of ['aaveV3', 'aaveV4'] as const) {
+    const adapter = ctx.addresses.lendingAdapters[venue]![0]
+    const market = shortMarketFor(ctx, venue)
+    if (!(await collateralEnabled(ctx, venue, adapter, market))) {
+      note(
+        `venue ${venue} skipped: it currently sets the USDC collateral parameter to zero (a governance ` +
+          'setting, read live), so no new borrow can be opened against USDC there'
+      )
+      continue
+    }
+    await shortLifecycle(ctx, venue, adapter, market)
+    ran.push(venue)
+  }
 
-  ok('03 complete: identical SDK code shorted ETH on two venues — only the adapter address changed')
+  if (ran.length === 2) {
+    ok('03 complete: identical SDK code shorted ETH on two venues, only the adapter address changed')
+  } else if (ran.length === 1) {
+    ok(`03 complete on ${ran[0]} only; the other venue has USDC collateral disabled at this block`)
+  } else {
+    note('03: both Aave venues have USDC collateral disabled at this block, no short was opened')
+  }
 }
 
 if (import.meta.main) {

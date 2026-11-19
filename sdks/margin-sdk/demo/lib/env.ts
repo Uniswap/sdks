@@ -27,6 +27,7 @@ import {
   getMarginAddresses,
   toPoolKey,
 } from '../../src'
+import { restoreAaveV3Collateral, seedMorphoLiquidity } from './helpers'
 
 // The live Morpho Blue WETH/USDC 86% LLTV market `longMarket` targets (verified onchain against
 // `Morpho.market(id)`; mirrors v4-periphery `test/fork/MorphoLendingAdapter.fork.t.sol`).
@@ -61,7 +62,12 @@ export interface Ctx {
   addresses: MarginAddresses
   weth: Address
   usdc: Address
-  /** The real mainnet v4 USDC/WETH 0.05% hookless pool (the most liquid USDC/WETH v4 pool). */
+  /**
+   * The real mainnet v4 ETH/USDC 0.05% hookless pool, the deepest USDC/ETH v4 pool (a 1 WETH trade
+   * moves it well under 0.3%, where the WETH/USDC 0.05% pool moves 2% at the tip in 2026-11). The
+   * pool's native ETH side stands for the markets' WETH: the SDK's native-pool routes wrap and
+   * unwrap through the Universal Router.
+   */
   poolKey: PoolKey
   /** Long ETH: collateral WETH, debt USDC. */
   longMarket: Market
@@ -89,7 +95,7 @@ export function buildCtx(rpcUrl: string): Ctx {
     addresses,
     weth,
     usdc: USDC,
-    poolKey: toPoolKey({ currencyA: weth, currencyB: USDC, fee: 500, tickSpacing: 10 }),
+    poolKey: toPoolKey({ currencyA: zeroAddress, currencyB: USDC, fee: 500, tickSpacing: 10 }),
     longMarket: {
       collateral: weth,
       debt: USDC,
@@ -211,9 +217,14 @@ export async function startAnvil(): Promise<{ rpcUrl: string; proc: Subprocess }
   return { rpcUrl, proc }
 }
 
+/** Idle USDC supplied into the long market on the fork, so every flow's leverage borrow fits. */
+const MORPHO_SEED_USDC = 1_000_000n * 10n ** 6n
+
 /**
  * Boots a fork, funds the deployer with gas ETH, resolves the Universal Router (deploying one
- * from the pinned v4-periphery build if none is supplied), runs `fn`, and tears the fork down.
+ * from the pinned v4-periphery build if none is supplied), applies the fork fixtures the flows
+ * need regardless of the live venue state (idle liquidity in the long market, a nonzero LTV on
+ * the Aave v3 short collateral), runs `fn`, and tears the fork down.
  */
 export async function withAnvil(fn: (ctx: Ctx) => Promise<void>): Promise<void> {
   const { rpcUrl, proc } = await startAnvil()
@@ -221,6 +232,8 @@ export async function withAnvil(fn: (ctx: Ctx) => Promise<void>): Promise<void> 
     const ctx = buildCtx(rpcUrl)
     await ctx.testClient.setBalance({ address: DEPLOYER, value: 1_000n * 10n ** 18n })
     const universalRouter = await resolveUniversalRouter(ctx)
+    await seedMorphoLiquidity(ctx, MORPHO_SEED_USDC)
+    await restoreAaveV3Collateral(ctx)
     await fn({ ...ctx, universalRouter })
   } finally {
     proc.kill()

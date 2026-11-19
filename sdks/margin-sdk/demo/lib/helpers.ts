@@ -3,20 +3,27 @@ import {
   type Address,
   type Hex,
   type TransactionReceipt,
+  createWalletClient,
   encodeAbiParameters,
   erc20Abi,
   formatUnits,
+  http,
+  isAddressEqual,
   keccak256,
   parseEventLogs,
   toHex,
+  zeroAddress,
 } from 'viem'
+import { mainnet } from 'viem/chains'
 
 import { type Ctx, V4_QUOTER } from './env'
 import {
+  LENDING_ADAPTER_ABI,
   MARGIN_ROUTER_ABI,
   MAX_UINT160,
   type Market,
   buildV4ExactOutRoute,
+  decodeMorphoMarketData,
   swapZeroForOne,
   withSlippageUp,
   permit2ApproveCall,
@@ -180,6 +187,177 @@ export async function balanceOf(ctx: Ctx, token: Address, owner: Address): Promi
   return ctx.publicClient.readContract({ address: token, abi: erc20Abi, functionName: 'balanceOf', args: [owner] })
 }
 
+/** Morpho Blue on mainnet, the venue the demo's long market lives on. */
+const MORPHO_BLUE: Address = '0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb'
+
+const MORPHO_SUPPLY_ABI = [
+  {
+    type: 'function',
+    name: 'supply',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'marketParams',
+        type: 'tuple',
+        components: [
+          { name: 'loanToken', type: 'address' },
+          { name: 'collateralToken', type: 'address' },
+          { name: 'oracle', type: 'address' },
+          { name: 'irm', type: 'address' },
+          { name: 'lltv', type: 'uint256' },
+        ],
+      },
+      { name: 'assets', type: 'uint256' },
+      { name: 'shares', type: 'uint256' },
+      { name: 'onBehalf', type: 'address' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [
+      { name: 'assetsSupplied', type: 'uint256' },
+      { name: 'sharesSupplied', type: 'uint256' },
+    ],
+  },
+] as const
+
+/**
+ * Aave v3 mainnet governance executor (level 1), a pool admin on the Aave v3 ACL manager (checked
+ * live before use); impersonated on the fork to restore a risk parameter governance zeroed.
+ */
+const AAVE_V3_POOL_ADMIN: Address = '0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A'
+
+/** The USDC LTV the demo's Aave v3 shorts assume: the value before governance zeroed it in 2026-11. */
+const AAVE_V3_USDC_LTV_BPS = 7500n
+
+const AAVE_V3_POOL_ABI = [
+  {
+    type: 'function',
+    name: 'ADDRESSES_PROVIDER',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'getConfiguration',
+    stateMutability: 'view',
+    inputs: [{ name: 'asset', type: 'address' }],
+    outputs: [{ name: '', type: 'tuple', components: [{ name: 'data', type: 'uint256' }] }],
+  },
+] as const
+
+const AAVE_V3_ADDRESSES_PROVIDER_ABI = [
+  {
+    type: 'function',
+    name: 'getPoolConfigurator',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'address' }],
+  },
+  { type: 'function', name: 'getACLManager', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+] as const
+
+const AAVE_V3_ACL_MANAGER_ABI = [
+  {
+    type: 'function',
+    name: 'isPoolAdmin',
+    stateMutability: 'view',
+    inputs: [{ name: 'admin', type: 'address' }],
+    outputs: [{ type: 'bool' }],
+  },
+] as const
+
+const AAVE_V3_POOL_CONFIGURATOR_ABI = [
+  {
+    type: 'function',
+    name: 'configureReserveAsCollateral',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'asset', type: 'address' },
+      { name: 'ltv', type: 'uint256' },
+      { name: 'liquidationThreshold', type: 'uint256' },
+      { name: 'liquidationBonus', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const
+
+/**
+ * Restores a nonzero LTV on the short market's collateral reserve in Aave v3 when governance has
+ * zeroed it (an incident-response setting that keeps the liquidation threshold, so open positions
+ * stay healthy while no new borrow can be opened against the asset). The demo shorts and the hedge
+ * open exactly such a borrow, so the fork gets the pre-change LTV back from the impersonated pool
+ * admin; the liquidation threshold and bonus are kept as read. A no-op while the LTV is nonzero.
+ */
+export async function restoreAaveV3Collateral(ctx: Ctx): Promise<void> {
+  const adapter = ctx.addresses.lendingAdapters.aaveV3?.[0]
+  if (!adapter) return
+  const collateral = ctx.shortMarket.collateral
+  const read = ctx.publicClient.readContract.bind(ctx.publicClient)
+  const pool = await read({ address: adapter, abi: LENDING_ADAPTER_ABI, functionName: 'lendingProtocol' })
+  const { data } = await read({
+    address: pool,
+    abi: AAVE_V3_POOL_ABI,
+    functionName: 'getConfiguration',
+    args: [collateral],
+  })
+  // reserve configuration bitmap: bits 0-15 LTV, 16-31 liquidation threshold, 32-47 liquidation bonus
+  const ltv = data & 0xffffn
+  if (ltv !== 0n) return
+  const liquidationThreshold = (data >> 16n) & 0xffffn
+  const liquidationBonus = (data >> 32n) & 0xffffn
+
+  const provider = await read({ address: pool, abi: AAVE_V3_POOL_ABI, functionName: 'ADDRESSES_PROVIDER' })
+  const configurator = await read({
+    address: provider,
+    abi: AAVE_V3_ADDRESSES_PROVIDER_ABI,
+    functionName: 'getPoolConfigurator',
+  })
+  const aclManager = await read({
+    address: provider,
+    abi: AAVE_V3_ADDRESSES_PROVIDER_ABI,
+    functionName: 'getACLManager',
+  })
+  const isAdmin = await read({
+    address: aclManager,
+    abi: AAVE_V3_ACL_MANAGER_ABI,
+    functionName: 'isPoolAdmin',
+    args: [AAVE_V3_POOL_ADMIN],
+  })
+  if (!isAdmin) throw new Error(`${AAVE_V3_POOL_ADMIN} is no longer an Aave v3 pool admin; update AAVE_V3_POOL_ADMIN`)
+
+  await ctx.testClient.setBalance({ address: AAVE_V3_POOL_ADMIN, value: 10n ** 18n })
+  const admin = createWalletClient({ chain: mainnet, transport: http(ctx.rpcUrl), account: AAVE_V3_POOL_ADMIN })
+  const hash = await admin.writeContract({
+    address: configurator,
+    abi: AAVE_V3_POOL_CONFIGURATOR_ABI,
+    functionName: 'configureReserveAsCollateral',
+    args: [collateral, AAVE_V3_USDC_LTV_BPS, liquidationThreshold, liquidationBonus],
+  })
+  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash })
+  if (receipt.status !== 'success') throw new Error('restoring the Aave v3 collateral LTV on the fork failed')
+  note(`Aave v3 ${collateral} LTV restored to ${AAVE_V3_USDC_LTV_BPS} bps on the fork (governance has it at zero)`)
+}
+
+/**
+ * Supplies `amount` of the long market's debt token into its Morpho Blue market from the deployer,
+ * so the flows' leverage borrows never depend on how much idle liquidity the live market holds at
+ * the fork block (Morpho reverts `insufficient liquidity` otherwise; the WETH/USDC 86% market held
+ * about 1,000 idle USDC in November 2026). The deployer's token balance is left as it was.
+ */
+export async function seedMorphoLiquidity(ctx: Ctx, amount: bigint): Promise<void> {
+  const { collateral, debt, data } = ctx.longMarket
+  const { oracle, irm, lltv } = decodeMorphoMarketData(data)
+  const before = await balanceOf(ctx, debt, ctx.deployer)
+  await deal(ctx, debt, ctx.deployer, before + amount)
+  await send(ctx, { address: debt, abi: erc20Abi, functionName: 'approve', args: [MORPHO_BLUE, amount] })
+  await send(ctx, {
+    address: MORPHO_BLUE,
+    abi: MORPHO_SUPPLY_ABI,
+    functionName: 'supply',
+    args: [{ loanToken: debt, collateralToken: collateral, oracle, irm, lltv }, amount, 0n, ctx.deployer, '0x'],
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Real quotes via the canonical mainnet v4 Quoter
 // ---------------------------------------------------------------------------
@@ -224,6 +402,16 @@ const QUOTER_ABI = [
  * plus a slippage-buffered cap, the way the docs instruct integrators to derive `maxDebtIn` /
  * `maxCollateralIn` (from a quote, never spot).
  */
+/**
+ * The `zeroForOne` flag for selling `input` through the demo pool. On a native pool, ETH is
+ * currency0 and stands for the market's WETH (the SDK's `swapZeroForOne` serves pools whose
+ * currencies are the market pair itself).
+ */
+function demoZeroForOne(ctx: Ctx, market: Market, input: Address): boolean {
+  if (isAddressEqual(ctx.poolKey.currency0, zeroAddress)) return isAddressEqual(input, ctx.weth)
+  return swapZeroForOne(market, input, ctx.poolKey)
+}
+
 export async function quoteSwapInput(
   ctx: Ctx,
   market: Market,
@@ -231,7 +419,7 @@ export async function quoteSwapInput(
   exactOut: bigint,
   slippageBps: number
 ): Promise<{ quoted: bigint; capped: bigint; zeroForOne: boolean }> {
-  const zeroForOne = swapZeroForOne(market, input, ctx.poolKey)
+  const zeroForOne = demoZeroForOne(ctx, market, input)
   const { result } = await ctx.publicClient.simulateContract({
     address: V4_QUOTER,
     abi: QUOTER_ABI,
@@ -269,6 +457,7 @@ export function demoRoute(
     amountOut: p.amountOut,
     amountInMaximum: p.maxIn,
     recipient: p.recipient,
+    weth9: ctx.weth,
   })
   return { universalRouter: ctx.universalRouter, routeCommands: commands, routeInputs: inputs }
 }

@@ -117,8 +117,15 @@ export async function run(ctx: Ctx): Promise<void> {
   const long = await getPosition(ctx.publicClient, { adapter: morpho, account: longAccount, market: longMarket })
   const short = await getPosition(ctx.publicClient, { adapter: aaveV3, account: shortAccount, market: shortMarket })
   note(`long: +${fmt(long.collateralAmount, 18, 'WETH')} · short: -${fmt(short.debtAmount, 18, 'WETH')}`)
-  // The residual delta is each leg's real price impact + fee on the live 0.05% pool.
-  assertApprox(short.debtAmount, long.collateralAmount, 150, 'net ETH delta ≈ 0 (within live-pool swap impact)')
+  // The near-spot sizing makes the two legs' notionals equal; the short's debt is what its route
+  // needed to buy that USDC exact-output on the live pool, so it must match the quote taken for it.
+  // The residual ETH delta is the pool's round-trip price impact plus fees at this block, a
+  // liquidity condition of the live pool (2.3% on a 1 WETH trade in 2026-11), reported, not bounded.
+  assertApprox(short.debtAmount, shortQuote.quoted, 10, 'short debt equals its live exact-output quote (within 10 bps)')
+  note(
+    `net ETH delta ${fmt(short.debtAmount - long.collateralAmount, 18, 'WETH')}: the live pool's round-trip ` +
+      'impact plus fees'
+  )
 
   // Close the short; the long is untouched (accounts are fully isolated).
   const debtToBuy = withSlippageUp(short.debtAmount, 10) // accrual buffer: the route must buy >= live debt

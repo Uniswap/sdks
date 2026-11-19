@@ -71,6 +71,7 @@ export async function run(ctx: Ctx): Promise<void> {
     amountOut: collateralToBuy,
     amountInMaximum: maxDebtIn,
     recipient: account,
+    weth9: ctx.weth,
   })
   const openPlan = new MarginPlanner()
     .setAccount(SUB_ID) // bind (and lazily deploy) the caller's sub-account
@@ -136,9 +137,10 @@ export async function run(ctx: Ctx): Promise<void> {
   assertApprox(position.debtAmount, debtBefore - repay, 5, 'debt cut from the wallet; collateral untouched')
 
   // -- (c) Owner escape hatch: act on Morpho directly, no router involvement --------------------
-  // The adapter is an encoder: read the exact (target, value, callData) the account would run.
+  // The adapter is an encoder: read the exact `Call[]` (value, data) the account would run against
+  // its lendingProtocol(), and forward each through the owner-only `execute`.
   const withdraw = parseUnits('0.05', 18)
-  const [, , callData] = await ctx.publicClient.readContract({
+  const calls = await ctx.publicClient.readContract({
     address: adapter,
     abi: LENDING_ADAPTER_ABI,
     functionName: 'encodeWithdrawCollateral',
@@ -146,12 +148,15 @@ export async function run(ctx: Ctx): Promise<void> {
     account, // encode as the account would (adapters may bind the caller)
   })
   const wethBefore = await balanceOf(ctx, weth, deployer)
-  await send(ctx, {
-    address: account,
-    abi: MARGIN_ACCOUNT_ABI,
-    functionName: 'execute', // owner-only; forwards to the adapter's lendingProtocol()
-    args: [adapter, callData],
-  })
+  for (const call of calls) {
+    await send(ctx, {
+      address: account,
+      abi: MARGIN_ACCOUNT_ABI,
+      functionName: 'execute', // owner-only; forwards to the adapter's lendingProtocol()
+      args: [adapter, call.data],
+      value: call.value,
+    })
+  }
   assert(
     (await balanceOf(ctx, weth, deployer)) - wethBefore === withdraw,
     'escape hatch withdrew collateral to the owner, router bypassed'
