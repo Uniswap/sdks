@@ -66,7 +66,7 @@ export type CommandDefinition =
       parser: Parser.V3Actions
     }
 
-const ALLOW_REVERT_FLAG = 0x80
+export const ALLOW_REVERT_FLAG = 0x80
 const REVERTIBLE_COMMANDS = new Set<CommandType>([CommandType.EXECUTE_SUB_PLAN])
 
 const PERMIT_STRUCT =

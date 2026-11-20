@@ -532,6 +532,27 @@ describe('Command Parser', () => {
     })
   }
 
+  // A sub-plan command has ALLOW_REVERT_FLAG (0x80) OR'd onto its command byte on-chain
+  // (RoutePlanner.addSubPlan); getCommands must mask that bit off before treating the
+  // byte as a CommandType enum value, or this throws a TypeError on real calldata.
+  describe('ALLOW_REVERT_FLAG masking', () => {
+    it('parses a sub-plan command with the ALLOW_REVERT_FLAG bit set without throwing', () => {
+      const subplan = new RoutePlanner().addCommand(CommandType.WRAP_ETH, [addressOne, amount])
+      const input = new RoutePlanner().addSubPlan(subplan)
+      // sanity: the encoded command byte actually carries the flag (0x21 | 0x80 = 0xa1)
+      expect(input.commands).to.equal('0xa1')
+
+      const functionSignature = 'execute(bytes,bytes[])'
+      const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, [input.commands, input.inputs])
+
+      const result = CommandParser.parseCalldata(calldata)
+
+      expect(result.commands).to.have.lengthOf(1)
+      expect(result.commands[0].commandType).to.equal(CommandType.EXECUTE_SUB_PLAN)
+      expect(result.commands[0].commandName).to.equal('EXECUTE_SUB_PLAN')
+    })
+  })
+
   // V4 swaps are delegated to V4BaseActionsParser; the V2.1.1 minHopPriceX36 lives inside the
   // swap action struct, so verify it survives a full round-trip through CommandParser.
   describe('V4 per-hop slippage (V2.1.1)', () => {
