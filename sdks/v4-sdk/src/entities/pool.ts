@@ -18,6 +18,21 @@ import JSBI from 'jsbi'
 
 export const DYNAMIC_FEE_FLAG = 0x800000
 const NO_TICK_DATA_PROVIDER_DEFAULT = new NoTickDataProvider()
+/** One hundred percent in pips (v4 fee units). */
+const ONE_HUNDRED_PERCENT_PIPS = 1_000_000
+
+/**
+ * Combines protocol and LP fees the same way as v4-core `ProtocolFeeLibrary.calculateSwapFee`:
+ * `protocolFee + lpFee - (protocolFee * lpFee / 1e6)`.
+ */
+export function calculateSwapFee(protocolFee: number, lpFee: number): number {
+  invariant(
+    Number.isInteger(protocolFee) && protocolFee >= 0 && protocolFee <= ONE_HUNDRED_PERCENT_PIPS,
+    'PROTOCOL_FEE'
+  )
+  invariant(Number.isInteger(lpFee) && lpFee >= 0 && lpFee <= ONE_HUNDRED_PERCENT_PIPS, 'LP_FEE')
+  return protocolFee + lpFee - Math.floor((protocolFee * lpFee) / ONE_HUNDRED_PERCENT_PIPS)
+}
 
 export type PoolKey = {
   currency0: string
@@ -42,6 +57,10 @@ export class Pool {
   public readonly tickDataProvider: TickDataProvider
   public readonly poolKey: PoolKey
   public readonly poolId: string
+  /**
+   * Optional protocol fee in pips, used only for off-chain swap math. Does not affect poolKey/poolId.
+   */
+  public readonly protocolFee: number
 
   private _currency0Price?: Price<Currency, Currency>
   private _currency1Price?: Price<Currency, Currency>
@@ -99,6 +118,8 @@ export class Pool {
    * @param sqrtRatioX96 The sqrt of the current ratio of amounts of currency1 to currency0
    * @param liquidity The current value of in range liquidity
    * @param tickCurrent The current tick of the pool
+   * @param ticks Tick data provider or list
+   * @param protocolFee Optional protocol fee in pips for swap math only (does not change poolKey)
    */
   public constructor(
     currencyA: Currency,
@@ -109,13 +130,18 @@ export class Pool {
     sqrtRatioX96: BigintIsh,
     liquidity: BigintIsh,
     tickCurrent: number,
-    ticks: TickDataProvider | (Tick | TickConstructorArgs)[] = NO_TICK_DATA_PROVIDER_DEFAULT
+    ticks: TickDataProvider | (Tick | TickConstructorArgs)[] = NO_TICK_DATA_PROVIDER_DEFAULT,
+    protocolFee: number = 0
   ) {
     invariant(isAddress(hooks), 'Invalid hook address')
     invariant(Number.isInteger(fee) && (fee === DYNAMIC_FEE_FLAG || fee < 1_000_000), 'FEE')
     if (fee === DYNAMIC_FEE_FLAG) {
       invariant(Number(hooks) > 0, 'Dynamic fee pool requires a hook')
     }
+    invariant(
+      Number.isInteger(protocolFee) && protocolFee >= 0 && protocolFee <= ONE_HUNDRED_PERCENT_PIPS,
+      'PROTOCOL_FEE'
+    )
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
     const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + 1)
     invariant(
@@ -129,6 +155,7 @@ export class Pool {
       ? [currencyA, currencyB]
       : [currencyB, currencyA]
     this.fee = fee
+    this.protocolFee = protocolFee
     this.sqrtRatioX96 = JSBI.BigInt(sqrtRatioX96)
     this.tickSpacing = tickSpacing
     this.hooks = hooks
@@ -137,6 +164,15 @@ export class Pool {
     this.tickDataProvider = Array.isArray(ticks) ? new TickListDataProvider(ticks, tickSpacing) : ticks
     this.poolKey = Pool.getPoolKey(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks)
     this.poolId = Pool.getPoolId(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks)
+  }
+
+  /** Effective swap fee in pips for off-chain math (LP fee combined with protocol fee). */
+  public get swapFee(): number {
+    if (this.fee === DYNAMIC_FEE_FLAG) {
+      // Without a resolved LP fee from slot0, fall back to protocol fee only.
+      return this.protocolFee
+    }
+    return this.protocolFee === 0 ? this.fee : calculateSwapFee(this.protocolFee, this.fee)
   }
 
   /** backwards compatibility with v2/3 sdks */
@@ -256,7 +292,8 @@ export class Pool {
         sqrtRatioX96,
         liquidity,
         tickCurrent,
-        this.tickDataProvider
+        this.tickDataProvider,
+        this.protocolFee
       ),
     ]
   }
@@ -294,7 +331,8 @@ export class Pool {
         sqrtRatioX96,
         liquidity,
         tickCurrent,
-        this.tickDataProvider
+        this.tickDataProvider,
+        this.protocolFee
       ),
     ]
   }
@@ -316,7 +354,7 @@ export class Pool {
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
     if (!this.hookImpactsSwap()) {
       return v3Swap(
-        JSBI.BigInt(this.fee),
+        JSBI.BigInt(this.swapFee),
         this.sqrtRatioX96,
         this.tickCurrent,
         this.liquidity,
