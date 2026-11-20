@@ -36,6 +36,9 @@ describe('CurrencyAmount', () => {
     const amount = CurrencyAmount.fromRawAmount(new Token(1, ADDRESS_ONE, 18), MaxUint256)
     expect(amount.quotient).toEqual(MaxUint256)
   })
+  it('token amount cannot be negative', () => {
+    expect(() => CurrencyAmount.fromRawAmount(new Token(1, ADDRESS_ONE, 18), -1)).toThrow('AMOUNT')
+  })
   it('token amount cannot exceed max uint256', () => {
     expect(() =>
       CurrencyAmount.fromRawAmount(new Token(1, ADDRESS_ONE, 18), JSBI.add(MaxUint256, JSBI.BigInt(1)))
