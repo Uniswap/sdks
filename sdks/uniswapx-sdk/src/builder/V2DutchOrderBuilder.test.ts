@@ -209,11 +209,50 @@ describe("V2DutchOrderBuilder", () => {
         recipient: constants.AddressZero,
       })
       .inputOverride(INPUT_START_AMOUNT.mul(98).div(100))
-      .outputOverrides([OUTPUT_START_AMOUNT.mul(102).div(100)])
+      .outputOverrides([
+        OUTPUT_START_AMOUNT.mul(102).div(100),
+        OUTPUT_START_AMOUNT.mul(10).div(100).mul(102).div(100),
+      ])
       .build();
 
     expect(order.info.cosignerData.decayStartTime).toEqual(deadline - 100);
     expect(order.info.outputs.length).toEqual(2);
+    expect(order.info.cosignerData.outputOverrides.length).toEqual(2);
+  });
+
+  it("throws when outputOverrides length does not match outputs", () => {
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
+    expect(() =>
+      builder
+        .cosigner(constants.AddressZero)
+        .cosignature("0x")
+        .deadline(deadline)
+        .decayEndTime(deadline)
+        .decayStartTime(deadline - 100)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .input({
+          token: INPUT_TOKEN,
+          startAmount: INPUT_START_AMOUNT,
+          endAmount: INPUT_START_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          startAmount: OUTPUT_START_AMOUNT,
+          endAmount: OUTPUT_START_AMOUNT.mul(90).div(100),
+          recipient: constants.AddressZero,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          startAmount: OUTPUT_START_AMOUNT.mul(10).div(100),
+          endAmount: OUTPUT_START_AMOUNT.mul(9).div(100),
+          recipient: constants.AddressZero,
+        })
+        .inputOverride(INPUT_START_AMOUNT.mul(98).div(100))
+        // Only one override for two outputs — must reject (issue #728).
+        .outputOverrides([OUTPUT_START_AMOUNT.mul(102).div(100)])
+        .build()
+    ).toThrow("Invariant failed: outputOverrides length must match outputs length");
   });
 
   it("cosigner not set", () => {
