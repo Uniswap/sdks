@@ -596,6 +596,19 @@ const ELYSIUM_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x379F556c5a748BD7Cc9baF0F7A344094Ac1814f5',
 }
 
+// Abstract V3 deployment: https://gov.uniswap.org/t/rfc-deploy-uniswap-v3-on-abstract/25206
+// The RFC mislabels QuoterV2 as Permit2 and SwapRouter02 as UniversalRouter; verified contracts:
+// https://abscan.org/address/0x728BD3eC25D5EDBafebB84F3d67367Cd9EBC7693#code
+// https://abscan.org/address/0x7712FA47387542819d4E35A23f8116C90C18767C#code
+const ABSTRACT_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0xA1160e73B63F322ae88cC2d8E700833e71D0b2a1',
+  multicallAddress: '0x9CA4dcb2505fbf536F6c54AA0a77C79f4fBC35C0',
+  quoterAddress: '0x728BD3eC25D5EDBafebB84F3d67367Cd9EBC7693',
+  nonfungiblePositionManagerAddress: '0xfA928D3ABc512383b8E5E77edd2d5678696084F9',
+  tickLensAddress: '0x9c7d30F93812f143b6Efa673DB8448EfCB9f747E',
+  swapRouter02Address: '0x7712FA47387542819d4E35A23f8116C90C18767C',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -634,6 +647,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ROBINHOOD]: ROBINHOOD_ADDRESSES,
   [ChainId.INK]: INK_ADDRESSES,
   [ChainId.ELYSIUM]: ELYSIUM_ADDRESSES,
+  [ChainId.ABSTRACT]: ABSTRACT_ADDRESSES,
 }
 
 /* V3 Contract Addresses */

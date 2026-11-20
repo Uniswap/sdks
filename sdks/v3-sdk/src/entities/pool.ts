@@ -1,4 +1,4 @@
-import { BigintIsh, CurrencyAmount, Price, Token } from '@uniswap/sdk-core'
+import { BigintIsh, CurrencyAmount, Price, Token, V3_CORE_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { FACTORY_ADDRESS, FeeAmount, TICK_SPACINGS } from '../constants'
@@ -38,7 +38,8 @@ export class Pool {
     factoryAddressOverride?: string
   ): string {
     return computePoolAddress({
-      factoryAddress: factoryAddressOverride ?? FACTORY_ADDRESS,
+      factoryAddress: factoryAddressOverride ?? V3_CORE_FACTORY_ADDRESSES[tokenA.chainId] ?? FACTORY_ADDRESS,
+      chainId: tokenA.chainId,
       fee,
       tokenA,
       tokenB,

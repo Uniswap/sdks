@@ -1,4 +1,4 @@
-import { ChainId, getAverageBlockTimeSecs, secondsToBlocks } from './chains'
+import { ChainId, getAverageBlockTimeSecs, secondsToBlocks, SUPPORTED_CHAINS } from './chains'
 
 describe('getAverageBlockTimeSecs', () => {
   it('returns the registered block time for a known chain', () => {
@@ -42,5 +42,12 @@ describe('secondsToBlocks', () => {
 
   it('propagates throw on unregistered chainId', () => {
     expect(() => secondsToBlocks(10, 99999)).toThrow(/unsupported chainId 99999/)
+  })
+})
+
+describe('supported chains', () => {
+  it('includes Abstract with chain id 2741', () => {
+    expect(ChainId.ABSTRACT).toEqual(2741)
+    expect(SUPPORTED_CHAINS).toContain(ChainId.ABSTRACT)
   })
 })
