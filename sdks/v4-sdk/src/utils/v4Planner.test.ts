@@ -6,7 +6,14 @@ import { Pool } from '../entities/pool'
 import { Trade } from '../entities/trade'
 import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
-import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ONE_ETHER, NEGATIVE_ONE } from '../internalConstants'
+import {
+  ADDRESS_ZERO,
+  EMPTY_BYTES,
+  FEE_AMOUNT_MEDIUM,
+  TICK_SPACING_TEN,
+  ONE_ETHER,
+  NEGATIVE_ONE,
+} from '../internalConstants'
 
 import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION, V4_SWAP_ACTIONS_V2_1_1, URVersion } from './v4Planner'
 
@@ -442,6 +449,43 @@ describe('RouterPlanner', () => {
       expect(planner.params[0]).toEqual(
         '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000000000000000000000000000000000000000000000000000000008'
       )
+    })
+  })
+
+  // PathKey.fee is uint24 on-chain: v4-periphery src/libraries/PathKey.sol
+  describe('path key fee', () => {
+    const swapExactIn = (fee: number) => [
+      {
+        currencyIn: DAI.address,
+        path: [
+          {
+            intermediateCurrency: USDC.address,
+            fee,
+            tickSpacing: TICK_SPACING_TEN,
+            hooks: ADDRESS_ZERO,
+            hookData: EMPTY_BYTES,
+          },
+        ],
+        amountIn: ONE_ETHER_BN,
+        amountOutMinimum: ONE_ETHER_BN,
+      },
+    ]
+
+    it('encodes an in-range fee byte for byte as before', () => {
+      planner.addAction(Actions.SWAP_EXACT_IN, swapExactIn(FEE_AMOUNT_MEDIUM))
+
+      expect(planner.params[0]).toEqual(
+        '0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000'
+      )
+    })
+
+    // 0x800000 is the dynamic fee flag, 0xffffff the top of the range
+    it.each([0x800000, 0xffffff])('accepts fee %i', (fee) => {
+      expect(() => planner.addAction(Actions.SWAP_EXACT_IN, swapExactIn(fee))).not.toThrow()
+    })
+
+    it('rejects a fee that does not fit in uint24', () => {
+      expect(() => planner.addAction(Actions.SWAP_EXACT_IN, swapExactIn(0x1000000))).toThrow('value out-of-bounds')
     })
   })
 })
