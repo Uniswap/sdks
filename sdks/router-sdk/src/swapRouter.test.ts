@@ -3,6 +3,7 @@ import { Pair, Route as V2Route, Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
   encodeSqrtRatioX96,
   FeeAmount,
+  Multicall,
   nearestUsableTick,
   Pool,
   Position,
@@ -17,6 +18,7 @@ import { SwapRouter, Trade } from '.'
 import { ApprovalTypes } from './approveAndCall'
 import { MixedRouteSDK } from './entities/mixedRoute/route'
 import { MixedRouteTrade } from './entities/mixedRoute/trade'
+import { MulticallExtended } from './multicallExtended'
 import { ADDRESS_ZERO } from './constants'
 
 describe('SwapRouter', () => {
@@ -1799,6 +1801,181 @@ describe('SwapRouter', () => {
           )
           expect(methodParameters.calldata).toEqual(expectedCalldata)
         })
+      })
+    })
+
+    // Regression tests for #514: swap-and-add must not aggregate the slippage check.
+    // In a multi-route EXACT_INPUT swap-and-add there is no trailing `sweepToken` /
+    // `unwrapWETH9` that enforces the swap-derived `minimumAmountOut` against the
+    // router balance, so individual swap floors are the only swap-level guard the
+    // user has. Aggregating them silently weakens the user's slippage tolerance.
+    describe('#swapAndAddCallParameters aggregated-slippage regression (issue #514)', () => {
+      const pool_V3_0_WETH = makeV3Pool(token0, WETH, liquidity)
+
+      // 3 routes from token0 -> WETH using only single-segment swaps so that
+      // each trade emits exactly one inner swap calldata. (A MixedRouteTrade
+      // with mixed protocols is intentionally avoided here because
+      // `partitionMixedRouteByProtocol` splits the route into multiple calls,
+      // making per-trade reasoning harder; the aggregate-sum check below
+      // covers that case implicitly.)
+      const amountIn = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
+      const v2TradeA = V2Trade.exactIn(new V2Route([pair_0_1, pair_1_WETH], token0, WETH), amountIn)
+      const v2TradeB = V2Trade.exactIn(new V2Route([pair_0_1, pair_1_2, pair_2_WETH], token0, WETH), amountIn)
+      const v3Trade = V3Trade.fromRoute(
+        new V3Route([pool_V3_0_1, pool_V3_1_WETH], token0, WETH),
+        amountIn,
+        TradeType.EXACT_INPUT
+      )
+
+      const position = new Position({
+        pool: pool_V3_0_WETH,
+        tickLower: -60,
+        tickUpper: 60,
+        liquidity: 1111111111,
+      })
+      const addLiquidityOptions = {
+        recipient: '0x0000000000000000000000000000000000000006',
+        slippageTolerance,
+        deadline: 2 ** 32,
+      }
+
+      // Decode the outer multicall (either bare `multicall(bytes[])` or the
+      // deadline-bearing `multicall(uint256,bytes[])` used by `MulticallExtended`)
+      // and pull the per-swap `amountOutMinimum` floor from every recognised
+      // V2/V3 swap call. Inner calls we don't recognise (`pull`, `approve`,
+      // `unwrapWETH9`, `sweepToken`, `mint`, ...) are ignored.
+      function decodePerSwapAmountOutMin(outerCalldata: string): JSBI[] {
+        const outerSelector = outerCalldata.slice(0, 10)
+        let inner: string[]
+        if (outerSelector === '0xac9650d8') {
+          // multicall(bytes[])
+          inner = Multicall.decodeMulticall(outerCalldata)
+        } else {
+          // multicall(uint256,bytes[]) or multicall(bytes32,bytes[])
+          const decoded = MulticallExtended.INTERFACE.parseTransaction({ data: outerCalldata })
+          inner = decoded.args.data as string[]
+        }
+
+        const mins: JSBI[] = []
+        for (const data of inner) {
+          const selector = data.slice(0, 10)
+          let fn: ReturnType<typeof SwapRouter.INTERFACE.getFunction>
+          try {
+            fn = SwapRouter.INTERFACE.getFunction(selector as any)
+          } catch {
+            continue
+          }
+          const decoded = SwapRouter.INTERFACE.decodeFunctionData(fn, data)
+          switch (fn.name) {
+            case 'exactInput':
+            case 'exactInputSingle':
+              mins.push(JSBI.BigInt(decoded.params.amountOutMinimum.toString()))
+              break
+            case 'swapExactTokensForTokens':
+              mins.push(JSBI.BigInt(decoded.amountOutMin.toString()))
+              break
+            default:
+              break
+          }
+        }
+        return mins
+      }
+
+      it('preserves per-swap amountOutMinimum on 3-route EXACT_INPUT swap-and-add', async () => {
+        const trades = [v2TradeA, v2TradeB, await v3Trade]
+        const { calldata } = SwapRouter.swapAndAddCallParameters(
+          trades,
+          { slippageTolerance },
+          position,
+          addLiquidityOptions,
+          ApprovalTypes.NOT_REQUIRED,
+          ApprovalTypes.NOT_REQUIRED
+        )
+
+        const mins = decodePerSwapAmountOutMin(calldata)
+        expect(mins).toHaveLength(3)
+
+        // Each individual swap must enforce its own slippage floor.
+        for (const m of mins) {
+          expect(JSBI.greaterThan(m, JSBI.BigInt(0))).toBe(true)
+        }
+
+        // The aggregated floor reported by the SDK must match the sum of
+        // per-swap `amountOutMinimum`s - that is, every wei of swap-level
+        // protection promised to the user is actually enforced on-chain.
+        const expectedAggregateMin = trades
+          .map((t) => t.minimumAmountOut(slippageTolerance).quotient)
+          .reduce((a, b) => JSBI.add(a, b), JSBI.BigInt(0))
+        const actualAggregateMin = mins.reduce((a, b) => JSBI.add(a, b), JSBI.BigInt(0))
+        expect(actualAggregateMin.toString()).toEqual(expectedAggregateMin.toString())
+      })
+
+      it('regular #swapCallParameters still aggregates the slippage check (3+ EXACT_INPUT trades)', async () => {
+        // Control: the original optimization is preserved for the non-swap-and-add
+        // path, where a trailing `sweepToken` / `unwrapWETH9` enforces the aggregated minimum.
+        const trades = [v2TradeA, v2TradeB, await v3Trade]
+        const { calldata } = SwapRouter.swapCallParameters(trades, {
+          slippageTolerance,
+          recipient,
+          deadlineOrPreviousBlockhash: deadline,
+        })
+
+        const mins = decodePerSwapAmountOutMin(calldata)
+        expect(mins).toHaveLength(3)
+        for (const m of mins) {
+          expect(m.toString()).toEqual('0')
+        }
+      })
+
+      it('two-route swap-and-add is unchanged (numberOfTrades > 2 is false)', async () => {
+        // Edge case: 2 trades never tripped the aggregated heuristic, so the
+        // fix must not alter encoding for the 2-trade path. We assert that
+        // both swaps carry a non-zero floor, matching pre-fix behaviour.
+        const trades = [v2TradeA, await v3Trade]
+        const { calldata } = SwapRouter.swapAndAddCallParameters(
+          trades,
+          { slippageTolerance },
+          position,
+          addLiquidityOptions,
+          ApprovalTypes.NOT_REQUIRED,
+          ApprovalTypes.NOT_REQUIRED
+        )
+
+        const mins = decodePerSwapAmountOutMin(calldata)
+        expect(mins).toHaveLength(2)
+        for (const m of mins) {
+          expect(JSBI.greaterThan(m, JSBI.BigInt(0))).toBe(true)
+        }
+      })
+
+      it('aggregate swap-and-add floor is never lower than the SDK-reported minimum', async () => {
+        // Property check that also covers MixedRouteTrade-with-sectioning by
+        // summing across however many inner swap calldatas are emitted. Pre-fix
+        // the per-swap values were all zero and this lower-bound was violated;
+        // post-fix the inequality always holds.
+        const mixedTrade = MixedRouteTrade.fromRoute(
+          new MixedRouteSDK([pair_0_1, pool_V3_1_WETH], token0, WETH),
+          amountIn,
+          TradeType.EXACT_INPUT
+        )
+
+        const trades = [v2TradeA, await v3Trade, await mixedTrade]
+        const { calldata } = SwapRouter.swapAndAddCallParameters(
+          trades,
+          { slippageTolerance },
+          position,
+          addLiquidityOptions,
+          ApprovalTypes.NOT_REQUIRED,
+          ApprovalTypes.NOT_REQUIRED
+        )
+
+        const mins = decodePerSwapAmountOutMin(calldata)
+        const aggregateMin = mins.reduce((a, b) => JSBI.add(a, b), JSBI.BigInt(0))
+        const documentedMin = trades
+          .map((t) => t.minimumAmountOut(slippageTolerance).quotient)
+          .reduce((a, b) => JSBI.add(a, b), JSBI.BigInt(0))
+
+        expect(JSBI.greaterThanOrEqual(aggregateMin, documentedMin)).toBe(true)
       })
     })
   })
