@@ -93,9 +93,11 @@ export abstract class SwapRouter {
       ZERO_OUT
     )
 
-    // flag for whether a refund needs to happen
-    const mustRefund = sampleTrade.inputAmount.currency.isNative && sampleTrade.tradeType === TradeType.EXACT_OUTPUT
     const inputIsNative = sampleTrade.inputAmount.currency.isNative
+    // flag for whether a refund needs to happen: any native-input trade can
+    // leave unspent ETH in the router (e.g. an exact-input swap that stops
+    // early against `sqrtPriceLimitX96`), not only exact-output trades
+    const mustRefund = inputIsNative
     // flags for whether funds should be send first to the router
     const outputIsNative = sampleTrade.outputAmount.currency.isNative
     const routerMustCustody = outputIsNative || !!options.fee
