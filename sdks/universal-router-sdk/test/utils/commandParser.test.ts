@@ -12,6 +12,12 @@ import { WETH, USDC as USDC_DATA, DAI, makeV4Pool, swapOptions } from './uniswap
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
+// Mirrors the real V4 PositionManager function UniversalRouter's Dispatcher.sol targets for
+// V4_POSITION_MANAGER_CALL (`address(V4_POSITION_MANAGER).call(inputs)`), so the test input matches
+// real on-chain calldata shape rather than the raw V4Planner actions/params tuple V4_SWAP uses.
+const MODIFY_LIQUIDITIES_INTERFACE = new ethers.utils.Interface([
+  'function modifyLiquidities(bytes unlockData, uint256 deadline)',
+])
 const amount = ethers.utils.parseEther('1')
 const TICKLIST = [
   {
@@ -450,10 +456,17 @@ describe('Command Parser', () => {
       },
     },
     {
+      // V4_POSITION_MANAGER_CALL's real on-chain calldata is a full `modifyLiquidities(bytes,uint256)`
+      // call (see UniversalRouter's Dispatcher.sol: `V4_POSITION_MANAGER.call(inputs)`), not the raw
+      // (bytes actions, bytes[] params) tuple that V4_SWAP uses. It must be parsed opaquely, matching
+      // V3_POSITION_MANAGER_CALL, since the SDK does not decode a full function call for this command.
       input: new RoutePlanner().addCommand(CommandType.V4_POSITION_MANAGER_CALL, [
-        new V4Planner()
-          .addAction(Actions.MINT_POSITION, [USDC_WETH.poolKey, -60, 60, 5000000, amount, amount, addressOne, '0x'])
-          .finalize(),
+        MODIFY_LIQUIDITIES_INTERFACE.encodeFunctionData('modifyLiquidities', [
+          new V4Planner()
+            .addAction(Actions.MINT_POSITION, [USDC_WETH.poolKey, -60, 60, 5000000, amount, amount, addressOne, '0x'])
+            .finalize(),
+          ethers.constants.MaxUint256,
+        ]),
       ]),
       result: {
         commands: [
@@ -462,43 +475,52 @@ describe('Command Parser', () => {
             commandType: CommandType.V4_POSITION_MANAGER_CALL,
             params: [
               {
-                name: 'MINT_POSITION',
-                value: [
-                  {
-                    name: 'poolKey',
-                    value: USDC_WETH.poolKey,
-                  },
-                  {
-                    name: 'tickLower',
-                    value: -60,
-                  },
-                  {
-                    name: 'tickUpper',
-                    value: 60,
-                  },
-                  {
-                    name: 'liquidity',
-                    value: BigNumber.from(5000000),
-                  },
-                  {
-                    name: 'amount0Max',
-                    value: amount,
-                  },
-                  {
-                    name: 'amount1Max',
-                    value: amount,
-                  },
-                  {
-                    name: 'owner',
-                    value: addressOne,
-                  },
-                  {
-                    name: 'hookData',
-                    value: '0x',
-                  },
-                ],
+                name: 'command',
+                value: MODIFY_LIQUIDITIES_INTERFACE.encodeFunctionData('modifyLiquidities', [
+                  new V4Planner()
+                    .addAction(Actions.MINT_POSITION, [
+                      USDC_WETH.poolKey,
+                      -60,
+                      60,
+                      5000000,
+                      amount,
+                      amount,
+                      addressOne,
+                      '0x',
+                    ])
+                    .finalize(),
+                  ethers.constants.MaxUint256,
+                ]),
               },
             ],
+          },
+        ],
+      },
+    },
+    {
+      // Regression test: the opaque (Parser.V3Actions) branch used to return `inputs.map(...)`,
+      // i.e. every command's raw input, for each opaque command in the route. Mixing three opaque
+      // commands with distinct calldata here proves each one now reports only its own input.
+      input: new RoutePlanner()
+        .addCommand(CommandType.V3_POSITION_MANAGER_PERMIT, ['0x1111111111111111'])
+        .addCommand(CommandType.V3_POSITION_MANAGER_CALL, ['0x2222222222222222'])
+        .addCommand(CommandType.V4_POSITION_MANAGER_CALL, ['0x3333333333333333']),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_POSITION_MANAGER_PERMIT',
+            commandType: CommandType.V3_POSITION_MANAGER_PERMIT,
+            params: [{ name: 'command', value: '0x1111111111111111' }],
+          },
+          {
+            commandName: 'V3_POSITION_MANAGER_CALL',
+            commandType: CommandType.V3_POSITION_MANAGER_CALL,
+            params: [{ name: 'command', value: '0x2222222222222222' }],
+          },
+          {
+            commandName: 'V4_POSITION_MANAGER_CALL',
+            commandType: CommandType.V4_POSITION_MANAGER_CALL,
+            params: [{ name: 'command', value: '0x3333333333333333' }],
           },
         ],
       },
