@@ -142,7 +142,11 @@ describe("V2DutchOrder", () => {
     });
     const order = new UnsignedV2DutchOrder(orderInfo, 1);
     const fullOrderHash = order.cosignatureHash(orderInfo.cosignerData);
-    const cosignature = await wallet.signMessage(fullOrderHash);
+    // Cosignatures are verified on-chain via raw `ecrecover` (CosignerLib.sol),
+    // not EIP-191 `personal_sign` — sign with signDigest to match the reactor.
+    const cosignature = ethers.utils.joinSignature(
+      wallet._signingKey().signDigest(fullOrderHash)
+    );
     const signedOrder = CosignedV2DutchOrder.fromUnsignedOrder(
       order,
       COSIGNER_DATA,

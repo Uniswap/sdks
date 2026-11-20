@@ -463,12 +463,17 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
    */
   resolve(options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
     if (options.currentBlock) {
-      if (
-        this.info.cosignerData.auctionTargetBlock.gt(0) &&
-        options.currentBlock.lt(this.info.cosignerData.auctionTargetBlock)
-      ) {
-        throw new OrderNotFillable("Target block in the future");
-      } else if (options.currentBlock.lt(this.info.auctionStartBlock)) {
+      // PriorityOrderReactor.sol#_validateOrder: the signed auctionStartBlock is
+      // replaced with the cosigned auctionTargetBlock only when a cosigner is set,
+      // the current block precedes the signed start, and the target precedes it too.
+      const auctionStartBlock =
+        this.info.cosigner !== ethers.constants.AddressZero &&
+        options.currentBlock.lt(this.info.auctionStartBlock) &&
+        this.info.cosignerData.auctionTargetBlock.lt(this.info.auctionStartBlock)
+          ? this.info.cosignerData.auctionTargetBlock
+          : this.info.auctionStartBlock;
+
+      if (options.currentBlock.lt(auctionStartBlock)) {
         throw new OrderNotFillable("Start block in the future");
       }
     }
@@ -530,7 +535,7 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
    *  @returns The address which co-signed the order
    */
   recoverCosigner(): string {
-    return ethers.utils.verifyMessage(
+    return ethers.utils.recoverAddress(
       this.cosignatureHash(this.info.cosignerData),
       this.info.cosignature
     );
