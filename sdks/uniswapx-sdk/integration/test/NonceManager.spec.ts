@@ -41,6 +41,17 @@ describe('NonceManager', () => {
     });
   });
 
+  it('reserves distinct nonces for concurrent calls', async () => {
+    const newManager = new NonceManager(ethers.provider, chainId, permit2.address);
+    const owner = await wallet.getAddress();
+    const nonces = await Promise.all([
+      newManager.useNonce(owner),
+      newManager.useNonce(owner),
+      newManager.useNonce(owner),
+    ]);
+    expect(nonces.map((nonce) => nonce.toString())).to.deep.equal(['0', '1', '2']);
+  });
+
   it('fetches and increments nonces', async () => {
     for (let i = 0; i < 512; i++) {
       expect(
