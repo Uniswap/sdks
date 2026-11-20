@@ -44,21 +44,27 @@ export class SignatureProvider {
   /**
    * Check if a permit is valid (not expired and nonce not used)
    * @param permit The permit data to validate
+   * @param owner The EIP-712 signer. Permit2 nonceBitmap is keyed by owner, not spender.
    * @returns true if the permit is valid, false otherwise
    */
-  async isPermitValid(permit: PermitTransferFrom | PermitBatchTransferFrom): Promise<boolean> {
-    return (await this.validatePermit(permit)).isValid
+  async isPermitValid(permit: PermitTransferFrom | PermitBatchTransferFrom, owner: string): Promise<boolean> {
+    return (await this.validatePermit(permit, owner)).isValid
   }
 
   /**
    * Get detailed validation results for a permit
    * @param permit The permit data to validate
+   * @param owner The EIP-712 signer. Permit2 nonceBitmap is keyed by owner, not spender.
    * @returns Object containing validation results
    */
-  async validatePermit(permit: PermitTransferFrom | PermitBatchTransferFrom): Promise<NonceValidationResult> {
+  async validatePermit(
+    permit: PermitTransferFrom | PermitBatchTransferFrom,
+    owner: string
+  ): Promise<NonceValidationResult> {
+    invariant(!!owner, 'OWNER_REQUIRED')
     const [isExpiredResult, isNonceUsedResult] = await Promise.all([
       this.isExpired(permit.deadline),
-      this.isNonceUsed(permit.spender, permit.nonce),
+      this.isNonceUsed(owner, permit.nonce),
     ])
 
     return {
