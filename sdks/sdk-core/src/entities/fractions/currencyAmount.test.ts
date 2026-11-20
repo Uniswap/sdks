@@ -112,4 +112,37 @@ describe('CurrencyAmount', () => {
       expect(amount.toExact()).toEqual('0.00123')
     })
   })
+
+  describe('#comparisons', () => {
+    const ADDRESS_TWO = '0x0000000000000000000000000000000000000002'
+    const tokenA = new Token(1, ADDRESS_ONE, 18)
+    const tokenB = new Token(1, ADDRESS_TWO, 18)
+
+    it('compares amounts of the same currency', () => {
+      const two = CurrencyAmount.fromRawAmount(tokenA, 2)
+      const one = CurrencyAmount.fromRawAmount(tokenA, 1)
+      expect(two.greaterThan(one)).toBe(true)
+      expect(one.lessThan(two)).toBe(true)
+      expect(one.equalTo(CurrencyAmount.fromRawAmount(tokenA, 1))).toBe(true)
+    })
+
+    it('still compares against a raw amount (number, JSBI) without a currency', () => {
+      const amount = CurrencyAmount.fromRawAmount(tokenA, 1)
+      const zero = CurrencyAmount.fromRawAmount(tokenA, 0)
+      expect(amount.greaterThan(0)).toBe(true)
+      expect(zero.equalTo(0)).toBe(true)
+      // raw BigintIsh (e.g. a JSBI ZERO constant) must keep working, not just the 0 literal
+      expect(zero.equalTo(JSBI.BigInt(0))).toBe(true)
+      expect(amount.greaterThan(JSBI.BigInt(0))).toBe(true)
+      expect(zero.lessThan(amount)).toBe(true)
+    })
+
+    it('throws when comparing different currencies', () => {
+      const a = CurrencyAmount.fromRawAmount(tokenA, 1)
+      const b = CurrencyAmount.fromRawAmount(tokenB, 1)
+      expect(() => a.greaterThan(b)).toThrow('CURRENCY')
+      expect(() => a.lessThan(b)).toThrow('CURRENCY')
+      expect(() => a.equalTo(b)).toThrow('CURRENCY')
+    })
+  })
 })
