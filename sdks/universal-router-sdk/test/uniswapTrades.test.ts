@@ -609,6 +609,41 @@ describe('Uniswap', () => {
   })
 
   describe('v4', () => {
+    describe('settleBeforeSwapHooks with a hook that returns unspent input', () => {
+      // RemainderHook in SettleBeforeSwapRemainder.t.sol is deployed here: it spends 60% of its input and settles the
+      // rest back to the router. Its flags (beforeSwap, beforeSwapReturnDelta) are in the low bits.
+      const REMAINDER_HOOK = '0x1111111111111111111111111111111111110088'
+
+      function hookedTrade(pool: V4Pool, input: Currency, output: Currency, amountIn: string) {
+        return V4Trade.createUncheckedTrade({
+          route: new V4Route([pool], input, output),
+          inputAmount: CurrencyAmount.fromRawAmount(input, amountIn),
+          // a one-unit quote: the hook prices the swap, so the floor is not what these fixtures test
+          outputAmount: CurrencyAmount.fromRawAmount(output, '1'),
+          tradeType: TradeType.EXACT_INPUT,
+        })
+      }
+
+      it('encodes a USDC->DAI swap that returns the unspent USDC to the payer', () => {
+        const pool = new V4Pool(DAI, USDC, 0, 60, REMAINDER_HOOK, encodeSqrtRatioX96(1, 1), 0, 0)
+        const trade = hookedTrade(pool, USDC, DAI, utils.parseUnits('1000', 6).toString())
+        const opts = swapOptions({ settleBeforeSwapHooks: [REMAINDER_HOOK] })
+        const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+        registerFixture('_UNISWAP_V4_SETTLE_BEFORE_SWAP_1000_USDC_FOR_DAI_REMAINDER', methodParameters)
+        expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      })
+
+      it('encodes an ETH->DAI swap through a WETH pool that refunds the unspent input as ETH', () => {
+        const pool = new V4Pool(DAI, WETH, 0, 60, REMAINDER_HOOK, encodeSqrtRatioX96(1, 1), 0, 0)
+        const inputEther = utils.parseEther('1').toString()
+        const trade = hookedTrade(pool, ETHER, DAI, inputEther)
+        const opts = swapOptions({ settleBeforeSwapHooks: [REMAINDER_HOOK] })
+        const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+        registerFixture('_UNISWAP_V4_SETTLE_BEFORE_SWAP_1_ETH_FOR_DAI_REMAINDER', methodParameters)
+        expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      })
+    })
+
     // swapping 1 ETH for 1 USDC
     it('encodes a single exactInput ETH->USDC swap', async () => {
       const inputEther = utils.parseEther('1').toString()

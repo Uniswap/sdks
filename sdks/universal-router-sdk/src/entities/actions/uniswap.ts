@@ -119,9 +119,13 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & 
    * fill), so after the swap each listed hop's input currency is taken on the open delta: back
    * to the caller when the caller paid the input (`payerIsUser`), so it never reaches a
    * recipient that only expects the output, and to the recipient when a third party or the
-   * router funded it, as the router's other unused-input refunds do. A hook that spends the
-   * whole input leaves a zero credit and that take moves nothing. Mixed-route v4 sections
-   * through a listed hook get the same take.
+   * router funded it, as the router's other unused-input refunds do. When the router wrapped or
+   * unwrapped the input for a listed first hop, the remainder is converted back and refunded in
+   * the currency paid. A hook that spends the whole input leaves a zero credit and that take
+   * moves nothing, for about 2.1k gas. Mixed-route v4 sections through a listed hook get the
+   * same take. On a later hop the remainder is that hop's intermediate currency, not the
+   * trade's input, so the refund is a token the quote does not show; route such hooks as the
+   * first hop where that matters.
    * Exact-input only: an exact-output route through one of these hooks is refused.
    * Matching is case-insensitive.
    */
@@ -485,6 +489,29 @@ export class UniswapTrade implements Command {
       }
     }
 
+    // A listed settle-before-swap hook on a route's first hop can leave unused input. When the
+    // router wrapped or unwrapped the input for that hop, the remainder was taken to the router
+    // in the pool's currency: convert it back and refund it to whoever funded the input, the
+    // caller unless a third party, a proxy or the router's own balance did. This runs before the
+    // exact-output refunds below so they cannot send it elsewhere first.
+    if (
+      (this.inputRequiresWrap || this.inputRequiresUnwrap) &&
+      this.trade.swaps.some((swap) =>
+        firstPoolHasSettleBeforeSwapHook(swap.route.pools, this.options.settleBeforeSwapHooks)
+      )
+    ) {
+      const thirdPartyFunded =
+        !!this.options.routerBalanceInput ||
+        !!this.options.useRouterBalance ||
+        this.options.tokenTransferMode === TokenTransferMode.ApproveProxy
+      const refundTo = thirdPartyFunded ? this.options.recipient : SENDER_AS_RECIPIENT
+      if (this.inputRequiresWrap) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [refundTo, 0])
+      } else {
+        planner.addCommand(CommandType.WRAP_ETH, [refundTo, CONTRACT_BALANCE])
+      }
+    }
+
     let minimumAmountOut: BigNumber = BigNumber.from(
       this.trade.minimumAmountOut(this.options.slippageTolerance).quotient.toString()
     )
@@ -789,7 +816,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT,
     takeAmount
   )
-  addSettleBeforeSwapRemainderTakes(v4Planner, v4Route, options, payerIsUser)
+  addSettleBeforeSwapRemainderTakes(v4Planner, v4Route, inputAmount.currency, options, payerIsUser)
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
@@ -797,6 +824,12 @@ function routeHasSettleBeforeSwapHook(pools: V4Pool[], settleBeforeSwapHooks: st
   if (!settleBeforeSwapHooks?.length) return false
   const hooks = new Set(settleBeforeSwapHooks.map((hook) => hook.toLowerCase()))
   return pools.some((pool) => hooks.has(pool.hooks.toLowerCase()))
+}
+
+/** Whether a route's first pool is a v4 pool through a hook in `settleBeforeSwapHooks`. */
+function firstPoolHasSettleBeforeSwapHook(pools: TPool[], settleBeforeSwapHooks: string[] | undefined): boolean {
+  const first = pools[0]
+  return first instanceof V4Pool && routeHasSettleBeforeSwapHook([first], settleBeforeSwapHooks)
 }
 
 /**
@@ -808,12 +841,20 @@ function routeHasSettleBeforeSwapHook(pools: V4Pool[], settleBeforeSwapHooks: st
  * The unused input belongs to whoever paid the input. When the caller paid it (`payerIsUser`,
  * i.e. Permit2 or native value from the caller), it goes back to the caller, never to a
  * recipient that may only handle the output (a bridge or a payment contract). Otherwise a third
- * party or the router funded the swap (`routerBalanceInput`, `ApproveProxy`, a wrap or unwrap
- * of the input), and it goes to the recipient, as the router's other unused-input refunds do.
+ * party or the router funded the swap (`routerBalanceInput`, `ApproveProxy`), and it goes to the
+ * recipient, as the router's other unused-input refunds do.
+ *
+ * When the router wrapped or unwrapped the trade's input for the first hop (`inputCurrency` is
+ * ETH and the pool takes WETH, or the reverse), that hop's remainder is taken to the router
+ * instead, and `UniswapTrade.encode` converts it back and refunds it in the currency paid.
+ *
+ * For a listed hook on a later hop, the remainder is the intermediate currency that hop is paid
+ * in, not the trade's input: the recipient of that refund gets a token the trade did not quote.
  */
 function addSettleBeforeSwapRemainderTakes(
   v4Planner: V4Planner,
   route: V4Route<Currency, Currency>,
+  inputCurrency: Currency,
   options: SwapOptions,
   payerIsUser: boolean
 ): void {
@@ -828,7 +869,9 @@ function addSettleBeforeSwapRemainderTakes(
     const key = getCurrencyAddress(remainder).toLowerCase()
     if (taken.has(key)) return
     taken.add(key)
-    v4Planner.addTake(remainder, refundTo)
+    // the router wrapped or unwrapped the input for this hop: leave the remainder with the router to convert back
+    const converted = i === 0 && !remainder.equals(inputCurrency) && remainder.wrapped.equals(inputCurrency.wrapped)
+    v4Planner.addTake(remainder, converted ? ROUTER_AS_RECIPIENT : refundTo)
   })
 }
 
@@ -957,7 +1000,14 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
       v4Planner.addTake(outputTokenForTake, swapRecipient)
       // the section settles first, so a listed hook's unspent input is a credit to collect here
-      addSettleBeforeSwapRemainderTakes(v4Planner, v4SubRoute, options, payerIsUser)
+      // only the first section can be paid in a wrapped or unwrapped form of the trade's input
+      addSettleBeforeSwapRemainderTakes(
+        v4Planner,
+        v4SubRoute,
+        i === 0 ? inputAmount.currency : inputToken,
+        options,
+        payerIsUser
+      )
 
       planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {

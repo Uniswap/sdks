@@ -1,5 +1,6 @@
 import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
+import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Interface } from '@ethersproject/abi'
 import { Trade as RouterTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, V4BaseActionsParser } from '@uniswap/v4-sdk'
@@ -9,7 +10,7 @@ import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
 import { CommandType } from '../../src/utils/routerCommands'
 import { CONTRACT_BALANCE, ETH_ADDRESS, ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT } from '../../src/utils/constants'
-import { ETHER, USDC, WETH, makeV3Pool, makeV4Pool, parseCommands, swapOptions } from '../utils/uniswapData'
+import { DAI, ETHER, USDC, WETH, makeV3Pool, makeV4Pool, parseCommands, swapOptions } from '../utils/uniswapData'
 import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
 
 // The Monad SPYx ERC-4626 wrapper hook and its vault-share token, in their EIP-55 casing.
@@ -52,6 +53,18 @@ function exactInTrade(...swaps: ReturnType<typeof v4Swap>[]) {
 function v4SwapInputs(calldata: string): string[] {
   const { commandTypes, inputs } = parseCommands(calldata)
   return inputs.filter((_, index) => commandTypes[index] === CommandType.V4_SWAP)
+}
+
+/** The router commands in order, each with its input. */
+function commandsOf(calldata: string): { type: number; input: string }[] {
+  const { commandTypes, inputs } = parseCommands(calldata)
+  return commandTypes.map((type, index) => ({ type, input: inputs[index] }))
+}
+
+/** The `(recipient, amount)` of an UNWRAP_WETH or WRAP_ETH command, recipient lowercased. */
+function recipientAndAmount(input: string): [string, string] {
+  const [recipient, amount] = defaultAbiCoder.decode(['address', 'uint256'], input)
+  return [(recipient as string).toLowerCase(), BigNumber.from(amount).toString()]
 }
 
 const PROXY_INTERFACE = new Interface([
@@ -293,18 +306,61 @@ describe('settleBeforeSwapHooks', () => {
     expect(takes(v4Input)[1]).to.deep.equal(remainderTake(SPYX.address, TEST_RECIPIENT_ADDRESS))
   })
 
-  it('sends unspent wrapped input to the recipient when the router wraps native input', () => {
+  it('refunds unspent wrapped input to the payer as ETH when the router wraps native input', () => {
     const trade = exactInTrade(v4Swap([WETH_SPYX_HOOKED], ETHER, SPYX, ONE_SPYX, ONE_SPYX))
 
-    const [v4Input] = v4SwapInputs(
-      SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] })).calldata
-    )
+    const { calldata } = SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] }))
+    const [v4Input] = v4SwapInputs(calldata)
+    const commands = commandsOf(calldata)
 
-    // the router wraps the ETH and pays the pool in WETH, so the remainder is WETH, refunded as the router's other
-    // wrapped-input leftovers are
+    // the router wraps the ETH and pays the pool in WETH, so the hook credits WETH back: the router keeps it,
+    // then unwraps all of it to the caller who sent the ETH
     expect((param(v4Input, 'SETTLE', 'currency') as string).toLowerCase()).to.equal(WETH.address.toLowerCase())
-    expect(param(v4Input, 'SETTLE', 'payerIsUser')).to.equal(false)
-    expect(takes(v4Input)[1]).to.deep.equal(remainderTake(WETH.address, TEST_RECIPIENT_ADDRESS))
+    expect(takes(v4Input)[1]).to.deep.equal(remainderTake(WETH.address, ROUTER_AS_RECIPIENT))
+    expect(commands.map((c) => c.type)).to.deep.equal([
+      CommandType.WRAP_ETH,
+      CommandType.V4_SWAP,
+      CommandType.UNWRAP_WETH,
+    ])
+    expect(recipientAndAmount(commands[2].input)).to.deep.equal([SENDER_AS_RECIPIENT, '0'])
+  })
+
+  it('refunds unspent unwrapped input to the payer as WETH when the router unwraps WETH input', () => {
+    const trade = exactInTrade(v4Swap([ETH_SPYX_HOOKED], WETH, SPYX, ONE_SPYX, ONE_SPYX))
+
+    const { calldata } = SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] }))
+    const [v4Input] = v4SwapInputs(calldata)
+    const commands = commandsOf(calldata)
+
+    // the router unwraps the WETH and pays the native pool in ETH, so the hook credits ETH back: the router keeps it,
+    // then wraps all of it back to the caller who paid in WETH
+    expect(param(v4Input, 'SETTLE', 'currency')).to.equal(ETH_ADDRESS)
+    expect(takes(v4Input)[1]).to.deep.equal(remainderTake(ETH_ADDRESS, ROUTER_AS_RECIPIENT))
+    const last = commands[commands.length - 1]
+    expect(last.type).to.equal(CommandType.WRAP_ETH)
+    expect(recipientAndAmount(last.input)).to.deep.equal([SENDER_AS_RECIPIENT, CONTRACT_BALANCE.toString()])
+  })
+
+  it('refunds unspent wrapped input to the recipient when a third party funds native input', () => {
+    const trade = exactInTrade(v4Swap([WETH_SPYX_HOOKED], ETHER, SPYX, ONE_SPYX, ONE_SPYX))
+
+    const { calldata } = SwapRouter.swapCallParameters(
+      trade,
+      swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK], routerBalanceInput: {}, recipient: TEST_RECIPIENT_ADDRESS })
+    )
+    const commands = commandsOf(calldata)
+
+    // the funder is not the swapper, so the unwrapped remainder goes to the recipient
+    const unwrap = commands.find((c) => c.type === CommandType.UNWRAP_WETH)!
+    expect(recipientAndAmount(unwrap.input)).to.deep.equal([TEST_RECIPIENT_ADDRESS.toLowerCase(), '0'])
+  })
+
+  it('adds no input refund command when the router does not convert the input', () => {
+    const trade = exactInTrade(v4Swap([WRAP_POOL], SPYX, WSPYX, ONE_SPYX, ONE_WSPYX))
+
+    const { calldata } = SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] }))
+
+    expect(commandsOf(calldata).map((c) => c.type)).to.deep.equal([CommandType.V4_SWAP])
   })
 
   it('sends unspent input to the caller when no recipient is given', () => {
@@ -341,6 +397,51 @@ describe('settleBeforeSwapHooks', () => {
     // unlisted, the section keeps its encoding
     const unlisted = SwapRouter.swapCallParameters(trade, swapOptions({}))
     expect(actionNames(v4SwapInputs(unlisted.calldata)[0])).to.deep.equal(['SETTLE', 'SWAP_EXACT_IN', 'TAKE'])
+  })
+
+  it('takes back a listed hook remainder in a first mixed-route section whose output stays on the router', () => {
+    const mixedRoute = new MixedRouteSDK([WRAP_POOL, makeV3Pool(WSPYX, USDC)], SPYX, USDC)
+    const trade = new RouterTrade({
+      mixedRoutes: [
+        {
+          mixedRoute,
+          inputAmount: CurrencyAmount.fromRawAmount(SPYX, ONE_SPYX),
+          outputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
+        },
+      ],
+      tradeType: TradeType.EXACT_INPUT,
+    })
+
+    const [v4Input] = v4SwapInputs(
+      SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] })).calldata
+    )
+
+    // the payer's own SPYx is settled first; wSPYx stays on the router for the V3 section, the SPYx remainder goes back
+    expect(param(v4Input, 'SETTLE', 'payerIsUser')).to.equal(true)
+    expect(takes(v4Input)).to.deep.equal([outputTake(WSPYX.address, ROUTER_AS_RECIPIENT), remainderTake(SPYX.address)])
+  })
+
+  it('takes back a listed hook remainder in a middle mixed-route section', () => {
+    const mixedRoute = new MixedRouteSDK([makeV3Pool(USDC, WSPYX), WRAP_POOL, makeV3Pool(SPYX, DAI)], USDC, DAI)
+    const trade = new RouterTrade({
+      mixedRoutes: [
+        {
+          mixedRoute,
+          inputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
+          outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_SPYX),
+        },
+      ],
+      tradeType: TradeType.EXACT_INPUT,
+    })
+
+    const [v4Input] = v4SwapInputs(
+      SwapRouter.swapCallParameters(trade, swapOptions({ settleBeforeSwapHooks: [WRAPPER_HOOK] })).calldata
+    )
+
+    // the section spends the router's wSPYx and leaves SPYx on the router for the last V3 section; the wSPYx it did
+    // not spend is an intermediate token, returned to the payer
+    expect((param(v4Input, 'SETTLE', 'amount') as BigNumber).toString()).to.equal(CONTRACT_BALANCE.toString())
+    expect(takes(v4Input)).to.deep.equal([outputTake(SPYX.address, ROUTER_AS_RECIPIENT), remainderTake(WSPYX.address)])
   })
 
   it('refuses an exact-output route through a listed hook', () => {
