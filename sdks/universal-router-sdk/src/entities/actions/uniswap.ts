@@ -114,6 +114,12 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit' | 'fee'> & 
    * `SETTLE(amountIn)` then a swap on the open delta, the order mixed-route v4 sections
    * already use, instead of settling after the swap. The swap spends what actually arrived,
    * so an input token whose transfers round down cannot leave an unsettled delta.
+   * A listed hook may also spend less than its hop's input and credit the rest back to the
+   * router (e.g. a hook that fills from a limit-order book and returns what it could not
+   * fill), so after the swap each listed hop's input currency is taken on the open delta to
+   * the recipient, as other unused input is; a hook that spends the whole input leaves a zero
+   * credit and that take moves nothing. Mixed-route v4 sections through a listed hook get the
+   * same take.
    * Exact-input only: an exact-output route through one of these hooks is refused.
    * Matching is case-insensitive.
    */
@@ -781,6 +787,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT,
     takeAmount
   )
+  addSettleBeforeSwapRemainderTakes(v4Planner, v4Route, options)
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
@@ -788,6 +795,32 @@ function routeHasSettleBeforeSwapHook(pools: V4Pool[], settleBeforeSwapHooks: st
   if (!settleBeforeSwapHooks?.length) return false
   const hooks = new Set(settleBeforeSwapHooks.map((hook) => hook.toLowerCase()))
   return pools.some((pool) => hooks.has(pool.hooks.toLowerCase()))
+}
+
+/**
+ * After a swap over `route`, takes on the open delta the input currency of each hop whose pool
+ * goes through a hook in `options.settleBeforeSwapHooks`, once per currency, to the recipient.
+ * Such a hook can spend less than its hop's input and credit the rest back to the router; left
+ * untaken, that credit reverts the unlock with `CurrencyNotSettled`. With no credit the take
+ * moves nothing. Unused input goes to the recipient, as the router's other input sweeps do.
+ */
+function addSettleBeforeSwapRemainderTakes(
+  v4Planner: V4Planner,
+  route: V4Route<Currency, Currency>,
+  options: SwapOptions
+): void {
+  if (!options.settleBeforeSwapHooks?.length) return
+  const hooks = new Set(options.settleBeforeSwapHooks.map((hook) => hook.toLowerCase()))
+  const taken = new Set<string>()
+  route.pools.forEach((pool, i) => {
+    if (!hooks.has(pool.hooks.toLowerCase())) return
+    // currencyPath[i] is the currency pool i is paid in
+    const remainder = route.currencyPath[i]
+    const key = getCurrencyAddress(remainder).toLowerCase()
+    if (taken.has(key)) return
+    taken.add(key)
+    v4Planner.addTake(remainder, options.recipient ?? SENDER_AS_RECIPIENT)
+  })
 }
 
 // encode a mixed route swap, i.e. including both v2 and v3 pools
@@ -914,6 +947,8 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       }
 
       v4Planner.addTake(outputTokenForTake, swapRecipient)
+      // the section settles first, so a listed hook's unspent input is a credit to collect here
+      addSettleBeforeSwapRemainderTakes(v4Planner, v4SubRoute, options)
 
       planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {
