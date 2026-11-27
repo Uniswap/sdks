@@ -14,7 +14,7 @@ import {
   toHex,
   Trade as V3Trade,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Trade as V4Trade } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
@@ -73,10 +73,12 @@ type AnyTradeType =
   | Trade<Currency, Currency, TradeType>
   | V2Trade<Currency, Currency, TradeType>
   | V3Trade<Currency, Currency, TradeType>
+  | V4Trade<Currency, Currency, TradeType>
   | MixedRouteTrade<Currency, Currency, TradeType>
   | (
       | V2Trade<Currency, Currency, TradeType>
       | V3Trade<Currency, Currency, TradeType>
+      | V4Trade<Currency, Currency, TradeType>
       | MixedRouteTrade<Currency, Currency, TradeType>
     )[]
 
