@@ -1,5 +1,8 @@
 import { ChainId } from '@uniswap/sdk-core'
 
+/**
+ * @deprecated use V3_CORE_FACTORY_ADDRESSES from sdk-core instead
+ */
 export const FACTORY_ADDRESS = '0x1F98431c8aD98523631AE4a59f267346ea31F984'
 
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
