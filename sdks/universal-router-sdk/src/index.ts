@@ -14,6 +14,11 @@ export {
   UniversalRouterVersion,
   isAtLeastV2_1_1,
 } from './utils/constants'
+// Per-step {commands, inputs} composition for callers that own the surrounding
+// plan: writes one step's command into the caller's RoutePlanner and applies no
+// ingress or settlement (no Permit2 transfer, fee, or sweep) — unlike
+// SwapRouter.encodeSwaps, which owns the full safety envelope.
+export { encodeSwapStep } from './utils/encodeSwapStep'
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
